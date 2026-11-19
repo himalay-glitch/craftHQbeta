@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { SVGProps } from "react";
 
 /** Circle with an exclamation mark, for inline error messages. */
@@ -30,14 +29,13 @@ export function AlertCircleIcon(props: SVGProps<SVGSVGElement>) {
  */
 export function CraftHQLogo({ height = 28, className }: { height?: number; className?: string }) {
   return (
-    <Image
+    <img
       src="/brand/crafthq-mark.webp"
       alt=""
       aria-hidden="true"
       width={Math.round((height * 125) / 84)}
       height={height}
       loading="eager"
-      unoptimized
       className={className}
     />
   );

@@ -1,6 +1,6 @@
 # CraftHQ design system
 
-**Version 0.1 · draft for review · 19 Nov 2026**
+**Version 0.2 · 19 Nov 2026**
 A shared file: change it only in its own pull request, approved by the other owner (see `CLAUDE.md`).
 
 ## Contents
@@ -20,7 +20,7 @@ A shared file: change it only in its own pull request, approved by the other own
 12. Implementation rules
 13. Review checklist
 14. Known deviations in the current code
-15. Open decisions
+15. Decisions
 16. Changelog
 
 ---
@@ -29,9 +29,9 @@ A shared file: change it only in its own pull request, approved by the other own
 
 - **This document is the authority.** When code, a screenshot or a mock-up disagrees with it, the document wins. Fix the code, or change the document first in its own pull request.
 - **Scope.** Every screen inside the signed-in CraftHQ app. The login page and other *brand surfaces* (§1.3) share the colours, type family and voice, but use their own scale.
-- **How rules are marked.** Everything is a rule unless it says **(Proposed)**, which means "do this unless you have a reason, and say why in the PR". The items in §15 are **open**: decide them together before building the parts they block.
+- **How rules are marked.** Everything is a rule unless it says **(Proposed)**, which means "do this unless you have a reason, and say why in the PR". §15 records the decisions made so far. A new open question goes there too, and is decided together before anyone builds the parts it blocks.
 - **How patterns are written.** Each pattern says *Use when*, *Don't use when* and *Why*. Big decisions also have **In plain words**: one sentence you can say to a client or a stakeholder.
-- **Changing it.** Open a small PR that touches only this file, plus `src/app/globals.css` if tokens change, so the two never drift apart. The other owner approves it.
+- **Changing it.** Open a small PR that touches only this file, plus `src/styles/globals.css` if tokens change, so the two never drift apart. The other owner approves it.
 - **For Claude.** Before any UI work, read the sections that apply. Use tokens only (§12). If a screen needs a pattern that isn't here, stop and ask; don't invent one silently. If existing code breaks a rule, say so, and fix it only if it's in your owner's area. Run the checklist in §13 before proposing a commit.
 
 ### 0.1 The short version
@@ -161,7 +161,7 @@ The plush robots bring warmth on brand surfaces and in small, rare moments. Work
 
 ## 3. Foundations
 
-All values are CSS custom properties in `src/app/globals.css`, exposed to Tailwind through `@theme inline`. Components use the Tailwind classes, never raw values (§12). Tokens marked *new* are added by the tokens PR (§14).
+All values are CSS custom properties in `src/styles/globals.css`, exposed to Tailwind through `@theme inline`. Components use the Tailwind classes, never raw values (§12). Tokens marked *new* are added by the tokens PR (§14).
 
 ### 3.1 Colour
 
@@ -272,7 +272,7 @@ Dark mode isn't designed yet. The app is light-only (`data-theme="light"`). The 
 
 ### 3.2 Typography
 
-- **Family:** Inter (variable, with optical sizing), loaded once in `layout.tsx`.
+- **Family:** Inter (variable, with optical sizing), self-hosted and loaded once in `src/layouts/BaseLayout.astro`.
 - **Mono:** the system mono stack (`font-mono`), for IDs, branch names, paths and code.
 - **Serif** (`font-serif`): not used in the app.
 
@@ -906,7 +906,7 @@ Rules:
 
 ## 7. Components
 
-These are the shared building blocks. Where they live, and who owns them, is decision 5 in §15.
+These are the shared building blocks. They live in `src/components/ui/`, a shared folder: each new component or change goes in its own PR that the other owner approves (§15, decision 5).
 
 ### 7.1 Button
 
@@ -1028,7 +1028,7 @@ Interactive content anchored to a trigger, such as the filter builder, the date 
 
 **Motion and phones:** motion follows §3.7. On phones, a modal becomes a bottom sheet (full width, `rounded-2xl` top corners, at most 90dvh, with a fixed footer), or goes full screen for long forms.
 
-**Implementation:** build it on the native `<dialog>` element with `showModal()`, which gives focus containment, Esc and the top layer for free, unless decision 4 in §15 picks a library. Props: `open` and `onClose`.
+**Implementation:** build it on the native `<dialog>` element with `showModal()`, which gives focus containment, Esc and the top layer for free, as decision 4 in §15 allows (menus, selects, popovers and tooltips use Radix UI instead). Props: `open` and `onClose`.
 
 ### 7.10 Panel and drawer
 
@@ -1046,7 +1046,7 @@ Interactive content anchored to a trigger, such as the filter builder, the date 
 
 **Status pill:** the tone's icon (12 px) and a label (`text-xs font-medium`) on the tone's tint, in the tone's ink. `rounded-full`, 20 px tall, `px-2`. In dense rows the status icon can stand on its own, because every status has a distinct shape, an accessible name and a tooltip with the label.
 
-Ticket statuses (Proposed):
+Ticket statuses:
 
 | Status | Tone | Icon | Means |
 |---|---|---|---|
@@ -1180,7 +1180,7 @@ The working ring (§7.13), the status label and the elapsed time show that a rob
 ### 8.6 Moments of completion
 
 - **When a pull request merges:** the status icon morphs into `GitMerge` (150 ms), and the row or card gets a 600 ms positive-tint highlight.
-- **Celebration** (Proposed): at real milestones only (a project's first merged pull request, then its 10th, 50th and 100th), the Builder hops up from the bottom-right corner (`--ease-plush`, 1.2 s at most) and leaves again. It plays for whoever is looking at that project or at Home at the time.
+- **Celebration:** at real milestones only (a project's first merged pull request, then its 10th, 50th and 100th), the Builder hops up from the bottom-right corner (`--ease-plush`, 1.2 s at most) and leaves again. It plays for whoever is looking at that project or at Home at the time.
   **Why milestones, not chance:** a celebration should mark something that actually happened. Random surprise rewards are Asana's mechanic, not ours.
   - It never covers anything you need to click (`pointer-events: none`).
   - It's off with reduced motion, and people can turn it off in Preferences.
@@ -1306,22 +1306,24 @@ The target is WCAG 2.2 AA.
 
   The tokens PR adds the ones that don't exist yet (§14).
 - **Changing tokens:** one shared-file PR that updates `globals.css` and this document together.
-- **Shared building blocks** (Proposed): build each component in §7 once and reuse it.
-  - Where they live is decision 5 in §15. Until that's settled, ask before creating a shared component.
+- **Shared building blocks:** build each component in §7 once, in `src/components/ui/`, and reuse it (§15, decision 5).
+  - The folder is shared: each new component or change goes in its own PR that the other owner approves.
   - Area code (dashboard, connect-accounts) uses them through their props (`variant`, `size`), and doesn't restyle them with `className` overrides.
 - **Component API:**
   - Use named exports, and the props `variant`, `size`, `disabled` and `loading`.
   - Overlays take `open` and `onClose`, the same contract as `ConnectAccountsModal`.
   - `ref` is a normal prop in React 19.
-  - Add `"use client"` only where it's needed.
+  - Interactive components are React islands. Hydrate each one with the lightest client directive that works (`client:load` only when it has to work at once), and keep state that has to be shared inside one island.
 - **Icons:** `import { X } from "lucide-react"`, with `size={16} strokeWidth={1.75}`, and `aria-hidden` when decorative.
 - **Motion:**
   - Use CSS transitions for hover, press and colour.
   - Use framer-motion for entering and leaving (`AnimatePresence`), list `layout` changes and robot moments.
   - Take durations and easings from §3.7.
   - Every animation checks for reduced motion (`useReducedMotion()` or the media query).
-- **Images and media:** `next/image` with `unoptimized` (see `CLAUDE.md`). Videos ship as `.webm` and `.mp4`, with a poster.
-- **Next.js 16:** follow `AGENTS.md`. Keep the shell static and stream the content (Suspense), so navigating never blanks the app.
+- **Images and media:** plain `<img>` with `width` and `height`, served from `public/` (see `CLAUDE.md`). Videos ship as `.webm` and `.mp4`, with a poster.
+- **Astro:** pages are static HTML, and only the islands load JavaScript.
+  - Keep the shell in `AppLayout.astro`, and give each widget its own island with its own loading and error state (§5.6), so a page never waits on its slowest part.
+  - Moving between pages is a full page load unless Astro's `<ClientRouter />` is added to `BaseLayout.astro` (a shared change). Within a page, an island updates the URL itself (`history.pushState`), for example when the detail panel opens (§4.7, §4.8).
 - **Dependencies:** nothing is added without asking (`CLAUDE.md` rule 4), and that includes UI libraries.
 - **Before a PR:**
   - lint and build
@@ -1365,9 +1367,11 @@ Copy this into every UI pull request:
 
 ---
 
-## 15. Open decisions
+## 15. Decisions
 
-| # | Decision | Recommendation | What it blocks |
+Agreed on 19 Nov 2026, in the review of the pull request that added this document.
+
+| # | Question | Decision | What it blocks |
 |---|---|---|---|
 | 1 | The word for a work item | **Ticket** (the public site talks about sending tickets) | all copy |
 | 2 | The name of a person's queue | **Needs you** | sidebar, Home |
@@ -1379,6 +1383,7 @@ Copy this into every UI pull request:
 | 8 | Celebrations | on, at milestones only, and can be turned off | §8.6 |
 | 9 | Dark mode | after v1, designed as a full set | — |
 | 10 | Spelling in the UI | US English | copy |
+| 11 | Who owns the app shell (the sidebar and the signed-in layout) | **himalay-glitch**: `src/layouts/AppLayout.astro` and `src/components/shell/` (see `CLAUDE.md`) | the shell, the sidebar |
 
 ---
 
@@ -1387,3 +1392,4 @@ Copy this into every UI pull request:
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-11-19 | First draft: foundations, shell, views, patterns, components and rules. The Asana benchmark was checked against Asana's public help centre, developer docs, blog and forum. Proposed by shubhampatil-lab for review by himalay-glitch. |
+| 0.2 | 2026-11-19 | §15 decided: all ten recommendations, plus decision 11 (the app shell belongs to himalay-glitch). Statuses (§7.12), celebrations (§8.6) and shared building blocks (§12) are no longer Proposed. The app moved from Next.js to Astro: paths in §0 and §3, the font in §3.2, and the implementation rules in §12 updated. |

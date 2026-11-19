@@ -1,7 +1,4 @@
-"use client";
-
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import type { LoginErrorBody } from "@/types/auth";
 import { AlertCircleIcon } from "@/components/icons";
 
@@ -26,7 +23,6 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const router = useRouter();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,8 +36,7 @@ export function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
-        router.push("/");
-        router.refresh();
+        window.location.assign("/");
         return;
       }
       const body: LoginErrorBody | null = await res.json().catch(() => null);
