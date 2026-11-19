@@ -63,6 +63,8 @@ export interface SearchItem {
 }
 
 export interface DashboardData {
+  /** The project this dashboard is for, e.g. "WePop". It's the page heading; the nav already says Dashboard. */
+  project: string;
   viewer: Viewer;
   /** Teammates who can own a new story. */
   people: Person[];

@@ -9,7 +9,7 @@ What the dashboard is, where its look and content come from, and how it behaves.
 | | Comes from | Notes |
 |---|---|---|
 | **Look** | The Asana "AI Teammates" screenshot, measured pixel by pixel (§6) | White page, a light grey top bar, 12 px cards with a faint shadow, pill filters, a hairline table |
-| **Content** | The manager's prototype (`crafthq-re.html`, Dashboard view) | Its five stats, nav links, stories, groups, wording ("story", "the agent") and New story form |
+| **Content** | The manager's prototype (`crafthq-re.html`, Dashboard view) | Its stats (Running and Queued split out, as on the live app, in place of With the agent and Done), nav links, stories, groups, wording ("story", "the agent") and New story form |
 | **Data reference only** | The live app.crafthq.ai dashboard | Not used for the look |
 
 **Scope, as agreed:** only the dashboard page is built; the nav links to the other pages lead nowhere yet. No phone-specific work beyond what's already there. No Builder render on the dashboard.
@@ -22,11 +22,11 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │ CraftHQ  Dashboard  Stories  Feature pages  Docs  Settings     ( ⌕ Search )    (AD) │ 48 top bar #F9F9F9
 ├──────────────────────────────────────────────────────────────────────────────────────┤
-│ Dashboard                                                          ( + New story )   │ 21/28 medium
-│ ┌ Needs you ┐ ┌ Ready to review ┐ ┌ ● With the agent ┐ ┌ Stuck ┐ ┌ Done ────────┐     │ five stat cards
-│ │ 12        │ │ 5               │ │ 9                │ │ 2     │ │ 6            │     │
-│ │ 3 more…   │ │ Test, then…     │ │ 0 queued, checked│ │ Not … │ │ of 43 stories│     │
-│ └───────────┘ └─────────────────┘ └──────────────────┘ └───────┘ └──────────────┘     │
+│ WePop                                                              ( + New story )   │ 21/28 medium, project name
+│ ┌ Needs you ┐ ┌ Ready to review ┐ ┌ Stuck ┐ ┌ ● Running ──────┐ ┌ Queued ─────────┐   │ five stat cards
+│ │ 12        │ │ 5               │ │ 2     │ │ 9               │ │ 0               │   │
+│ │ 3 more…   │ │ Test, then…     │ │ Not … │ │ 2 in progress, …│ │ Agent checked … │   │
+│ └───────────┘ └─────────────────┘ └───────┘ └─────────────────┘ └─────────────────┘   │
 │ ( Show: Mine ⌄ ) ( Filter ⌄ )                                                        │ pills 30
 │ ┌ Story ─────────────── Next ──────── Action ─────────── Owner  Waiting on  Updated ┐ │ boxed table
 │ │ hq-21 Test story      (Stuck)       Preview could not…                            │ │ rows 46
@@ -47,15 +47,15 @@ Content is capped at 1280 px and centred, with 32 px side padding.
 - **Account menu** (Radix): name, email, the workspace line from the prototype, Settings, Sign out (goes to `/login` until there's a sign-out endpoint).
 
 ### Stats (`SummaryCards`)
-The prototype's five, with its numbers and lines. Each card does what it does in the prototype, so each lifts on hover (the reference's raised card):
+Five cards: the three that filter the table, then the agent's two. Running and Queued are separate stats, as on the live app's "Agent's turn" card (`screencapture-app-crafthq-ai-2026-11-19-14_17_03.pdf`: 1 Running · 0 Queued); they replace the prototype's "With the agent" (which showed running, with queued in its line) and "Done", the least important card. Every card does something, so each lifts on hover (the reference's raised card):
 
 | Card | Value | Line | Click |
 |---|---|---|---|
 | Needs you | stories waiting on you | "3 more waiting on others" | Show: Mine, Filter: Everything |
 | Ready to review | Review stories | "Test, then accept or ask for changes" | toggles Filter: Review |
-| With the agent | stories the agent is running | "0 queued, checked just now" | Details, With the agent tab |
 | Stuck | Stuck stories | "Not being picked up" | toggles Filter: Stuck |
-| Done | done stories | "of 43 stories" | Details, Recent activity tab |
+| Running (green dot while it's above 0) | stories the agent is working on | "2 in progress, 7 in review", or "The agent is idle" | Details, With the agent tab |
+| Queued | stories waiting for the agent to start | "Agent checked just now" (the loop tick) | Details, With the agent tab |
 
 A card whose filter is on has a blue edge. Values are never coloured.
 
