@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type SubmitEvent } from "react";
-import { ArrowUpRight, CircleCheck, CircleExclamationPoint, LoaderCircle } from "lucide-react";
+import { ArrowUpRight, Circle, CircleCheck, CircleExclamationPoint, LoaderCircle } from "lucide-react";
 import { CONNECTIONS_CHANNEL, type Connection, type ConnectionBroadcast } from "@/types/connections";
 import {
   ConnectionError,
@@ -29,9 +29,13 @@ type ConnectionRowProps = {
 };
 
 const ICON = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
+/** Icons inside status pills: 12 px with a heavier stroke (DESIGN.md §3.6). */
+const PILL_ICON = { size: 12, strokeWidth: 2, "aria-hidden": true } as const;
 
 /** How often to check, while a sign-in window is open, whether the provider has finished. */
 const SIGN_IN_POLL_MS = 2000;
+/** Local runs only: how often to check whether the provider's window has closed. */
+const WINDOW_CHECK_MS = 800;
 
 const FIELD =
   "h-8 min-w-0 flex-1 basis-48 rounded-lg border-0 bg-field px-3 font-mono text-sm text-foreground " +
@@ -41,15 +45,29 @@ const FIELD =
 const TEXT_BUTTON =
   "inline-flex cursor-pointer items-center border-0 bg-transparent font-sans text-sm font-medium text-primary-strong hover:underline";
 
-function Spinner() {
-  return <LoaderCircle {...ICON} className="flex-none animate-spin motion-reduce:animate-none" />;
+/** Status pill tones (DESIGN.md §7.12): a tint background with the tone's ink. */
+const PILL_TONE = {
+  neutral: "bg-field text-muted-foreground",
+  positive: "bg-success-tint text-success-ink",
+  attention: "bg-warning-tint text-warning-ink",
+} as const;
+
+function Spinner({ size = 16 }: { size?: number }) {
+  return (
+    <LoaderCircle
+      size={size}
+      strokeWidth={size < 16 ? 2 : 1.75}
+      aria-hidden
+      className="flex-none animate-spin motion-reduce:animate-none"
+    />
+  );
 }
 
 function ErrorLine({ id, message, className = "" }: { id?: string; message: string; className?: string }) {
   return (
     <p id={id} role="alert" className={`flex items-start gap-1.5 text-sm text-danger-ink ${className}`}>
       <CircleExclamationPoint {...ICON} className="mt-0.5 flex-none" />
-      <span>{message}</span>
+      <span className="text-pretty">{message}</span>
     </p>
   );
 }
@@ -141,9 +159,23 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
       });
     }, SIGN_IN_POLL_MS);
 
+    // Local runs only: the provider sends its answer to the live app, so this page never hears it.
+    // Count the window closing (or moving on to the live app, which this page can't see into) as approved.
+    let watch: number | undefined;
+    if (import.meta.env.DEV) {
+      watch = window.setInterval(() => {
+        if (!windowRef.current?.closed) return;
+        window.clearInterval(watch);
+        void previewWindowSignIn(service, "connected")
+          .then((found) => settle({ connection: found }))
+          .catch(() => settle({ error: `${copy.name} didn't finish connecting. Try again.` }));
+      }, WINDOW_CHECK_MS);
+    }
+
     return () => {
       channel?.close();
       window.clearInterval(poll);
+      if (watch !== undefined) window.clearInterval(watch);
       onBusyChange(false);
     };
   }, [phase, connection.service, copy.name, onBusyChange, onConnected]);
@@ -166,23 +198,6 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
         setPhase("idle");
         setError(caught instanceof ConnectionError ? caught.message : `Couldn't reach ${copy.name}. Try again.`);
       });
-  }
-
-  async function previewOutcome(outcome: "connected" | "no-repos" | "cancelled") {
-    windowRef.current?.close();
-    windowRef.current = null;
-    if (outcome === "cancelled") {
-      setPhase("idle");
-      return;
-    }
-    try {
-      const updated = await previewWindowSignIn(connection.service, outcome);
-      setPhase("idle");
-      onConnected(updated);
-    } catch (caught) {
-      setPhase("idle");
-      setError(caught instanceof ConnectionError ? caught.message : `${copy.name} didn't finish connecting. Try again.`);
-    }
   }
 
   async function connect(phaseWhileRunning: Phase, phaseAfterFailure: Phase, input: ConnectInput = {}) {
@@ -243,48 +258,36 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
     setPhase("token");
   }
 
-  let status: ReactNode;
+  // The state, as a pill beside the name (DESIGN.md §7.12): an icon, a label and a tone, so it never
+  // reads as part of the description underneath.
+  let pill: { tone: keyof typeof PILL_TONE; icon: ReactNode; label: string };
+  if (phase === "connecting" || phase === "checking" || phase === "saving") {
+    pill = { tone: "neutral", icon: <Spinner size={12} />, label: phase === "connecting" ? "Connecting" : "Checking" };
+  } else if (connected) {
+    pill = { tone: "positive", icon: <CircleCheck {...PILL_ICON} />, label: "Connected" };
+  } else if (connection.status === "needs_attention") {
+    pill = { tone: "attention", icon: <CircleExclamationPoint {...PILL_ICON} />, label: "Needs attention" };
+  } else {
+    pill = { tone: "neutral", icon: <Circle {...PILL_ICON} />, label: "Not connected" };
+  }
+
+  // The line under the name: what the connection is for, or, once something has happened, the detail
+  // that matters now.
+  let detail: string;
   if (phase === "connecting") {
-    status = (
-      <>
-        <Spinner />
-        <span>{`Waiting for ${copy.name}. Approve CraftHQ in the window that opened.`}</span>
-      </>
-    );
-  } else if (phase === "checking" || phase === "saving") {
-    status = (
-      <>
-        <Spinner />
-        <span>{phase === "checking" ? "Checking the code…" : "Checking the token…"}</span>
-      </>
-    );
+    detail = `Approve CraftHQ in the ${copy.name} window that opened.`;
   } else if (connected) {
     const who =
       connection.via === "token"
-        ? `Connected with a developer token •••• ${connection.tokenLast4 ?? ""}`
-        : connection.account
-          ? `Connected as ${connection.account}`
-          : "Connected";
-    const reach = connection.repositories ? ` · ${repositoryCount(connection.repositories)}` : "";
-    status = (
-      <>
-        <CircleCheck {...ICON} className="flex-none text-success" />
-        <span>{who + reach}</span>
-      </>
-    );
+        ? `Developer token •••• ${connection.tokenLast4 ?? ""}`
+        : (connection.account ?? copy.name);
+    detail = connection.repositories ? `${who} · ${repositoryCount(connection.repositories)}` : who;
+  } else if (noRepositories) {
+    detail = "No repositories yet. Ask an owner of your GitHub organization to install the CraftHQ app, or use a developer token.";
   } else if (connection.status === "needs_attention") {
-    status = (
-      <>
-        <CircleExclamationPoint {...ICON} className="flex-none text-warning" />
-        <span className="text-warning-ink">
-          {noRepositories ? "Connected, but no repositories yet" : (connection.reason ?? "Needs attention")}
-        </span>
-      </>
-    );
-  } else if (phase === "code" || phase === "token") {
-    status = <span className="text-muted-foreground">{phase === "code" ? "Waiting for your code" : "Waiting for your token"}</span>;
+    detail = connection.reason ?? `${copy.name} needs attention.`;
   } else {
-    status = <span className="text-muted-foreground">{connection.required ? "Not connected · Required" : "Not connected"}</span>;
+    detail = copy.purpose;
   }
 
   const variant = isNext ? "primary" : "secondary";
@@ -336,44 +339,24 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
 
   let below: ReactNode = null;
   if (phase === "connecting") {
-    below = (
-      <>
-        {signInUrl ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {"No window? "}
-            <a href={signInUrl} target="_blank" rel="noopener" className="text-primary-strong underline">
-              {`Open ${copy.name}`}
-              <span className="sr-only"> (opens in a new tab)</span>
-            </a>
-          </p>
-        ) : null}
-        {import.meta.env.DEV ? (
-          <div className="mt-3 rounded-lg bg-field p-3">
-            <p className="text-sm text-muted-foreground">
-              {`Local preview only: ${copy.name} sends its answer to the live app, so this page can't see it. How did it go?`}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => void previewOutcome("connected")}>
-                Approved
-              </Button>
-              <Button size="sm" onClick={() => void previewOutcome("no-repos")}>
-                Approved, no repositories
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => void previewOutcome("cancelled")}>
-                Cancelled
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </>
-    );
+    below = signInUrl ? (
+      <p className="mt-2 text-sm text-muted-foreground">
+        {"No window? "}
+        <a href={signInUrl} target="_blank" rel="noopener" className="text-primary-strong underline">
+          {`Open ${copy.name}`}
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      </p>
+    ) : null;
   } else if (usesCode && !connected && (phase === "code" || phase === "checking")) {
     below = (
       <form onSubmit={submitCode} noValidate className="mt-4 flex flex-col gap-1.5">
         <label htmlFor={fieldId} className="text-sm font-medium">
           {`Code from ${copy.name}`}
         </label>
-        <p className="text-sm text-muted-foreground">{`${copy.name} opened in a new tab. Sign in there, then paste the code it shows.`}</p>
+        <p className="text-sm text-pretty text-muted-foreground">
+          {`${copy.name} opened in a new tab. Sign in there, then paste the code it shows.`}
+        </p>
         <div className="flex flex-wrap gap-2">
           <input
             id={fieldId}
@@ -414,7 +397,7 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
         <label htmlFor={fieldId} className="text-sm font-medium">
           Developer token
         </label>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-pretty text-muted-foreground">
           {"It reaches every repository you can, so use it only in development environments. "}
           <a href={NEW_GITHUB_TOKEN_URL} target="_blank" rel="noopener noreferrer" className="text-primary-strong underline">
             Create a classic token on GitHub
@@ -454,12 +437,7 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
   } else {
     below = (
       <>
-        {error ? <ErrorLine message={error} className="mt-3" /> : null}
-        {noRepositories ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Ask an owner of your GitHub organization to install the CraftHQ app, or use a developer token.
-          </p>
-        ) : null}
+        {error ? <ErrorLine message={error} className="mt-2" /> : null}
         {canUseToken && phase === "idle" ? (
           <button type="button" onClick={openTokenForm} className={`mt-2 ${TEXT_BUTTON}`}>
             {noRepositories ? "Use a developer token" : "Use a developer token instead"}
@@ -471,7 +449,8 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
 
   return (
     <li className="rounded-xl border border-border p-4">
-      <div className="flex flex-wrap items-start gap-3">
+      {/* Top line: logo, name and state on the left; the action on the right. */}
+      <div className="flex flex-wrap items-center gap-3">
         {copy.logo && !logoMissing ? (
           <img
             src={copy.logo}
@@ -489,16 +468,26 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
             {copy.initial}
           </span>
         )}
-        <div className="min-w-0 flex-1 basis-56">
-          <p className="text-sm font-semibold">{copy.name}</p>
-          <p className="text-sm text-muted-foreground">{copy.purpose}</p>
-          <p className="mt-1.5 flex items-center gap-1.5 text-sm" aria-live="polite">
-            {status}
-          </p>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <h3 className="text-sm font-semibold">{copy.name}</h3>
+          {/* Mark the exception, not the rule: every connection is required unless it says so. */}
+          {connection.required ? null : <span className="text-xs text-muted-foreground">Optional</span>}
+          <span
+            aria-live="polite"
+            className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium ${PILL_TONE[pill.tone]}`}
+          >
+            {pill.icon}
+            {pill.label}
+          </span>
         </div>
         {action}
       </div>
-      {below}
+
+      {/* Everything else lines up with the name, and runs the full width of the row. */}
+      <div className="pl-9">
+        <p className="mt-1 text-sm text-pretty text-muted-foreground">{detail}</p>
+        {below}
+      </div>
     </li>
   );
 }

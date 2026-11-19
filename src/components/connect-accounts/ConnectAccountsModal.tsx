@@ -138,7 +138,7 @@ export function ConnectAccountsModal({ open, onClose }: ConnectAccountsModalProp
             <h2 id={titleId} className="text-base font-semibold">
               Connect your accounts
             </h2>
-            <p id={descriptionId} className="mt-1 text-sm text-muted-foreground">
+            <p id={descriptionId} className="mt-1 text-sm text-balance text-muted-foreground">
               Connect GitHub first, then Claude. The robots can start once both are connected.
             </p>
           </div>

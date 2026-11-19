@@ -8,7 +8,7 @@ import { errorResponse } from "../_respond";
  *
  * - GitHub: the live CraftHQ.AI GitHub App's real authorization page. Authorizing there really links
  *   your GitHub account to the live app, and GitHub sends the answer to app.crafthq.ai, so this local
- *   app never hears it (the modal offers local-preview buttons instead). The real backend will add
+ *   app never hears it: in local runs the modal counts the window closing as approved. The real backend will add
  *   a state value and its own callback.
  * - Claude: ./mock-sign-in, a stand-in that shows a test code, until the real Anthropic page's
  *   address is known.

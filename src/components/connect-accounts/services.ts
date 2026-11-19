@@ -22,7 +22,7 @@ type ServiceCopy = {
 export const SERVICE_COPY: Record<ConnectionService, ServiceCopy> = {
   github: {
     name: "GitHub",
-    purpose: "CraftHQ opens pull requests as you, in repositories where your organization installed the CraftHQ app.",
+    purpose: "CraftHQ opens pull requests as you, in repositories where the CraftHQ app is installed.",
     initial: "G",
     logo: "/connect-accounts/GitHub_Invertocat_Black.svg",
     brandButton: { variant: "inverse", mark: "/connect-accounts/GitHub_Invertocat_White.svg" },
