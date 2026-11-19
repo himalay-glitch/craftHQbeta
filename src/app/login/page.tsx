@@ -11,7 +11,6 @@ const team: RebusBotItem[] = [
     idle: "/videos/bots/builder-idle",
     work: "/videos/bots/builder-work",
     poster: "/images/bots/builder.webp",
-    bg: "#fde7e1",
   },
 ];
 

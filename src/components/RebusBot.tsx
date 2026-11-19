@@ -11,8 +11,8 @@ export type RebusBotItem = {
   idle: string;
   work: string;
   poster: string;
-  /** Backdrop colour baked into the videos; shown while a clip loads. */
-  bg: string;
+  /** Optional backdrop behind the clip (none: the clips sit on white and blend into the page). */
+  bg?: string;
 };
 
 const CYCLE_MS = 4200;
@@ -83,7 +83,7 @@ export function RebusBot({ bots }: { bots: RebusBotItem[] }) {
   return (
     <span className="rebus-slot" data-working={working} onPointerEnter={startWork} onPointerLeave={stopWork}>
       {bots.map((bot, i) => (
-        <span key={bot.key} className={`rebus-bot${i === active ? " is-active" : ""}`} style={{ background: bot.bg }}>
+        <span key={bot.key} className={`rebus-bot${i === active ? " is-active" : ""}`} style={bot.bg ? { background: bot.bg } : undefined}>
           {reduced ? (
             <Image src={bot.poster} alt="" fill sizes="68px" unoptimized />
           ) : (
