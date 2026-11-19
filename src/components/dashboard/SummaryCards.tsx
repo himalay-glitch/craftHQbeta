@@ -55,23 +55,26 @@ interface SummaryCardsProps {
   needsYou: number;
   othersWaiting: number;
   readyToReview: number;
-  running: number;
+  stuck: number;
+  /** Stories the agent is working on, split by stage for the Running card's line. */
+  running: { inProgress: number; inReview: number };
   queued: number;
   loopTick: string;
-  stuck: number;
-  done: number;
-  totalStories: number;
   /** Which filter-card is on, if any. */
   active: "mine" | "review" | "stuck" | null;
   onNeedsYou: () => void;
   onReview: () => void;
-  onAgent: () => void;
   onStuck: () => void;
-  onDone: () => void;
+  onAgent: () => void;
 }
 
-/** The prototype's five stats: Needs you, Ready to review, With the agent, Stuck, Done. */
+/**
+ * Five stats. First the three that filter the table (Needs you, Ready to review, Stuck), then the agent's
+ * two, Running and Queued, as on the live app's "Agent's turn" card. Done was the least important and is
+ * gone; it lives in the Details panel's Recent activity.
+ */
 export function SummaryCards(p: SummaryCardsProps) {
+  const runningTotal = p.running.inProgress + p.running.inReview;
   return (
     <section aria-label="Summary" className={`${styles.cards} mt-4`}>
       <StatCard
@@ -88,15 +91,20 @@ export function SummaryCards(p: SummaryCardsProps) {
         onClick={p.onReview}
         pressed={p.active === "review"}
       />
-      <StatCard
-        label="With the agent"
-        value={p.running}
-        sub={`${p.queued} queued, checked ${p.loopTick}`}
-        onClick={p.onAgent}
-        dot
-      />
       <StatCard label="Stuck" value={p.stuck} sub="Not being picked up" onClick={p.onStuck} pressed={p.active === "stuck"} />
-      <StatCard label="Done" value={p.done} sub={`of ${p.totalStories} stories`} onClick={p.onDone} />
+      <StatCard
+        label="Running"
+        value={runningTotal}
+        sub={runningTotal === 0 ? "The agent is idle" : `${p.running.inProgress} in progress, ${p.running.inReview} in review`}
+        onClick={p.onAgent}
+        dot={runningTotal > 0}
+      />
+      <StatCard
+        label="Queued"
+        value={p.queued}
+        sub={`Agent checked ${p.loopTick}`}
+        onClick={p.onAgent}
+      />
     </section>
   );
 }

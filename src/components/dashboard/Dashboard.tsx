@@ -71,7 +71,6 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const setup = useConnectionSetup();
 
   const [stories, setStories] = useState(data.stories);
-  const [done, setDone] = useState(data.done);
   const [show, setShow] = useState<Show>("mine");
   const [need, setNeed] = useState<"all" | NeedKind>("all");
   const [sort, setSort] = useState<SortMode>("group");
@@ -99,6 +98,11 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const othersWaiting = needing.filter((s) => s.need !== "stuck" && s.waitingOn !== "You").length;
   const reviewCount = needing.filter((s) => s.need === "review").length;
   const stuckCount = needing.filter((s) => s.need === "stuck").length;
+  // The agent's side, as on the live app's "Agent's turn" card: what it's running now, by stage.
+  const running = {
+    inProgress: data.running.filter((r) => r.status === "In progress").length,
+    inReview: data.running.filter((r) => r.status === "In review").length,
+  };
   // "Mine" is what's waiting on you, plus stuck stories, because those need a person too.
   const inShow = show === "mine" ? needing.filter((s) => s.waitingOn === "You" || s.need === "stuck") : needing;
   const visible = sortQueue(need === "all" ? inShow : inShow.filter((s) => s.need === need), sort);
@@ -199,11 +203,9 @@ export function Dashboard({ data }: { data: DashboardData }) {
     const ref = storyRef(story.id);
     let status: StoryStatus;
     let message: string;
-    let doneDelta = 0;
     switch (action.type) {
       case "accept":
         status = "done";
-        doneDelta = 1;
         message = `${ref} accepted and moved to Done.`;
         break;
       case "approve":
@@ -247,13 +249,9 @@ export function Dashboard({ data }: { data: DashboardData }) {
     const index = visible.findIndex((s) => s.id === story.id);
     const after = visible[index + 1] ?? visible[index - 1];
     setStories((ss) => ss.map((s) => (s.id === story.id ? { ...s, status, need: undefined } : s)));
-    if (doneDelta) setDone((d) => d + doneDelta);
     showToast(message, {
       label: "Undo",
-      run: () => {
-        setStories((ss) => ss.map((s) => (s.id === story.id ? story : s)));
-        if (doneDelta) setDone((d) => d - doneDelta);
-      },
+      run: () => setStories((ss) => ss.map((s) => (s.id === story.id ? story : s))),
     });
     closePanel(after?.id);
   };
@@ -327,18 +325,15 @@ export function Dashboard({ data }: { data: DashboardData }) {
               needsYou={youCount}
               othersWaiting={othersWaiting}
               readyToReview={reviewCount}
-              running={data.running.length}
+              stuck={stuckCount}
+              running={running}
               queued={data.queued}
               loopTick={data.loopTick}
-              stuck={stuckCount}
-              done={done}
-              totalStories={data.totalStories}
               active={activeCard}
               onNeedsYou={resetFilters}
               onReview={() => setNeed((n) => (n === "review" ? "all" : "review"))}
               onAgent={() => openLocal({ kind: "details", tab: "agent" })}
               onStuck={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
-              onDone={() => openLocal({ kind: "details", tab: "activity" })}
             />
 
             <div className="mt-5 flex flex-wrap items-center gap-2">
