@@ -794,21 +794,22 @@ Rules:
 
 Follow this pattern in onboarding, in Settings → Connections and in `ConnectAccountsModal`.
 
-- **Row:** the official logo (24 px), the name (`text-sm font-semibold`) with one muted line on what CraftHQ does with it, the status, and the action.
+- **Row:** the top line has the official logo (24 px), the name (`text-sm font-semibold`) and a status pill (§7.12), with the action on the right. Under the name, one muted line says what CraftHQ does with the connection. It runs the full width of the row and wraps with `text-pretty`, so no line ends on a single word. Once something has happened, that line shows the detail that matters instead: the account, or the reason it needs attention.
 - **States:**
 
 | State | Shows | Action |
 |---|---|---|
-| Not connected | "Not connected", muted (plus "Required" when it's needed) | **Connect**: primary for the next required one, secondary otherwise |
-| Connecting | a spinner and "Waiting for GitHub…" | Cancel |
-| Connected | a positive check and "Connected as @name" | ⋯ → Manage, Disconnect |
-| Needs attention | an attention icon and the reason ("Access expired", "Missing repository access") | **Reconnect** |
+| Not connected | a grey "Not connected" pill, and the purpose line | **Connect**: primary for the next required one, secondary otherwise |
+| Connecting | a "Connecting" pill with a spinner, and "Approve CraftHQ in the GitHub window that opened." | Cancel |
+| Connected | a green "Connected" pill, and the account under the name ("@name · 3 repositories") | ⋯ → Manage, Disconnect |
+| Needs attention | an amber "Needs attention" pill, and the reason under the name ("Access expired", "No repositories yet") | **Reconnect** |
 | Failed | a negative inline message: what happened and what to do next | Try again |
 
-- **Order:** required connections first, then optional ones. Show progress in words ("1 of 2 required connected").
+- **Order:** required connections first, then optional ones. Show progress in words ("1 of 2 connected").
+- **Required is the default:** don't label every row "Required". Say once, in the modal's description, that all of them are needed, and tag only an optional service "Optional" (the same rule as optional form fields, §6.14).
 - **Before connecting,** say in up to three plain bullets what CraftHQ will be able to do, with a link to the details.
 - **OAuth:** open the provider in a popup (or redirect, on phones).
-  - If the popup is blocked, show "Open GitHub sign-in" as a link.
+  - If the popup is blocked, show "No window? Open GitHub" as a link.
   - Cancelling or failing returns to Not connected with an inline message. It's never a dead end.
 - **Connect, then paste a code** (how Claude connects):
   - **Connect Claude ↗** opens Claude's page in a new tab, where the person signs in. The row then shows a "Code from Claude" field with the helper text "Claude opened in a new tab. Sign in there, then paste the code it shows.", in mono with pasting allowed, and **Connect**. Enter also submits.
