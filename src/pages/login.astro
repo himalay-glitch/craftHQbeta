@@ -1,6 +1,5 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import { CraftHQLogo } from "@/components/icons";
 import { LoginForm } from "@/components/LoginForm";
 import { RebusBot, type RebusBotItem } from "@/components/RebusBot";
 
@@ -20,10 +19,8 @@ const team: RebusBotItem[] = [
 <BaseLayout>
   <div class="flex min-h-dvh flex-col bg-background">
     <header class="flex h-16 flex-none items-center justify-between px-5 sm:px-8">
-      <span class="flex items-center gap-2">
-        <CraftHQLogo height={36} />
-        <span class="text-[16px] font-semibold tracking-[-0.02em]">CraftHQ</span>
-      </span>
+      {/* The black-glass wordmark (design/blender/crafthq_logo_glass_v001.blend), the same file and 24 px height as the dashboard's top bar. */}
+      <img src="/dashboard/crafthq-logo-glass.webp" width={84} height={24} alt="CraftHQ" class="block h-6 w-auto" />
       <span class="text-[13px] text-muted-foreground">by BetaCraft</span>
     </header>
 
