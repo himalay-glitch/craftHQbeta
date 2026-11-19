@@ -1,0 +1,33 @@
+---
+// The HTML document every page shares: font, global CSS, metadata and icons.
+// Inter is self-hosted with its optical-size axis: at headline sizes the browser switches to the
+// display cut automatically (font-optical-sizing: auto), the closest open match to the tight
+// grotesque used on muse.ai.
+// The login is designed as a near-white page, so the site is light-only. The dark tokens in
+// globals.css are kept for reference but not applied.
+import "@fontsource-variable/inter/opsz.css";
+import "@/styles/globals.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title = "CraftHQ", description = "Your robot build team, shipping 10× faster." } = Astro.props;
+---
+
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

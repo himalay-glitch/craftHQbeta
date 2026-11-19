@@ -11,7 +11,8 @@
 
 :root {
   --danger: #b91c1c;
-  /* --font-inter is injected by next/font in layout.tsx */
+  /* self-hosted by @fontsource-variable/inter (imported in BaseLayout.astro) */
+  --font-inter: "Inter Variable";
   --font: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   /* Not used in the app (DESIGN.md §3.2); kept for reference */
   --serif: "Iowan Old Style", "Charter", "Palatino Linotype", Palatino, Georgia, serif;
