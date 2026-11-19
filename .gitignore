@@ -13,9 +13,8 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# astro
+/.astro/
 
 # production
 /build
@@ -41,7 +40,6 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 # playwright mcp
 /.playwright-mcp/

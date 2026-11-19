@@ -1,6 +1,3 @@
-"use client";
-
-import Image from "next/image";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 export type RebusBotItem = {
@@ -85,7 +82,7 @@ export function RebusBot({ bots }: { bots: RebusBotItem[] }) {
       {bots.map((bot, i) => (
         <span key={bot.key} className={`rebus-bot${i === active ? " is-active" : ""}`} style={bot.bg ? { background: bot.bg } : undefined}>
           {reduced ? (
-            <Image src={bot.poster} alt="" fill sizes="68px" unoptimized />
+            <img src={bot.poster} alt="" />
           ) : (
             <>
               <video
