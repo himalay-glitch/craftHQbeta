@@ -224,6 +224,15 @@ Rules:
 - Status colour is never used on its own (§7.12).
 - Marks sit on `bg-card` or `bg-background`, not on top of fills.
 
+#### Provider sign-in buttons
+
+A provider's sign-in button may wear that provider's own colours, but only that one button, only while it's the next step (§6.6), and only where the provider's brand rules allow it. Everything else stays in CraftHQ's colours.
+
+| Provider | Button | Text and mark | Why |
+|---|---|---|---|
+| GitHub | `bg-inverse` (`#111112`) | white text, GitHub's official white mark | GitHub allows its mark only in white, black, grey or green, unmodified |
+| Claude | `bg-brand-claude` `#c4522c`, hover `bg-brand-claude-hover` `#af4928` | white text, no logo | Claude's orange (`#d97757`, Anthropic's brand guidelines) deepened in the same hue so white text passes 4.5:1. The Claude logo needs Anthropic's approval and its own supplied files |
+
 #### Robot identity
 
 | Robot | Hue | Backdrop | Role |
@@ -805,6 +814,7 @@ Follow this pattern in onboarding, in Settings → Connections and in `ConnectAc
   - **Sign in with Claude** opens the provider's page in a new tab. The row then shows a code field, "Paste the code from Claude's sign-in page", in mono with pasting allowed, and **Connect**. Enter also submits.
   - The code is the one the provider's page shows after the person signs in. Never ask for a sign-in code from an email: that belongs on the provider's own page, and asking for it looks like phishing.
   - A wrong code says "That code didn't work. Check it, or sign in again to get a new one." An expired code says "That code has expired. Sign in again to get a new one." Both offer **Sign in again**.
+- **Sign-in buttons** follow §3.1 Provider sign-in buttons: GitHub's is black with its white mark, Claude's is Claude orange with white text.
 - **Keys,** if a service uses one:
   - Use a password-style mono field, and allow pasting.
   - After saving, show only the last four characters ("•••• 9fA2"), with **Replace key**.
@@ -943,7 +953,7 @@ A 24, 28 or 32 px square in the ghost style, with a 16 px icon. An `aria-label` 
   - `bg-field` with no border, `rounded-lg`, 32 px tall (md) or 28 px (sm), with `px-3`.
   - Text is `text-sm`, or `text-base` on touch screens (`pointer-coarse:text-base`) so iOS doesn't zoom in.
 - **Hover:** `bg-field-hover`.
-- **Focus:** a white fill, a 1.5 px `--focus` ring and a 4 px `--focus-ring` halo: the login field's focus, scaled down.
+- **Focus:** a white fill, a 1.5 px `--focus` ring and a 4 px `--focus-ring` halo (`focus:shadow-focus`): the login field's focus, scaled down.
 - **Label and help text:** the label sits above the field (`text-sm font-medium`, with a 6 px gap) and help text below it (muted `text-sm`). An error replaces the help text.
 - **Placeholder:** an example, never the label. App forms always show labels; only the login page hides them.
 - **Text area:** starts at 3 lines, grows to 12, then scrolls.
@@ -1301,7 +1311,7 @@ The target is WCAG 2.2 AA.
   - text: `text-foreground`, `text-muted-foreground`, `text-faint`, `text-on-inverse`, `text-primary-strong`
   - borders: `border-border`, `border-border-strong`
   - action: `bg-primary`, `bg-primary-strong`
-  - shadows: `shadow-raised`, `shadow-popover`, `shadow-overlay`, `shadow-drag`
+  - shadows: `shadow-raised`, `shadow-popover`, `shadow-overlay`, `shadow-drag`, and `shadow-focus` for the filled-field focus ring
   - other: the tone tokens, `rounded-robot`, `tracking-title`
 
   The tokens PR adds the ones that don't exist yet (§14).
