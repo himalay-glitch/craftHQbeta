@@ -25,6 +25,10 @@ Commands: `npm ci` to install, `npm run dev`, `npm run lint`, `npm run build`.
 - Images use `next/image` with `unoptimized`. Static files live in `public/` and are referenced by absolute path, for example `/images/bots/builder.webp`. Videos ship as `.webm` and `.mp4` pairs.
 - Blender files and renders are in `design/`; plans and reference screenshots are in `docs/`. Rendered frame sequences are gitignored.
 
+## Design system
+
+All UI follows `DESIGN.md`. Read the sections that apply before building or changing any screen or component. When the code and `DESIGN.md` disagree, `DESIGN.md` wins: fix the code, or change the document first in its own shared-file PR.
+
 ## Who owns what
 
 Only the owner edits an area. Importing code from the other person's area is fine; editing it is not.
@@ -35,7 +39,7 @@ Only the owner edits an area. Importing code from the other person's area is fin
 | Connect-accounts modal | shubhampatil-lab | `src/components/connect-accounts/`, `src/app/api/connections/`, `src/types/connections.ts`, `public/connect-accounts/` |
 | Login page (existing) | himalay-glitch | `src/app/login/`, `src/components/LoginForm.tsx`, `src/components/RebusBot.tsx`, `src/components/icons.tsx`, `src/app/api/auth/`, `src/types/auth.ts`, `public/images/bots/`, `public/videos/bots/` |
 | Design sources and docs | himalay-glitch | `design/`, `docs/` |
-| Shared: changed only in a separate, announced PR | both | `package.json`, `package-lock.json`, `src/app/layout.tsx`, `src/app/globals.css`, `next.config.ts` (routing and redirects), `tsconfig.json`, `eslint.config.mjs`, `.gitignore`, `.env.example`, `.githooks/`, `CLAUDE.md`, `AGENTS.md`, and any file in `public/` outside the folders above |
+| Shared: changed only in a separate, announced PR | both | `package.json`, `package-lock.json`, `src/app/layout.tsx`, `src/app/globals.css`, `next.config.ts` (routing and redirects), `tsconfig.json`, `eslint.config.mjs`, `.gitignore`, `.env.example`, `.githooks/`, `CLAUDE.md`, `DESIGN.md`, `AGENTS.md`, and any file in `public/` outside the folders above |
 
 One exception: a PR that needs a new environment variable may add its placeholder line to `.env.example`.
 
