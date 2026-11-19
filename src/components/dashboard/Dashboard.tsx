@@ -300,7 +300,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
             tabIndex={-1}
             className="text-[21px] leading-7 font-medium tracking-[-0.01em] text-[var(--tx)] outline-none"
           >
-            Dashboard
+            {/* The project's name, not "Dashboard": the nav already says which page this is. */}
+            {data.project}
           </h1>
           <button type="button" className={BTN_PRIMARY} onClick={() => openLocal({ kind: "new" })}>
             <Plus aria-hidden="true" size={16} strokeWidth={2} />

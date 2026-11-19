@@ -7,6 +7,7 @@ import type { DashboardData } from "@/types/dashboard";
 const SAME_REVIEW = "Move the story back to Approved to have this built.";
 
 export const dashboardData: DashboardData = {
+  project: "WePop",
   viewer: {
     id: "me",
     name: "Aakash Dhar",

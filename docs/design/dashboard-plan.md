@@ -22,7 +22,7 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │ CraftHQ  Dashboard  Stories  Feature pages  Docs  Settings     ( ⌕ Search )    (AD) │ 48 top bar #F9F9F9
 ├──────────────────────────────────────────────────────────────────────────────────────┤
-│ Dashboard                                                          ( + New story )   │ 21/28 medium
+│ WePop                                                              ( + New story )   │ 21/28 medium, project name
 │ ┌ Needs you ┐ ┌ Ready to review ┐ ┌ Stuck ┐ ┌ ● Running ──────┐ ┌ Queued ─────────┐   │ five stat cards
 │ │ 12        │ │ 5               │ │ 2     │ │ 9               │ │ 0               │   │
 │ │ 3 more…   │ │ Test, then…     │ │ Not … │ │ 2 in progress, …│ │ Agent checked … │   │
