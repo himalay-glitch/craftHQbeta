@@ -224,9 +224,9 @@ Rules:
 - Status colour is never used on its own (§7.12).
 - Marks sit on `bg-card` or `bg-background`, not on top of fills.
 
-#### Provider sign-in buttons
+#### Provider connection buttons
 
-A provider's sign-in button may wear that provider's own colours, but only that one button, only while it's the next step (§6.6), and only where the provider's brand rules allow it. Everything else stays in CraftHQ's colours.
+A provider's connection button may wear that provider's own colours, but only that one button, only while it's the next step (§6.6), and only where the provider's brand rules allow it. Everything else stays in CraftHQ's colours.
 
 | Provider | Button | Text and mark | Why |
 |---|---|---|---|
@@ -810,11 +810,12 @@ Follow this pattern in onboarding, in Settings → Connections and in `ConnectAc
 - **OAuth:** open the provider in a popup (or redirect, on phones).
   - If the popup is blocked, show "Open GitHub sign-in" as a link.
   - Cancelling or failing returns to Not connected with an inline message. It's never a dead end.
-- **Sign in, then paste a code** (how Claude connects):
-  - **Sign in with Claude** opens the provider's page in a new tab. The row then shows a code field, "Paste the code from Claude's sign-in page", in mono with pasting allowed, and **Connect**. Enter also submits.
+- **Connect, then paste a code** (how Claude connects):
+  - **Connect Claude ↗** opens Claude's page in a new tab, where the person signs in. The row then shows a "Code from Claude" field with the helper text "Claude opened in a new tab. Sign in there, then paste the code it shows.", in mono with pasting allowed, and **Connect**. Enter also submits.
   - The code is the one the provider's page shows after the person signs in. Never ask for a sign-in code from an email: that belongs on the provider's own page, and asking for it looks like phishing.
-  - A wrong code says "That code didn't work. Check it, or sign in again to get a new one." An expired code says "That code has expired. Sign in again to get a new one." Both offer **Sign in again**.
-- **Sign-in buttons** follow §3.1 Provider sign-in buttons: GitHub's is black with its white mark, Claude's is Claude orange with white text.
+  - A wrong code says "That code didn't work. Check it, or get a new one from Claude." An expired code says "That code has expired. Get a new one from Claude." Both offer **Open Claude again**.
+- **Button wording:** people are already signed in to CraftHQ when they connect accounts, so the buttons say **Connect GitHub ↗** or **Connect Claude ↗**, never "Sign in with…". "Sign in" appears only where it's literally true, on the provider's own page. The ↗ marks a button that opens a page outside CraftHQ.
+- **Connection buttons** follow §3.1 Provider connection buttons: GitHub's is black with its white mark, Claude's is Claude orange with white text.
 - **Keys,** if a service uses one:
   - Use a password-style mono field, and allow pasting.
   - After saving, show only the last four characters ("•••• 9fA2"), with **Replace key**.
@@ -825,7 +826,7 @@ Follow this pattern in onboarding, in Settings → Connections and in `ConnectAc
   - It takes `open` and `onClose`, and can be closed at any time. Finished connections stay connected.
   - A scrim click closes it only when nothing is in progress.
   - Width: `max-w-xl`, or `max-w-3xl` for more than four services.
-  - Footer (Proposed): "Do this later", then **Done**, which becomes available once the required connections are made.
+  - Footer: **Skip for now** closes it (the dashboard then reminds people to finish setup), and **Go to dashboard** appears once the required connections are made.
 
 ### 6.7 Empty states
 
