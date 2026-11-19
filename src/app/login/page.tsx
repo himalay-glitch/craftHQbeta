@@ -1,6 +1,9 @@
-import { CraftHQLogo } from "@/components/icons";
+import Image from "next/image";
 import { LoginForm } from "@/components/LoginForm";
 import { RebusBot, type RebusBotItem } from "@/components/RebusBot";
+// Black-glass CraftHQ wordmark, rendered in Blender (design/blender/crafthq_logo_glass_v001.blend,
+// front camera → design/renders/logo_glass_v001/). 3x file for the 36px header height.
+import logoGlass from "./crafthq-logo-glass.webp";
 
 // The Builder bot (coral plush, yellow safety helmet, round glasses), rendered in Blender
 // (design/blender/crafthq_bots_v001.blend). Idle loop; its "working" loop plays on hover.
@@ -18,10 +21,14 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <header className="flex h-16 flex-none items-center justify-between px-5 sm:px-8">
-        <span className="flex items-center gap-2">
-          <CraftHQLogo height={36} />
-          <span className="text-[16px] font-semibold tracking-[-0.02em]">CraftHQ</span>
-        </span>
+        <Image
+          src={logoGlass}
+          alt="CraftHQ"
+          height={36}
+          width={Math.round((36 * logoGlass.width) / logoGlass.height)}
+          loading="eager"
+          unoptimized
+        />
         <span className="text-[13px] text-muted-foreground">by BetaCraft</span>
       </header>
 
