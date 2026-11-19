@@ -81,6 +81,11 @@ A card whose filter is on has a blue edge. Values are never coloured.
 - **New story:** Title, Why, Detail, Owner and Files, as in the prototype; only Title is required.
 - The open story is in the URL, so links, reloads and Back reopen it. ↑/↓ (or J/K) move between stories, Esc closes and returns focus to the row. Copy link copies the URL.
 
+### Connecting accounts (`ConnectAccountsModal` from #4, `SetupBanner`, `setup.ts`)
+- After sign-in the login form goes to `/dashboard`. Whenever GitHub or Claude isn't connected, `ConnectAccountsModal` opens on load, with the dashboard behind it.
+- If someone skips it, a banner above the stats says what's missing and offers **Connect accounts**, which reopens the modal.
+- The mock connections start as not connected. The GitHub step only completes under `npm run dev`, because closing its window counts as approved only there.
+
 ### After an action
 The row folds away, the counts update, and a dark toast at the bottom says what happened, with **Undo** for 6 seconds (paused on hover).
 
@@ -126,6 +131,5 @@ The look follows the reference rather than `DESIGN.md`'s scale. A `DESIGN.md` ex
 ## 8. Still to do
 
 - Draft the `DESIGN.md` exception PR (§7).
-- `ConnectAccountsModal` (#4), being wired in the login → modal → dashboard flow: it opens over the dashboard on load whenever GitHub or Claude isn't connected, and after someone skips it a banner above the stats says what's missing and offers "Connect accounts".
 - Replace the sample data (`src/pages/dashboard/_sample-data.ts`) with the CraftHQ API.
 - Overlay a 2× screenshot on the reference to fine-tune type and spacing.
