@@ -1355,6 +1355,8 @@ Copy this into every UI pull request:
 | `globals.css` | `--radius` (14 px), `--serif` and the dark block are leftovers from the old site | retire them, or keep them with a "not used" comment | shared |
 | `LoginForm.tsx` | two error messages start lowercase ("sign-in failed", "network error — try again") | use sentence case (§9) | login owner |
 | `LoginForm.tsx`, `login/page.tsx` | arbitrary sizes (`h-[54px]`, `rounded-[20px]`, `text-[13px]`) | allowed on a brand surface; move them to tokens when the files are next touched | login owner |
+| `LoginForm.tsx` | while either field is empty, the "Sign in" button is faded (white text on pale blue, 1.63:1), but it's still clickable; §11 needs 4.5:1 | keep it full blue all the time (4.55:1), or use dark text in the faded state | login owner |
+| `LoginForm.tsx` | the helper text says "instance operator", but §4.1 says to use "workspace admin" | change the copy, or change §4.1 if "instance operator" is a deliberate product term | login owner |
 | `icons.tsx` | the custom `AlertCircleIcon` duplicates lucide's `CircleExclamationPoint` | swap it when the file is next touched | login owner |
 
 ---
