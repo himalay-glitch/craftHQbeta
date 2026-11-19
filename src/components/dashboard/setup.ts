@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ConnectionService, ConnectionsResponse } from "@/types/connections";
 
-const NAMES: Record<ConnectionService, string> = { github: "GitHub", claude: "Claude" };
-
 /** The required services that aren't connected yet, in the order people connect them. */
-async function fetchMissing(signal?: AbortSignal): Promise<string[]> {
+async function fetchMissing(signal?: AbortSignal): Promise<ConnectionService[]> {
   const res = await fetch("/api/connections", { cache: "no-store", signal });
   if (!res.ok) throw new Error(`GET /api/connections answered ${res.status}`);
   const { connections } = (await res.json()) as ConnectionsResponse;
-  return connections.filter((c) => c.required && c.status !== "connected").map((c) => NAMES[c.service]);
+  return connections.filter((c) => c.required && c.status !== "connected").map((c) => c.service);
 }
 
 /**
@@ -17,7 +15,7 @@ async function fetchMissing(signal?: AbortSignal): Promise<string[]> {
  * checks again, so the banner knows what's still missing.
  */
 export function useConnectionSetup() {
-  const [missing, setMissing] = useState<string[]>([]);
+  const [missing, setMissing] = useState<ConnectionService[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
