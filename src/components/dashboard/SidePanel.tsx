@@ -12,7 +12,7 @@ interface SidePanelProps {
   /** Extra icon buttons beside Close. */
   actions?: ReactNode;
   footer?: ReactNode;
-  /** 1024 px and wider: the page stays usable beside the panel. Narrower: it covers the page. */
+  /** 1024 px and wider: the panel floats over the page, which stays usable. Narrower: it covers the page with a scrim. */
   isWide: boolean;
   onClose: () => void;
   children: ReactNode;

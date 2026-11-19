@@ -75,7 +75,7 @@ A card whose filter is on has a blue edge. Values are never coloured.
 **Chip tones** (each pair at least 5.7:1): Stuck red (`#B3261E` on `#FDECEC`); Decision amber (`#8A5300` on `#FDF3DC`); Review and Planning blue (`#1F57C3` on `#E9F0FE`); Triage and Say what to do next grey (`#4A4B4D` on `#F0F0F0`).
 
 ### Panels (`SidePanel`, `StoryPanel`, `ActivityPanel`, `NewStoryPanel`)
-- 480 px from the right, under the top bar. On screens 1024 px and wider the page narrows beside it and stays usable; below that it covers the page with a scrim. Slides in over 200 ms; fades with reduced motion.
+- 480 px from the right, under the top bar. On screens 1024 px and wider it floats over the page with its shadow, with no scrim: the table keeps its full width underneath and stays clickable. Below that it covers the page with a scrim. Slides in over 200 ms; fades with reduced motion.
 - **Story panel:** the story's facts (Next, Stage, Waiting on, Owner, Open items, Updated), "Latest from the agent", and the group's actions, worded as in the prototype: Review → Accept · Done / Ask for changes; Planning → Approve and build / Ask a question; Decision → Let the defaults stand / Answer in a note; Stuck → Restart / Add a note; Triage → Move to planning / Cancel story; Say what to do next → Add a note. Notes open a box pinned to the bottom ("Notes get a reply. Code changes only after you approve.").
 - **Details panel:** the prototype's two tabs. With the agent: loop tick, Running and Queued, the running stories. Recent activity: the agent's runs, plus About and the version.
 - **New story:** Title, Why, Detail, Owner and Files, as in the prototype; only Title is required.

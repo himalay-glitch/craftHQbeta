@@ -294,108 +294,103 @@ export function Dashboard({ data }: { data: DashboardData }) {
 
   return (
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
-      {/* With a panel open on a wide screen, the page narrows beside it instead of hiding under it. */}
-      <div
-        className="transition-[padding] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none"
-        style={{ paddingRight: panelOpenWide ? "var(--panel-w)" : 0 }}
-      >
-        <main id="main" className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-16 md:px-8">
-          <div className="flex items-center justify-between gap-4">
-            <h1
-              id="dashboard-title"
-              tabIndex={-1}
-              className="text-[21px] leading-7 font-medium tracking-[-0.01em] text-[var(--tx)] outline-none"
-            >
-              Dashboard
-            </h1>
-            <button type="button" className={BTN_PRIMARY} onClick={() => openLocal({ kind: "new" })}>
-              <Plus aria-hidden="true" size={16} strokeWidth={2} />
-              New story
-            </button>
-          </div>
+      {/* Panels float over the page from the right; the table keeps its full width underneath. */}
+      <main id="main" className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-16 md:px-8">
+        <div className="flex items-center justify-between gap-4">
+          <h1
+            id="dashboard-title"
+            tabIndex={-1}
+            className="text-[21px] leading-7 font-medium tracking-[-0.01em] text-[var(--tx)] outline-none"
+          >
+            Dashboard
+          </h1>
+          <button type="button" className={BTN_PRIMARY} onClick={() => openLocal({ kind: "new" })}>
+            <Plus aria-hidden="true" size={16} strokeWidth={2} />
+            New story
+          </button>
+        </div>
 
-          {!setup.open && <SetupBanner missing={setup.missing} onConnect={setup.reopen} />}
+        {!setup.open && <SetupBanner missing={setup.missing} onConnect={setup.reopen} />}
 
-          {override === "loading" ? (
-            <DashboardSkeleton />
-          ) : override === "error" ? (
-            <>
-              <DashboardSkeleton part="cards" />
-              <div className="mt-5">
-                <QueueMessage kind="error" onRetry={() => window.location.assign(window.location.pathname)} />
-              </div>
-            </>
-          ) : (
-            <>
-              <SummaryCards
-                needsYou={youCount}
-                othersWaiting={othersWaiting}
-                readyToReview={reviewCount}
-                running={data.running.length}
-                queued={data.queued}
-                loopTick={data.loopTick}
-                stuck={stuckCount}
-                done={done}
-                totalStories={data.totalStories}
-                active={activeCard}
-                onNeedsYou={resetFilters}
-                onReview={() => setNeed((n) => (n === "review" ? "all" : "review"))}
-                onAgent={() => openLocal({ kind: "details", tab: "agent" })}
-                onStuck={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
-                onDone={() => openLocal({ kind: "details", tab: "activity" })}
+        {override === "loading" ? (
+          <DashboardSkeleton />
+        ) : override === "error" ? (
+          <>
+            <DashboardSkeleton part="cards" />
+            <div className="mt-5">
+              <QueueMessage kind="error" onRetry={() => window.location.assign(window.location.pathname)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <SummaryCards
+              needsYou={youCount}
+              othersWaiting={othersWaiting}
+              readyToReview={reviewCount}
+              running={data.running.length}
+              queued={data.queued}
+              loopTick={data.loopTick}
+              stuck={stuckCount}
+              done={done}
+              totalStories={data.totalStories}
+              active={activeCard}
+              onNeedsYou={resetFilters}
+              onReview={() => setNeed((n) => (n === "review" ? "all" : "review"))}
+              onAgent={() => openLocal({ kind: "details", tab: "agent" })}
+              onStuck={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
+              onDone={() => openLocal({ kind: "details", tab: "activity" })}
+            />
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <FilterPill name="Show" value={show} defaultValue="mine" options={showOptions} onChange={setShow} showDefaultValue />
+              <FilterPill
+                name="Filter"
+                value={need}
+                defaultValue="all"
+                options={needOptions}
+                onChange={setNeed}
+                formatActive={(label) => `Showing: ${label}`}
               />
+              {!filtersAreDefault && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="h-[30px] rounded-full px-2.5 text-[13px] text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.04] hover:text-[var(--tx)]"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
 
-              <div className="mt-5 flex flex-wrap items-center gap-2">
-                <FilterPill name="Show" value={show} defaultValue="mine" options={showOptions} onChange={setShow} showDefaultValue />
-                <FilterPill
-                  name="Filter"
-                  value={need}
-                  defaultValue="all"
-                  options={needOptions}
-                  onChange={setNeed}
-                  formatActive={(label) => `Showing: ${label}`}
-                />
-                {!filtersAreDefault && (
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="h-[30px] rounded-full px-2.5 text-[13px] text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.04] hover:text-[var(--tx)]"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              <div className="mt-4">
-                {visible.length === 0 ? (
-                  need === "all" ? (
-                    <QueueMessage kind="clear" mine={show === "mine"} />
-                  ) : (
-                    <QueueMessage kind="filtered" onClear={() => setNeed("all")} />
-                  )
+            <div className="mt-4">
+              {visible.length === 0 ? (
+                need === "all" ? (
+                  <QueueMessage kind="clear" mine={show === "mine"} />
                 ) : (
-                  <>
-                    <div className="hidden md:block">
-                      <QueueTable
-                        stories={visible}
-                        selectedId={openStory?.id ?? null}
-                        sort={sort}
-                        onSort={() =>
-                          setSort((s) => (s === "group" ? "updated-desc" : s === "updated-desc" ? "updated-asc" : "group"))
-                        }
-                        onOpen={open}
-                      />
-                    </div>
-                    <div className="md:hidden">
-                      <QueueList stories={visible} onOpen={open} />
-                    </div>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </main>
-      </div>
+                  <QueueMessage kind="filtered" onClear={() => setNeed("all")} />
+                )
+              ) : (
+                <>
+                  <div className="hidden md:block">
+                    <QueueTable
+                      stories={visible}
+                      selectedId={openStory?.id ?? null}
+                      sort={sort}
+                      onSort={() =>
+                        setSort((s) => (s === "group" ? "updated-desc" : s === "updated-desc" ? "updated-asc" : "group"))
+                      }
+                      onOpen={open}
+                    />
+                  </div>
+                  <div className="md:hidden">
+                    <QueueList stories={visible} onOpen={open} />
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </main>
 
       <AnimatePresence>
         {panel === "story" && openStory && (
@@ -436,6 +431,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
         )}
       </AnimatePresence>
 
+      {/* With a panel open, toasts centre in the uncovered part of the page so they don't sit on the panel's buttons. */}
       <Toast toast={toast} onDismiss={dismissToast} offsetRight={panelOpenWide ? "var(--panel-w)" : "0px"} />
 
       {/* Shubham's modal: right after sign-in it opens over the dashboard until GitHub and Claude are connected. */}
