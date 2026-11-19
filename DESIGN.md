@@ -801,6 +801,10 @@ Follow this pattern in onboarding, in Settings → Connections and in `ConnectAc
 - **OAuth:** open the provider in a popup (or redirect, on phones).
   - If the popup is blocked, show "Open GitHub sign-in" as a link.
   - Cancelling or failing returns to Not connected with an inline message. It's never a dead end.
+- **Sign in, then paste a code** (how Claude connects):
+  - **Sign in with Claude** opens the provider's page in a new tab. The row then shows a code field, "Paste the code from Claude's sign-in page", in mono with pasting allowed, and **Connect**. Enter also submits.
+  - The code is the one the provider's page shows after the person signs in. Never ask for a sign-in code from an email: that belongs on the provider's own page, and asking for it looks like phishing.
+  - A wrong code says "That code didn't work. Check it, or sign in again to get a new one." An expired code says "That code has expired. Sign in again to get a new one." Both offer **Sign in again**.
 - **Keys,** if a service uses one:
   - Use a password-style mono field, and allow pasting.
   - After saving, show only the last four characters ("•••• 9fA2"), with **Replace key**.
