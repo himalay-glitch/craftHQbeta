@@ -943,7 +943,7 @@ A 24, 28 or 32 px square in the ghost style, with a 16 px icon. An `aria-label` 
   - `bg-field` with no border, `rounded-lg`, 32 px tall (md) or 28 px (sm), with `px-3`.
   - Text is `text-sm`, or `text-base` on touch screens (`pointer-coarse:text-base`) so iOS doesn't zoom in.
 - **Hover:** `bg-field-hover`.
-- **Focus:** a white fill, a 1.5 px `--focus` ring and a 4 px `--focus-ring` halo: the login field's focus, scaled down.
+- **Focus:** a white fill, a 1.5 px `--focus` ring and a 4 px `--focus-ring` halo (`focus:shadow-focus`): the login field's focus, scaled down.
 - **Label and help text:** the label sits above the field (`text-sm font-medium`, with a 6 px gap) and help text below it (muted `text-sm`). An error replaces the help text.
 - **Placeholder:** an example, never the label. App forms always show labels; only the login page hides them.
 - **Text area:** starts at 3 lines, grows to 12, then scrolls.
@@ -1301,7 +1301,7 @@ The target is WCAG 2.2 AA.
   - text: `text-foreground`, `text-muted-foreground`, `text-faint`, `text-on-inverse`, `text-primary-strong`
   - borders: `border-border`, `border-border-strong`
   - action: `bg-primary`, `bg-primary-strong`
-  - shadows: `shadow-raised`, `shadow-popover`, `shadow-overlay`, `shadow-drag`
+  - shadows: `shadow-raised`, `shadow-popover`, `shadow-overlay`, `shadow-drag`, and `shadow-focus` for the filled-field focus ring
   - other: the tone tokens, `rounded-robot`, `tracking-title`
 
   The tokens PR adds the ones that don't exist yet (§14).
