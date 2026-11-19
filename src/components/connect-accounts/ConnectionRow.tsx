@@ -222,7 +222,7 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
     event.preventDefault();
     const trimmed = code.trim();
     if (!trimmed) {
-      setError(`Paste the code from ${copy.name}'s sign-in page.`);
+      setError(`Paste the code ${copy.name} showed you.`);
       return;
     }
     void connect("checking", "code", { code: trimmed });
@@ -304,6 +304,8 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
       <Button variant={branded ? branded.variant : variant} data-autofocus={isNext || undefined} onClick={openSignInWindow}>
         {mark ? <img src={mark} alt="" width={16} height={16} className="size-4 flex-none" /> : null}
         {`${verb} ${copy.name}`}
+        <ArrowUpRight {...ICON} />
+        <span className="sr-only">{` (opens a ${copy.name} window)`}</span>
       </Button>
     );
   } else if (!connected && phase === "idle" && usesCode) {
@@ -321,13 +323,13 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
           setPhase("code");
         }}
       >
-        {`Sign in with ${copy.name}`}
+        {`Connect ${copy.name}`}
         <ArrowUpRight {...ICON} />
         <span className="sr-only">(opens in a new tab)</span>
       </a>
     ) : (
       <Button variant={codeVariant} disabled>
-        {`Sign in with ${copy.name}`}
+        {`Connect ${copy.name}`}
       </Button>
     );
   }
@@ -340,7 +342,7 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
           <p className="mt-3 text-sm text-muted-foreground">
             {"No window? "}
             <a href={signInUrl} target="_blank" rel="noopener" className="text-primary-strong underline">
-              {`Open ${copy.name} sign-in`}
+              {`Open ${copy.name}`}
               <span className="sr-only"> (opens in a new tab)</span>
             </a>
           </p>
@@ -369,8 +371,9 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
     below = (
       <form onSubmit={submitCode} noValidate className="mt-4 flex flex-col gap-1.5">
         <label htmlFor={fieldId} className="text-sm font-medium">
-          {`Code from ${copy.name}'s sign-in page`}
+          {`Code from ${copy.name}`}
         </label>
+        <p className="text-sm text-muted-foreground">{`${copy.name} opened in a new tab. Sign in there, then paste the code it shows.`}</p>
         <div className="flex flex-wrap gap-2">
           <input
             id={fieldId}
@@ -398,7 +401,7 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
           <p className="text-sm text-muted-foreground">
             {"Didn't get a code? "}
             <a href={signInUrl} target="_blank" rel="noopener noreferrer" className="text-primary-strong underline">
-              Open the sign-in page again
+              {`Open ${copy.name} again`}
               <span className="sr-only"> (opens in a new tab)</span>
             </a>
           </p>

@@ -189,7 +189,7 @@ export function ConnectAccountsModal({ open, onClose }: ConnectAccountsModalProp
               Go to dashboard
             </Button>
           ) : (
-            <Button onClick={onClose}>Do this later</Button>
+            <Button onClick={onClose}>Skip for now</Button>
           )}
         </footer>
       </div>

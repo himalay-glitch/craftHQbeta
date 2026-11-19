@@ -49,12 +49,12 @@ export const POST = (async ({ params, request, url }) => {
   // Claude: the code from its sign-in page.
   if (methodOf(service) === "code") {
     const code = typeof body.code === "string" ? body.code.trim() : "";
-    if (!code) return errorResponse(`Paste the code from ${name}'s sign-in page.`, 400);
+    if (!code) return errorResponse(`Paste the code ${name} showed you.`, 400);
     await wait(CONNECT_DELAY_MS);
     if (simulate === "fail") return errorResponse(`${name} didn't finish connecting. Try again.`, 502);
-    if (simulate === "expired-code") return errorResponse("That code has expired. Sign in again to get a new one.", 410);
+    if (simulate === "expired-code") return errorResponse(`That code has expired. Get a new one from ${name}.`, 410);
     if (!isMockCode(code)) {
-      return errorResponse("That code didn't work. Check it, or sign in again to get a new one.", 400);
+      return errorResponse(`That code didn't work. Check it, or get a new one from ${name}.`, 400);
     }
     return Response.json({ connection: connect(service) } satisfies ConnectionResponse);
   }
