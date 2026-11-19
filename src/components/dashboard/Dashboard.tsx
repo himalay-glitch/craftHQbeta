@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { AnimatePresence } from "framer-motion";
 import { Tooltip } from "radix-ui";
 import { Plus } from "lucide-react";
+import { ConnectAccountsModal } from "@/components/connect-accounts";
 import type { DashboardData, DashboardStateOverride, NeedKind, Story, StoryStatus } from "@/types/dashboard";
 import { BTN_PRIMARY } from "./classes";
 import { clearStoryParam, NEEDS, readStoryParam, sortQueue, storyRef, URL_EVENT, writeStoryParam, type SortMode } from "./format";
@@ -12,6 +13,8 @@ import { NewStoryPanel } from "./NewStoryPanel";
 import { QueueList } from "./QueueList";
 import { QueueMessage } from "./QueueMessage";
 import { QueueTable } from "./QueueTable";
+import { SetupBanner } from "./SetupBanner";
+import { useConnectionSetup } from "./setup";
 import { StoryPanel, type StoryAction } from "./StoryPanel";
 import { SummaryCards } from "./SummaryCards";
 import { Toast, type ToastMessage } from "./Toast";
@@ -65,6 +68,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const override = useStateOverride();
   const urlStory = useUrlStory();
   const isWide = useIsWide();
+  const setup = useConnectionSetup();
 
   const [stories, setStories] = useState(data.stories);
   const [done, setDone] = useState(data.done);
@@ -169,7 +173,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
     if (panel === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest('[role="menu"], [role="listbox"], [role="tablist"]')) return;
+      // Keys inside the connect-accounts modal (a <dialog>) belong to it, Esc included.
+      if (target.closest('[role="menu"], [role="listbox"], [role="tablist"], dialog')) return;
       if (e.key === "Escape") {
         if (!e.defaultPrevented && !document.querySelector('[role="menu"]')) closePanel();
         return;
@@ -309,6 +314,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
             </button>
           </div>
 
+          {!setup.open && <SetupBanner missing={setup.missing} onConnect={setup.reopen} />}
+
           {override === "loading" ? (
             <DashboardSkeleton />
           ) : override === "error" ? (
@@ -430,6 +437,9 @@ export function Dashboard({ data }: { data: DashboardData }) {
       </AnimatePresence>
 
       <Toast toast={toast} onDismiss={dismissToast} offsetRight={panelOpenWide ? "var(--panel-w)" : "0px"} />
+
+      {/* Shubham's modal: right after sign-in it opens over the dashboard until GitHub and Claude are connected. */}
+      <ConnectAccountsModal open={setup.open} onClose={setup.close} />
     </Tooltip.Provider>
   );
 }
