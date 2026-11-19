@@ -1,20 +1,15 @@
-import type { NextRequest } from "next/server";
-import { MOCK_CODE, isService, methodOf } from "../../mock-store";
-import { errorResponse } from "../../respond";
+import type { APIRoute } from "astro";
+import { MOCK_CODE, isService, methodOf } from "../_mock-store";
+import { errorResponse } from "../_respond";
 
 /**
  * Development stand-in for the provider's sign-in page (Anthropic's, for Claude). It skips the
  * sign-in and shows the test code to paste back into CraftHQ. It deliberately looks like a plain
  * CraftHQ dev page, not like Anthropic's.
  */
-export async function GET(_request: NextRequest, ctx: RouteContext<"/api/connections/[service]/mock-sign-in">) {
-  const { service } = await ctx.params;
-  if (!isService(service) || methodOf(service) !== "code") {
-    return errorResponse("That service doesn't use a sign-in code.", 404);
-  }
 
-  return new Response(PAGE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
-}
+// Runs on the server for each request rather than being built ahead of time.
+export const prerender = false;
 
 const PAGE = `<!doctype html>
 <html lang="en">
@@ -40,3 +35,12 @@ const PAGE = `<!doctype html>
 </body>
 </html>
 `;
+
+export const GET = (({ params }) => {
+  const service = params.service ?? "";
+  if (!isService(service) || methodOf(service) !== "code") {
+    return errorResponse("That service doesn't use a sign-in code.", 404);
+  }
+
+  return new Response(PAGE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+}) satisfies APIRoute;

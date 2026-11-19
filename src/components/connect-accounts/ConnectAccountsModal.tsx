@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useId, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 import { CircleExclamationPoint, X } from "lucide-react";
 import type { Connection } from "@/types/connections";

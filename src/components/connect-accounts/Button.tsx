@@ -5,7 +5,8 @@ import type { ButtonHTMLAttributes } from "react";
  * area until decision 5 in DESIGN.md §15 settles where shared components go.
  */
 
-export type ButtonVariant = "primary" | "secondary" | "ghost";
+/** "inverse" (GitHub's black) and "claude" (Claude's orange) are only for that provider's sign-in button. */
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "inverse" | "claude";
 export type ButtonSize = "sm" | "md";
 
 const BASE =
@@ -17,6 +18,9 @@ const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-primary text-white not-disabled:hover:bg-primary-strong",
   secondary: "bg-field text-foreground not-disabled:hover:bg-field-hover",
   ghost: "bg-transparent text-muted-foreground not-disabled:hover:bg-hover not-disabled:hover:text-foreground",
+  inverse: "bg-inverse text-on-inverse not-disabled:hover:bg-inverse/85",
+  // White text: the orange is deepened (see globals.css) so it passes 4.5:1.
+  claude: "bg-brand-claude text-white not-disabled:hover:bg-brand-claude-hover",
 };
 
 /** sm is 28 px, for toolbars and rows; md is 32 px, the default (DESIGN.md §3.3). */

@@ -1,5 +1,6 @@
 import type {
   ConnectWithCodeBody,
+  ConnectWithTokenBody,
   Connection,
   ConnectionErrorBody,
   ConnectionResponse,
@@ -46,21 +47,35 @@ export async function fetchConnections(signal?: AbortSignal): Promise<Connection
   return (await request<ConnectionsResponse>(BASE, { signal })).connections;
 }
 
-/** Connects a service. Services that connect with a code (Claude) need `code`. */
+/** What a connection needs: a sign-in code (Claude), a developer token (GitHub's alternative), or nothing. */
+export type ConnectInput = { code: string } | { token: string } | Record<string, never>;
+
 export async function connectService(
   service: ConnectionService,
-  code?: string,
+  input: ConnectInput = {},
   signal?: AbortSignal,
 ): Promise<Connection> {
   const init: RequestInit = { method: "POST", signal };
-  if (code !== undefined) {
+  if ("code" in input) {
     init.headers = { "Content-Type": "application/json" };
-    init.body = JSON.stringify({ code } satisfies ConnectWithCodeBody);
+    init.body = JSON.stringify({ code: input.code } satisfies ConnectWithCodeBody);
+  } else if ("token" in input) {
+    init.headers = { "Content-Type": "application/json" };
+    init.body = JSON.stringify({ token: input.token } satisfies ConnectWithTokenBody);
   }
   return (await request<ConnectionResponse>(`${BASE}/${service}`, init)).connection;
 }
 
-/** The sign-in page to open, for services that connect with a code. */
+/**
+ * Local preview only: record how a sign-in window ended, because the real provider sends its answer
+ * to the live app, not to this machine. "no-repos" means approved, but no repositories are reachable.
+ */
+export async function previewWindowSignIn(service: ConnectionService, outcome: "connected" | "no-repos"): Promise<Connection> {
+  const query = outcome === "no-repos" ? "?simulate=no-repos" : "";
+  return (await request<ConnectionResponse>(`${BASE}/${service}${query}`, { method: "POST" })).connection;
+}
+
+/** The sign-in page to open: the provider's own page, or a local stand-in. */
 export async function startSignIn(service: ConnectionService, signal?: AbortSignal): Promise<string> {
   return (await request<SignInStartResponse>(`${BASE}/${service}/start`, { method: "POST", signal })).url;
 }

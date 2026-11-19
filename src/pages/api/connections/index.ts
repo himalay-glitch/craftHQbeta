@@ -1,20 +1,20 @@
-import type { NextRequest } from "next/server";
+import type { APIRoute } from "astro";
 import type { Connection, ConnectionsResponse } from "@/types/connections";
-import { listConnections } from "./mock-store";
+import { listConnections } from "./_mock-store";
 
 /**
  * Mock of GET /api/connections: the workspace's connections, in the order people connect
- * them (GitHub, then Claude). There's no backend yet, so state comes from ./mock-store.ts.
+ * them (GitHub, then Claude). There's no backend yet, so state comes from ./_mock-store.ts.
  *
  * Add `?simulate=expired` to preview GitHub needing attention.
  */
-export async function GET(request: NextRequest) {
-  // Reading the request keeps this handler dynamic under Cache Components; without it the
-  // response would be prerendered at build time and never change.
-  const simulate = request.nextUrl.searchParams.get("simulate");
 
+// Runs on the server for each request rather than being built ahead of time.
+export const prerender = false;
+
+export const GET = (({ url }) => {
   let connections = listConnections();
-  if (simulate === "expired") {
+  if (url.searchParams.get("simulate") === "expired") {
     connections = connections.map(
       (connection): Connection =>
         connection.service === "github"
@@ -24,4 +24,4 @@ export async function GET(request: NextRequest) {
   }
 
   return Response.json({ connections } satisfies ConnectionsResponse);
-}
+}) satisfies APIRoute;
