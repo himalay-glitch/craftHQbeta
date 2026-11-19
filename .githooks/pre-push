@@ -1,0 +1,11 @@
+#!/bin/sh
+# Blocks any push to main, including deleting it. Turn it on once per clone with:
+#   git config core.hooksPath .githooks
+# git passes one line per ref being pushed: <local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "Direct push to main is blocked. Push a feature branch and open a PR." >&2
+    exit 1
+  fi
+done
+exit 0

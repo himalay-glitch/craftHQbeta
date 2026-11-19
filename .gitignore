@@ -19,6 +19,7 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -31,7 +32,9 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
+# .env* covers .env, .env.local and .env.*.local; the template with placeholders is committed
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -48,3 +51,6 @@ next-env.d.ts
 
 # Blender frame sequences (re-render from design/blender/*.blend)
 design/renders/**/frame_*.png
+
+# personal Claude session notes stay local so they never conflict
+SESSION_LOG*.md
