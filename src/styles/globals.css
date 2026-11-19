@@ -75,6 +75,10 @@ html[data-theme="light"] {
   --danger-tint: rgb(185 28 28 / 0.08);
   --danger-hover: #991b1b;
 
+  /* Claude's sign-in button: Anthropic's orange (#d97757) deepened in the same hue, so white text passes 4.5:1 */
+  --brand-claude: #c4522c;
+  --brand-claude-hover: #af4928;
+
   /* Robot identity (DESIGN.md §3.1) */
   --bot-asker: #0b8fc9;
   --bot-asker-bg: #e1f0ff;
@@ -124,6 +128,8 @@ html[data-theme="light"] {
   --color-danger-ink: var(--danger-ink);
   --color-danger-tint: var(--danger-tint);
   --color-danger-hover: var(--danger-hover);
+  --color-brand-claude: var(--brand-claude);
+  --color-brand-claude-hover: var(--brand-claude-hover);
   --color-bot-asker: var(--bot-asker);
   --color-bot-asker-bg: var(--bot-asker-bg);
   --color-bot-builder: var(--bot-builder);
