@@ -1,0 +1,32 @@
+---
+// One story's page: /stories/hq-53. Rendered on request (not prerendered), so a story created in this
+// browser (kept in local storage until the CraftHQ API exists) also has a page; the island renders in the
+// browser only, where it can read that storage.
+export const prerender = false;
+
+import AppLayout from "@/layouts/AppLayout.astro";
+import { StoryPage } from "@/components/stories/StoryPage";
+import { buildThread } from "@/components/stories/thread";
+import type { StoryPageData } from "@/types/stories";
+import { storiesData } from "./_sample-data";
+import { threads } from "./_threads";
+
+const match = Astro.params.id?.match(/^hq-(\d+)$/);
+if (!match) return Astro.redirect("/stories");
+
+const storyId = Number(match[1]);
+const story = storiesData.stories.find((s) => s.id === storyId) ?? null;
+const data: StoryPageData = {
+  story,
+  storyId,
+  thread: story ? (threads[storyId] ?? buildThread(story, storiesData.people, storiesData.viewer)) : null,
+  viewer: storiesData.viewer,
+  people: storiesData.people,
+  stories: storiesData.stories.map(({ id, title }) => ({ id, title })),
+};
+const search = storiesData.stories.map(({ id, title, status }) => ({ id, title, status }));
+---
+
+<AppLayout title={`${story?.title ?? "Story"} · CraftHQ`} viewer={storiesData.viewer} search={search}>
+  <StoryPage client:only="react" data={data} />
+</AppLayout>
