@@ -2,32 +2,37 @@
 
 The CraftHQ web app. Today it has the login page. Two people are building the next parts in parallel, each with Claude on their own computer: himalay-glitch builds the dashboard screen and shubhampatil-lab builds the modal that asks users to connect their accounts (Claude and other services).
 
-Next.js 16 has breaking changes from older versions. Follow `AGENTS.md` and read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js code.
+The app is built with Astro 7: pages are `.astro` files rendered to HTML, and anything interactive is a React component that the page hydrates as an island. Astro 7 is newer than most training data, so check https://docs.astro.build before relying on an Astro API from memory.
 
 ## Stack
 
-- Next.js 16.4 (App Router in `src/app/`), React 19.3, TypeScript 5 in strict mode
-- Tailwind CSS 4.3, configured in CSS in `src/app/globals.css` and compiled through `@tailwindcss/turbopack`. There is no `tailwind.config` file.
+- Astro 7.3 with `@astrojs/react`, React 19.3, TypeScript 5 in strict mode, Node 22.12 or newer
+- Pages are static by default. A route that has to run on the server sets `export const prerender = false`, and the Node adapter (`@astrojs/node`, standalone) serves it.
+- Tailwind CSS 4.3, configured in CSS in `src/styles/globals.css` and compiled through `@tailwindcss/vite`. There is no `tailwind.config` file.
+- Inter is self-hosted with its optical-size axis through `@fontsource-variable/inter`, imported in `src/layouts/BaseLayout.astro`
 - framer-motion for animation, lucide-react for icons
-- ESLint 9 with `eslint-config-next`
-- `next.config.ts` turns on `cacheComponents` and `partialPrefetching`, and redirects `/` to `/login`
+- ESLint 10 with `typescript-eslint` and `eslint-plugin-react-hooks` lints `.ts` and `.tsx` files; `astro check` type-checks `.astro` files
+- `astro.config.mjs` holds the integrations, the adapter and the redirects (today `/` goes to `/login`)
 - No environment variables are read yet (see `.env.example`)
 
-Commands: `npm ci` to install, `npm run dev`, `npm run lint`, `npm run build`.
+Commands: `npm ci` to install, `npm run dev` (http://localhost:4321), `npm run lint`, `npm run build` (runs `astro check`, then builds), `npm start` to serve the build.
 
 ## Folder conventions
 
-- Pages are `src/app/<route>/page.tsx`. API routes are `src/app/api/<name>/route.ts`.
-- Components live in `src/components/`: one PascalCase `.tsx` file per component, with named exports (`export function LoginForm`). Files that use state, effects or browser APIs start with `"use client"`.
+- Pages are `src/pages/<route>.astro` or `src/pages/<route>/index.astro`. API routes are `src/pages/api/<name>.ts`: they export handlers such as `POST`, plus `export const prerender = false`.
+- Every page wraps its content in `src/layouts/BaseLayout.astro` (document, font, global CSS, metadata, icons). Signed-in screens will wrap theirs in `src/layouts/AppLayout.astro`, the app shell with the sidebar.
+- Interactive UI is React. Components live in `src/components/`: one PascalCase `.tsx` file per component, with named exports (`export function LoginForm`). A page hydrates one with a client directive: `client:load` when it has to work straight away (forms, the headline bot), `client:visible` or `client:idle` when it can wait. Without a directive, a React component renders to static HTML with no JavaScript. Astro ignores `"use client"`, so don't add it.
+- Islands don't share React state. Things that share state, like a button and the modal it opens, belong in one island.
+- Markup with no interactivity can be an `.astro` component instead of React.
 - Import from `src/` through the `@/` alias, for example `@/components/icons`.
 - Types live in `src/types/<area>.ts`.
-- Style with Tailwind utility classes and the colour tokens defined in `globals.css` (`bg-background`, `text-foreground`, `text-muted-foreground`, `var(--cta)`, `var(--field-bg)`). The site is light-only (`data-theme="light"` in `src/app/layout.tsx`). Keep styling in your own files; new tokens or classes in `globals.css` are a shared-file change.
-- Images use `next/image` with `unoptimized`. Static files live in `public/` and are referenced by absolute path, for example `/images/bots/builder.webp`. Videos ship as `.webm` and `.mp4` pairs.
+- Style with Tailwind utility classes and the colour tokens defined in `globals.css` (`bg-background`, `text-foreground`, `text-muted-foreground`, `var(--cta)`, `var(--field-bg)`). The site is light-only (`data-theme="light"` in `src/layouts/BaseLayout.astro`). Keep styling in your own files; new tokens or classes in `globals.css` are a shared-file change.
+- Images are plain `<img>` tags with `width` and `height`. Static files live in `public/` and are referenced by absolute path, for example `/images/bots/builder.webp`. Videos ship as `.webm` and `.mp4` pairs.
 - Blender files and renders are in `design/`; plans and reference screenshots are in `docs/`. Rendered frame sequences are gitignored.
 
 ## Design system
 
-All UI follows `DESIGN.md`. Read the sections that apply before building or changing any screen or component. When the code and `DESIGN.md` disagree, `DESIGN.md` wins: fix the code, or change the document first in its own shared-file PR.
+All UI follows `DESIGN.md`. Read the sections that apply before building or changing any screen or component. When the code and `DESIGN.md` disagree, `DESIGN.md` wins: fix the code if it's in your own area (if it isn't, tell its owner), or change the document first in its own shared-file PR.
 
 ## Who owns what
 
@@ -35,11 +40,12 @@ Only the owner edits an area. Importing code from the other person's area is fin
 
 | Area | Owner | Paths |
 |---|---|---|
-| Dashboard screen | himalay-glitch | `src/app/dashboard/`, `src/components/dashboard/`, `src/types/dashboard.ts`, `public/dashboard/` |
-| Connect-accounts modal | shubhampatil-lab | `src/components/connect-accounts/`, `src/app/api/connections/`, `src/types/connections.ts`, `public/connect-accounts/` |
-| Login page (existing) | himalay-glitch | `src/app/login/`, `src/components/LoginForm.tsx`, `src/components/RebusBot.tsx`, `src/components/icons.tsx`, `src/app/api/auth/`, `src/types/auth.ts`, `public/images/bots/`, `public/videos/bots/` |
+| App shell (sidebar and signed-in layout) | himalay-glitch | `src/layouts/AppLayout.astro`, `src/components/shell/` |
+| Dashboard screen | himalay-glitch | `src/pages/dashboard/`, `src/components/dashboard/`, `src/types/dashboard.ts`, `public/dashboard/` |
+| Connect-accounts modal | shubhampatil-lab | `src/components/connect-accounts/`, `src/pages/api/connections/`, `src/types/connections.ts`, `public/connect-accounts/` |
+| Login page (existing) | himalay-glitch | `src/pages/login.astro`, `src/components/LoginForm.tsx`, `src/components/RebusBot.tsx`, `src/components/icons.tsx`, `src/pages/api/auth/`, `src/types/auth.ts`, `public/images/bots/`, `public/videos/bots/` |
 | Design sources and docs | himalay-glitch | `design/`, `docs/` |
-| Shared: changed only in a separate, announced PR | both | `package.json`, `package-lock.json`, `src/app/layout.tsx`, `src/app/globals.css`, `next.config.ts` (routing and redirects), `tsconfig.json`, `eslint.config.mjs`, `.gitignore`, `.env.example`, `.githooks/`, `CLAUDE.md`, `DESIGN.md`, `AGENTS.md`, and any file in `public/` outside the folders above |
+| Shared: changed only in a separate, announced PR | both | `package.json`, `package-lock.json`, `astro.config.mjs` (integrations, adapter, routing and redirects), `src/layouts/BaseLayout.astro`, `src/styles/globals.css`, `src/components/ui/` (shared components, `DESIGN.md` §15 decision 5), `tsconfig.json`, `eslint.config.mjs`, `.gitignore`, `.env.example`, `.githooks/`, `CLAUDE.md`, `DESIGN.md`, and any file in `public/` outside the folders above |
 
 One exception: a PR that needs a new environment variable may add its placeholder line to `.env.example`.
 
@@ -50,10 +56,10 @@ Branch names start with `himalay/` or `shubham/`.
 The modal is meant to open from the dashboard, so the areas touch at one point:
 
 - shubhampatil-lab exports the modal as `ConnectAccountsModal` from `src/components/connect-accounts/index.ts`, with the props `open: boolean` and `onClose: () => void`.
-- himalay-glitch renders it from the dashboard code. Nobody else edits files inside `src/components/connect-accounts/`.
+- himalay-glitch renders it from inside one of the dashboard's own React islands (for example the setup checklist in `src/components/dashboard/`), which holds the open state, because separate islands don't share state. Nobody else edits files inside `src/components/connect-accounts/`.
 - Changing those props is an announced change: agree on it first, then the modal owner ships it, and the dashboard owner updates their side in a follow-up PR.
 
-Pointing `/` at the dashboard after sign-in (the login form sends people to `/`, which currently redirects to `/login`) means editing `next.config.ts`, so it goes in its own shared-file PR.
+Pointing `/` at the dashboard after sign-in (the login form sends people to `/`, which currently redirects to `/login`) means editing `astro.config.mjs`, so it goes in its own shared-file PR.
 
 ## First-time setup on each computer
 
@@ -64,7 +70,7 @@ git config core.hooksPath .githooks
 npm ci
 ```
 
-The `core.hooksPath` setting is stored per computer. Without it, the hook that blocks pushes to `main` never runs.
+It needs Node 22.12 or newer (`node --version`). The `core.hooksPath` setting is stored per computer. Without it, the hook that blocks pushes to `main` never runs.
 
 ## TEAM RULES
 
