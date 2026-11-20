@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
+import LoginIntro from "@/components/LoginIntro.astro";
 import { CraftHQLogo } from "@/components/icons";
 import { LoginForm } from "@/components/LoginForm";
 import { RebusBot, type RebusBotItem } from "@/components/RebusBot";
@@ -18,8 +19,10 @@ const team: RebusBotItem[] = [
 ---
 
 <BaseLayout>
+  {/* First, so its gate runs before the page paints (DESIGN.md §8.8). */}
+  <LoginIntro />
   <div class="flex min-h-dvh flex-col bg-background">
-    <header class="flex h-16 flex-none items-center justify-between px-5 sm:px-8">
+    <header class="flex h-16 flex-none items-center justify-between px-5 sm:px-8" data-intro-fade="3">
       <span class="flex items-center gap-2">
         <CraftHQLogo height={36} />
         <span class="text-[16px] font-semibold tracking-[-0.02em]">CraftHQ</span>
@@ -34,14 +37,14 @@ const team: RebusBotItem[] = [
         <h1 class="sr-only">Your robot build team, shipping 10× faster.</h1>
         <p aria-hidden="true" class="hero-title">
           <span class="block">
-            Your <RebusBot client:load bots={team} /> build team,
+            <span data-intro-fade="1">Your</span> <RebusBot client:load bots={team} /> <span data-intro-fade="1">build team,</span>
           </span>
-          <span class="block">shipping 10× faster</span>
+          <span class="block" data-intro-fade="1">shipping 10× faster</span>
         </p>
 
-        <p class="mt-4 text-[16px] leading-6 text-muted-foreground">Sign in to your build team</p>
+        <p class="mt-4 text-[16px] leading-6 text-muted-foreground" data-intro-fade="2">Sign in to your build team</p>
 
-        <div class="mt-8 w-full max-w-[400px]">
+        <div class="mt-8 w-full max-w-[400px]" data-intro-fade="3">
           <LoginForm client:load />
         </div>
       </div>
