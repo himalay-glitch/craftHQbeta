@@ -1,0 +1,728 @@
+<!doctype html>
+<!--
+  Login intro prototype, for review. Lives only on shubham/local-demo (a demo branch that never
+  becomes a PR). With that branch checked out, `npm run dev` serves it at
+  http://localhost:4321/prototypes/login-intro/index.html. It uses the app's own Builder clips, poster and
+  logo; the real login page (src/pages/login.astro) is unchanged.
+-->
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CraftHQ login intro (prototype)</title>
+
+    <!--
+      Gate: runs before the first paint. If the intro will play, the page starts blank, so the
+      full login page never flashes before the mascot appears. The real version plays once per
+      browser session; this prototype plays on every load so it can be reviewed.
+    -->
+    <script>
+      (function () {
+        var PROTOTYPE_ALWAYS_PLAY = true;
+        try {
+          var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          var seen = false;
+          try {
+            seen = sessionStorage.getItem("crafthq:intro") === "seen";
+          } catch (e) {}
+          if (!reduced && (!seen || PROTOTYPE_ALWAYS_PLAY)) {
+            document.documentElement.setAttribute("data-intro", "pending");
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    <style>
+      /* ---------- Copied from the app: font, tokens, reset (src/styles/globals.css) ---------- */
+      @font-face {
+        font-family: "Inter Variable";
+        font-style: normal;
+        font-display: swap;
+        font-weight: 100 900;
+        src: url(/prototypes/login-intro/inter-latin-opsz-normal.woff2) format("woff2-variations");
+      }
+      :root {
+        --font: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --bg: #fcfcfc;
+        --text: #111112;
+        --muted: rgb(0 4 9 / 0.59);
+        --field-bg: rgb(0 0 0 / 0.05);
+        --field-bg-hover: rgb(0 0 0 / 0.07);
+        --field-bg-focus: #fff;
+        --focus: #2f6fed;
+        --focus-ring: rgb(47 111 237 / 0.16);
+        --cta: #2f6fed;
+        --cta-hover: #2459d6;
+        /* DESIGN.md §3.7 motion tokens */
+        --ease-out: cubic-bezier(0.2, 0, 0, 1);
+        --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+        --ease-plush: cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        height: 100%;
+      }
+      body {
+        background: var(--bg);
+        min-height: 100%;
+        color: var(--text);
+        font-family: var(--font);
+        font-optical-sizing: auto;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.5;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .block {
+        display: block;
+      }
+
+      /* ---------- Copied from the app: login page layout (src/pages/login.astro) ---------- */
+      .page {
+        display: flex;
+        min-height: 100dvh;
+        flex-direction: column;
+        background: var(--bg);
+      }
+      .top {
+        display: flex;
+        height: 64px;
+        flex: none;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+      }
+      .top img {
+        display: block;
+        height: 24px;
+        width: auto;
+      }
+      .top span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      @media (min-width: 640px) {
+        .top {
+          padding: 0 32px;
+        }
+      }
+      main {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 0 20px 64px;
+      }
+      .hero {
+        display: flex;
+        width: 100%;
+        max-width: 640px;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .subtitle {
+        margin-top: 16px;
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--muted);
+      }
+      .form-wrap {
+        margin-top: 32px;
+        width: 100%;
+        max-width: 400px;
+      }
+
+      /* ---------- Copied from the app: the headline and the bot (globals.css) ---------- */
+      .hero-title {
+        font-size: clamp(36px, 3.4vw + 14px, 62px);
+        font-weight: 500;
+        line-height: 1.1;
+        letter-spacing: -0.01em;
+        text-wrap: balance;
+      }
+      .rebus-slot {
+        position: relative;
+        display: inline-block;
+        width: 1.08em;
+        height: 1.08em;
+        margin: 0 -0.07em;
+        vertical-align: -0.08em;
+        mix-blend-mode: darken;
+        cursor: default;
+        transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .rebus-slot:hover {
+        transform: scale(1.06) rotate(-3deg);
+      }
+      .rebus-bot {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transform: scale(0.55) rotate(-12deg);
+        transition:
+          transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
+          opacity 0.18s ease-out;
+      }
+      .rebus-bot.is-active {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+      }
+      .rebus-bot > video,
+      .rebus-bot > img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transform: scale(1.18);
+      }
+      .rebus-bot > .rebus-work {
+        opacity: 0;
+        transition: opacity 0.12s linear;
+      }
+      .rebus-slot[data-working="true"] .rebus-bot.is-active > .rebus-work {
+        opacity: 1;
+      }
+      .rebus-chip {
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 8px);
+        translate: -50% 4px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #111112;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 16px;
+        letter-spacing: 0;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.15s ease-out,
+          translate 0.2s ease-out;
+      }
+      .rebus-slot[data-working="true"] .rebus-chip {
+        opacity: 1;
+        translate: -50% 0;
+      }
+
+      /* ---------- Copied from the app: the form (src/components/LoginForm.tsx) ---------- */
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .field {
+        height: 54px;
+        width: 100%;
+        border-radius: 20px;
+        border: none;
+        background: var(--field-bg);
+        padding: 0 16px;
+        font: inherit;
+        font-size: 16px;
+        line-height: 22px;
+        color: var(--text);
+        transition:
+          background-color 150ms,
+          box-shadow 150ms;
+      }
+      .field::placeholder {
+        color: var(--muted);
+      }
+      .field:hover {
+        background: var(--field-bg-hover);
+      }
+      .field:focus {
+        background: var(--field-bg-focus);
+        outline: none;
+        box-shadow:
+          0 0 0 1.5px var(--focus),
+          0 0 0 5px var(--focus-ring);
+      }
+      .cta {
+        margin-top: 8px;
+        height: 44px;
+        width: 100%;
+        cursor: pointer;
+        border-radius: 999px;
+        border: none;
+        background: var(--cta);
+        font: inherit;
+        font-size: 16px;
+        font-weight: 500;
+        color: #fff;
+        transition:
+          background-color 150ms,
+          transform 150ms;
+      }
+      .cta[data-ready="false"] {
+        background: color-mix(in srgb, var(--cta) 36%, #fff);
+      }
+      .cta[data-ready="true"]:hover {
+        background: var(--cta-hover);
+      }
+      .cta:active {
+        transform: translateY(1px);
+      }
+      .helper {
+        margin-top: 4px;
+        text-align: center;
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--muted);
+      }
+
+      /* ---------- New: the intro ---------- */
+      /* While the intro is pending or playing, everything except the bot is hidden. */
+      html[data-intro] .intro-fade {
+        opacity: 0;
+      }
+      /* Pending: the page is blank until the clip and the font are ready. */
+      html[data-intro="pending"] .rebus-slot {
+        opacity: 0;
+      }
+      html[data-intro] .rebus-slot {
+        pointer-events: none;
+      }
+      /* Safety net: if the script never starts the intro, show the page after 2.5 s anyway. */
+      html[data-intro="pending"] .intro-fade,
+      html[data-intro="pending"] .rebus-slot {
+        animation: intro-failsafe 0s 2.5s forwards;
+      }
+      @keyframes intro-failsafe {
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* ---------- Prototype only: the review bar ---------- */
+      .review {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        left: 16px;
+        margin-left: auto;
+        max-width: max-content;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px 6px 14px;
+        border-radius: 999px;
+        background: #fff;
+        box-shadow:
+          0 0 0 1px rgb(0 0 0 / 0.06),
+          0 4px 16px rgb(0 0 0 / 0.08);
+        font-size: 12px;
+        line-height: 16px;
+        color: var(--muted);
+        opacity: 0.55;
+        transition: opacity 150ms;
+        z-index: 10;
+      }
+      .review:hover,
+      .review:focus-within {
+        opacity: 1;
+      }
+      .review strong {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .review button {
+        height: 28px;
+        padding: 0 12px;
+        border: none;
+        border-radius: 999px;
+        background: var(--field-bg);
+        font: inherit;
+        font-weight: 500;
+        color: var(--text);
+        cursor: pointer;
+      }
+      .review button:hover {
+        background: var(--field-bg-hover);
+      }
+      .review input[type="range"] {
+        width: 140px;
+        accent-color: var(--cta);
+      }
+      .review output {
+        min-width: 3.4em;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+      }
+      @media (max-width: 480px) {
+        .review {
+          border-radius: 16px;
+          justify-content: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="top intro-fade" data-step="3">
+        <img src="/dashboard/crafthq-logo-glass.webp" width="84" height="24" alt="CraftHQ" />
+        <span>by BetaCraft</span>
+      </header>
+
+      <main>
+        <div class="hero">
+          <h1 class="sr-only">Your robot build team, shipping 10× faster.</h1>
+          <p aria-hidden="true" class="hero-title">
+            <span class="block"
+              ><span class="intro-fade" data-step="1">Your</span>
+              <span class="rebus-slot" data-working="false"
+                ><span class="rebus-bot is-active"
+                  ><video
+                    class="rebus-idle"
+                    poster="/images/bots/builder.webp"
+                    muted
+                    loop
+                    playsinline
+                    autoplay
+                    preload="auto"
+                    disablepictureinpicture
+                    tabindex="-1"
+                  >
+                    <source src="/videos/bots/builder-idle.webm" type="video/webm" />
+                    <source src="/videos/bots/builder-idle.mp4" type="video/mp4" /></video
+                  ><video
+                    class="rebus-work"
+                    muted
+                    loop
+                    playsinline
+                    preload="auto"
+                    disablepictureinpicture
+                    tabindex="-1"
+                  >
+                    <source src="/videos/bots/builder-work.webm" type="video/webm" />
+                    <source src="/videos/bots/builder-work.mp4" type="video/mp4" /></video></span
+                ><span class="rebus-chip">Builder · builds it</span></span
+              >
+              <span class="intro-fade" data-step="1">build team,</span></span
+            >
+            <span class="block intro-fade" data-step="1">shipping 10× faster</span>
+          </p>
+
+          <p class="subtitle intro-fade" data-step="2">Sign in to your build team</p>
+
+          <div class="form-wrap intro-fade" data-step="3">
+            <!-- Prototype: the form goes nowhere. -->
+            <form id="login">
+              <label class="sr-only" for="login-email">Email</label>
+              <input id="login-email" class="field" type="email" placeholder="you@example.com" autocomplete="email" />
+              <label class="sr-only" for="login-password">Password</label>
+              <input id="login-password" class="field" type="password" placeholder="Password" autocomplete="current-password" />
+              <button class="cta" type="submit" data-ready="false">Sign in</button>
+              <p class="helper">Use the email your instance operator registered for you.</p>
+            </form>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div class="review" data-review>
+      <span><strong>Prototype</strong> · login intro</span>
+      <button type="button" data-act="replay">Replay</button>
+      <button type="button" data-act="slow">Replay at ¼ speed</button>
+      <input type="range" min="0" max="2120" step="10" value="0" aria-label="Scrub through the intro" />
+      <output>0.00 s</output>
+    </div>
+
+    <script>
+      (function () {
+        var html = document.documentElement;
+        var slot = document.querySelector(".rebus-slot");
+        var bot = slot.querySelector(".rebus-bot");
+        var idle = slot.querySelector(".rebus-idle");
+        var work = slot.querySelector(".rebus-work");
+        var fades = Array.prototype.slice.call(document.querySelectorAll(".intro-fade"));
+        var scrub = document.querySelector('.review input[type="range"]');
+        var readout = document.querySelector(".review output");
+
+        // ---- Timing (ms). One hop on the blank screen, a second hop carries it into the headline. ----
+        var EASE = {
+          out: "cubic-bezier(0.2, 0, 0, 1)", // --ease-out: things entering
+          inOut: "cubic-bezier(0.4, 0, 0.2, 1)", // --ease-in-out: things moving across the screen
+          plush: "cubic-bezier(0.34, 1.56, 0.64, 1)", // --ease-plush: robots only
+        };
+        var T = {
+          pop: 450, // the mascot pops in (--duration-playful)
+          flyAt: 1100, // it starts moving to its seat in the headline, mid-way through its second hop
+          land: 1800, // it lands in the headline on the hop clip's landing squash, then stands up (idle)
+          swap: 120, // the hop clip cross-fades to the idle loop (same as the hover cross-fade)
+          // Headline words, then subtitle, then form and header. They wait until the bot has flown
+          // past the second line: its darken blend would let dark text show through its body.
+          fadeAt: { 1: 1700, 2: 1780, 3: 1860 },
+          fade: 300, // --duration-slow
+        };
+        var DONE = Math.max(T.land + T.swap, T.fadeAt[3] + T.fade);
+        // builder-work is two hops in 2 s. Start it part-way in, so its loop ends exactly on landing.
+        var HOP_CLIP = 2000;
+        var HOP_OFFSET = (HOP_CLIP - (T.land % HOP_CLIP)) % HOP_CLIP;
+        var BIG = function () {
+          // How big the mascot is on the blank screen (its visible size, in CSS px).
+          return Math.min(176, window.innerWidth * 0.42, window.innerHeight * 0.32);
+        };
+
+        var run = null; // the intro in progress, if any
+
+        function start(rate) {
+          stop();
+          html.setAttribute("data-intro", "playing");
+
+          // FLIP: measure where the bot sits in the headline, then start it at the centre of the
+          // screen and animate it home. The bot that lands is the real one, so there is no swap.
+          var r = slot.getBoundingClientRect();
+          var dx = window.innerWidth / 2 - (r.left + r.width / 2);
+          var dy = window.innerHeight * 0.46 - (r.top + r.height / 2);
+          var s = BIG() / (r.width * 1.18);
+          var anims = [];
+
+          anims.push(
+            slot.animate(
+              [
+                { translate: dx + "px " + dy + "px", scale: s },
+                { translate: dx + "px " + dy + "px", scale: s, offset: T.flyAt / T.land, easing: EASE.inOut },
+                { translate: "0px 0px", scale: 1 },
+              ],
+              { duration: T.land, fill: "both" },
+            ),
+          );
+          anims.push(
+            bot.animate(
+              [
+                { opacity: 0, transform: "scale(0.55) rotate(-12deg)" },
+                { opacity: 1, transform: "scale(1) rotate(0deg)" },
+              ],
+              { duration: T.pop, easing: EASE.plush, fill: "both" },
+            ),
+          );
+          anims.push(
+            work.animate([{ opacity: 1 }, { opacity: 1, offset: T.land / (T.land + T.swap) }, { opacity: 0 }], {
+              duration: T.land + T.swap,
+              fill: "both",
+            }),
+          );
+          fades.forEach(function (el) {
+            anims.push(
+              el.animate([{ opacity: 0 }, { opacity: 1 }], {
+                duration: T.fade,
+                delay: T.fadeAt[el.getAttribute("data-step")],
+                easing: EASE.out,
+                fill: "both",
+              }),
+            );
+          });
+
+          // Markers on the same clock, so they follow slow motion and skipping.
+          var landed = new Animation(new KeyframeEffect(null, [], { duration: T.land }), document.timeline);
+          landed.onfinish = function () {
+            if (!run) return;
+            idle.currentTime = 0;
+            play(idle, rate);
+          };
+          var done = new Animation(new KeyframeEffect(null, [], { duration: DONE }), document.timeline);
+          done.onfinish = finishCleanly;
+          anims.push(landed, done);
+
+          anims.forEach(function (a) {
+            a.playbackRate = rate;
+            a.play();
+          });
+          idle.pause();
+          work.currentTime = HOP_OFFSET / 1000;
+          play(work, rate);
+
+          run = { anims: anims, rate: rate };
+          tick();
+        }
+
+        function play(video, rate) {
+          video.playbackRate = rate;
+          var p = video.play();
+          if (p) p.catch(function () {});
+        }
+
+        // Jump to the end: any click, tap or key press during the intro skips it.
+        function skip() {
+          if (!run) return;
+          run.anims.forEach(function (a) {
+            try {
+              a.finish();
+            } catch (e) {}
+          });
+        }
+
+        function finishCleanly() {
+          if (!run) return;
+          stop();
+          try {
+            sessionStorage.setItem("crafthq:intro", "seen");
+          } catch (e) {}
+        }
+
+        // Back to the plain login page: no intro state, idle loop playing.
+        function stop() {
+          if (run) run.anims.forEach(function (a) {
+            a.cancel();
+          });
+          run = null;
+          html.removeAttribute("data-intro");
+          work.pause();
+          work.currentTime = 0;
+          work.playbackRate = 1;
+          idle.playbackRate = 1;
+          if (idle.paused) play(idle, 1);
+        }
+
+        // ---- Start once the hop clip and the font are ready, so the landing spot is measured on
+        // the final layout. If they aren't ready in 1.2 s, skip the intro rather than make anyone wait.
+        function ready(timeout) {
+          var clip = new Promise(function (res) {
+            if (work.readyState >= 4) return res();
+            work.addEventListener("canplaythrough", res, { once: true });
+          });
+          var font = document.fonts ? document.fonts.ready : Promise.resolve();
+          var timer = new Promise(function (res) {
+            setTimeout(function () {
+              res(false);
+            }, timeout);
+          });
+          return Promise.race([
+            Promise.all([clip, font]).then(function () {
+              return true;
+            }),
+            timer,
+          ]);
+        }
+
+        function whenVisible() {
+          return new Promise(function (res) {
+            if (!document.hidden) return res();
+            document.addEventListener("visibilitychange", function on() {
+              if (!document.hidden) {
+                document.removeEventListener("visibilitychange", on);
+                res();
+              }
+            });
+          });
+        }
+
+        if (html.getAttribute("data-intro") === "pending") {
+          ready(1200).then(function (ok) {
+            if (!ok) return stop();
+            whenVisible().then(function () {
+              requestAnimationFrame(function () {
+                start(1);
+              });
+            });
+          });
+        }
+
+        // Skip on input (the review bar doesn't count). A width change (rotating a phone, resizing
+        // a window) also skips it, since the landing spot moves. Height alone doesn't: phones change
+        // it when the browser toolbar slides.
+        function isReview(e) {
+          return e.target && e.target.closest && e.target.closest("[data-review]");
+        }
+        window.addEventListener("pointerdown", function (e) {
+          if (!isReview(e)) skip();
+        });
+        window.addEventListener("keydown", function (e) {
+          if (!isReview(e)) skip();
+        });
+        var lastWidth = window.innerWidth;
+        window.addEventListener("resize", function () {
+          if (window.innerWidth !== lastWidth) skip();
+          lastWidth = window.innerWidth;
+        });
+
+        // ---- The bot's normal hover behaviour, as in RebusBot.tsx ----
+        slot.addEventListener("pointerenter", function () {
+          if (run) return;
+          slot.setAttribute("data-working", "true");
+          work.currentTime = 0;
+          play(work, 1);
+        });
+        slot.addEventListener("pointerleave", function () {
+          if (run) return;
+          slot.setAttribute("data-working", "false");
+          work.pause();
+        });
+
+        // ---- The form is inert in the prototype ----
+        var form = document.getElementById("login");
+        var email = document.getElementById("login-email");
+        var pass = document.getElementById("login-password");
+        var cta = form.querySelector(".cta");
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+        });
+        form.addEventListener("input", function () {
+          cta.setAttribute("data-ready", String(email.value.length > 0 && pass.value.length > 0));
+        });
+
+        // ---- Prototype only: replay, slow motion, scrubbing ----
+        function tick() {
+          if (!run) {
+            readout.textContent = "done";
+            return;
+          }
+          var t = run.anims[0].currentTime || 0;
+          if (run.anims[run.anims.length - 1].playState === "running") {
+            scrub.value = String(Math.round(t));
+            readout.textContent = (t / 1000).toFixed(2) + " s";
+          }
+          requestAnimationFrame(tick);
+        }
+
+        // Freeze the intro at a moment (ms) to inspect it.
+        function seek(ms) {
+          if (!run) start(1);
+          run.anims.forEach(function (a) {
+            a.pause();
+            a.currentTime = ms;
+          });
+          work.pause();
+          idle.pause();
+          work.currentTime = ((HOP_OFFSET + Math.min(ms, T.land - 1)) % HOP_CLIP) / 1000;
+          idle.currentTime = Math.max(0, ms - T.land) / 1000;
+          readout.textContent = (ms / 1000).toFixed(2) + " s";
+        }
+        window.__introSeek = seek;
+
+        scrub.max = String(DONE);
+        document.querySelector('[data-act="replay"]').addEventListener("click", function () {
+          start(1);
+        });
+        document.querySelector('[data-act="slow"]').addEventListener("click", function () {
+          start(0.25);
+        });
+        scrub.addEventListener("input", function () {
+          seek(Number(scrub.value));
+        });
+      })();
+    </script>
+  </body>
+</html>
