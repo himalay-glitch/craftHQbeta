@@ -58,6 +58,8 @@ export const threads: Record<number, StoryThreadData> = {
           " ask before resolving anything that conflicts.",
         ],
       },
+      { kind: "stage", id: "53-verified", at: "Nov 19", text: "Checked by a second agent · it does what the story asks" },
+      { kind: "stage", id: "53-pr", at: "Nov 19", text: "Pull request #259 updated" },
       { kind: "stage", id: "53-review", at: "Nov 19", text: "Moved to In review" },
       {
         kind: "message",
@@ -67,7 +69,7 @@ export const threads: Record<number, StoryThreadData> = {
         report: {
           outcome: "Ready for your review. All 1,253 automated checks passed, and the “more” fix on the bio holds.",
           means: "The profile page works as the story asks, in English and Korean. Event places still show the venue name rather than the area, as noted before.",
-          next: "Skye: open Profile in the preview, try the card and list switch and “more”, then accept it.",
+          next: "Skye: open Profile in the preview, try the card and list switch and “more”, then merge pull request #259 and mark the story Done.",
           details: ["Merged main: no conflicts", "Checked on web and Android sizes", "No other screens changed"],
         },
       },

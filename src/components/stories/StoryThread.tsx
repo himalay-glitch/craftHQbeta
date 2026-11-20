@@ -350,7 +350,7 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
         <TheirRow author={{ kind: "agent" }} head={lastKey !== "agent"} at="Now">
           <div className={`${CARD} ${chat.enter}`}>
             <p className="m-0 flex items-center gap-1.5 text-[12px] leading-4 text-[var(--tx2)]">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--cta)]" />
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-[#d97706]" />
               {ask.label}
             </p>
             <p className="m-0 mt-1.5 text-[14px] leading-5 font-semibold">{ask.title}</p>

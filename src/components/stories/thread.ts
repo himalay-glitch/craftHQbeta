@@ -10,6 +10,9 @@ const reached = (s: StoryItem, stage: (typeof STAGE_ORDER)[number]) =>
 
 export const AGENT: Author = { kind: "agent" };
 
+/** The story's pull request (front end only): the agent opens it once the work passes its check. */
+export const prNumberFor = (id: number) => 100 + id * 3;
+
 export function personFor(initials: string | undefined, people: Person[], viewer: Viewer): Author {
   const p = people.find((x) => x.initials === initials) ?? viewer;
   return { kind: "person", name: p.name, initials: p.initials };
@@ -38,11 +41,12 @@ export function buildFacts(s: StoryItem, owner?: string): StoryFacts {
           ? { state: "running", line: "Running with the build" }
           : { state: "none", line: "Written from the plan" },
     plan: s.status === "new" ? "Being written" : "Written",
+    // Opened by the agent when the work passes its check; merged by a person, never by the agent.
     pullRequest: done
       ? { state: "merged", line: "Merged into main" }
       : review
-        ? { state: "none", line: "Not opened yet" }
-        : { state: "none", line: "Opens after review" },
+        ? { state: "open", line: `Open · #${prNumberFor(s.id)} · waiting for you to merge` }
+        : { state: "none", line: "Opens when the work passes its check" },
     ownerName: owner,
     source: "Typed in CraftHQ",
     repository: "we-pop",
@@ -153,6 +157,8 @@ export function buildThread(s: StoryItem, people: Person[], viewer: Viewer): Sto
       summary: "Built in 38m · 6 steps",
       steps: ["Read the plan", "Changed the screens", "Added sample data", "Wrote the checks", "Ran 214 checks: all passed", "Built the preview"],
     });
+    e.push({ kind: "stage", id: id("verified"), at: "Nov 12", text: "Checked by a second agent · it does what the story asks" });
+    e.push({ kind: "stage", id: id("pr"), at: "Nov 12", text: `Pull request #${prNumberFor(s.id)} opened` });
     e.push({ kind: "stage", id: id("review"), at: "Nov 12", text: "Moved to In review" });
     e.push({
       kind: "message",
@@ -160,16 +166,16 @@ export function buildThread(s: StoryItem, people: Person[], viewer: Viewer): Sto
       at: "Nov 12",
       author: AGENT,
       report: {
-        outcome: "Ready for your review. All 214 automated checks passed.",
+        outcome: "Ready for your review. All 214 automated checks passed, and a second agent checked it against the story.",
         means: `“${s.title}” works as the story asks, in the preview.`,
-        next: `${first}: open the preview, try it, then accept it or ask for changes.`,
+        next: `${first}: try the preview and read pull request #${prNumberFor(s.id)}. To accept, merge it and mark the story Done; to change it, write a note and rebuild.`,
         details: ["Checked on web and Android sizes", "Used the sample events for empty states", "No other screens were changed"],
       },
     });
   }
 
   if (s.status === "done") {
-    e.push({ kind: "stage", id: id("accepted"), at: "Nov 13", text: `Accepted by ${ownerName ?? "the owner"} · merged into main` });
+    e.push({ kind: "stage", id: id("accepted"), at: "Nov 13", text: `Pull request merged · marked Done by ${ownerName ?? "the owner"}` });
   }
 
   if (s.status === "cancelled") {

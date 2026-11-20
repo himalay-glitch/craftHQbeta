@@ -20,6 +20,9 @@ interface StoryComposerProps {
   onRebuildChange: (rebuild: boolean) => void;
   /** Quick replies shown above the box; choosing one fills it in. */
   suggestions?: string[];
+  /** The line above the box: what a note does in the story's status (statuses guide: a note is a conversation,
+   *  a status is an instruction). */
+  hint?: string;
   onSend: (message: { text: Segment[]; files: FileRef[]; rebuild: boolean }) => void;
 }
 
@@ -46,10 +49,11 @@ const kindOf = (f: File): FileRef["kind"] => (f.type.startsWith("image/") ? "ima
 
 /**
  * The message box: a rounded field with + to attach (or paste, or drop anything on it) and a send button
- * that wakes up as you type. "@" brings in a teammate or the agent, "#" links another story. In review,
- * "Rebuild after sending" turns a note into a change request. The draft is kept per story.
+ * that wakes up as you type. "@" brings in a teammate or the agent, "#" links another story. Above it, one
+ * line says what a note does right now. In review, "Rebuild after sending" turns a note into a change request
+ * (a note, then Approved). The draft is kept per story.
  */
-export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, onRebuildChange, suggestions = [], onSend }: StoryComposerProps) {
+export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, onRebuildChange, suggestions = [], hint, onSend }: StoryComposerProps) {
   // The story page renders only in the browser (client:only), so local storage can be read straight away.
   const [text, setText] = useState(() => readDraft(storyId));
   const [files, setFiles] = useState<Attachment[]>([]);
@@ -172,6 +176,12 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
         </div>
       )}
 
+      {hint && (
+        <p id={`${COMPOSER_INPUT_ID}-hint`} className="m-0 mb-2 px-3 text-[12px] leading-4 text-[var(--tx2)]">
+          {hint}
+        </p>
+      )}
+
       <div
         onDragOver={(e) => {
           if (!hasFiles(e)) return;
@@ -258,6 +268,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
               }
             }}
             placeholder="Message the agent, or @ a teammate"
+            aria-describedby={hint ? `${COMPOSER_INPUT_ID}-hint` : undefined}
             className="field-sizing-content block max-h-40 min-h-9 w-full flex-1 resize-none bg-transparent py-2 text-[14px] leading-5 tracking-[-0.15px] text-[var(--tx)] placeholder:text-[var(--tx2)] focus:outline-none"
           />
           <button
@@ -288,7 +299,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
               Rebuild after sending
             </button>
             <span className="text-[12px] leading-4 text-[var(--tx2)]">
-              {rebuild ? "The agent changes the code with your note, then you review again." : "Off: the agent only replies."}
+              {rebuild ? "Sets the story to Approved: the agent rebuilds with your note, it's checked again, then you review." : "Off: you get a reply. A note in review never changes the code."}
             </span>
           </div>
         )}

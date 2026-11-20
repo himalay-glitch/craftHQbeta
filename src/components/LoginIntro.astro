@@ -9,7 +9,7 @@
 // - Mark what fades in with data-intro-fade: "1" headline words, "2" subtitle, "3" form and header.
 // - The Builder is found by RebusBot's classes (.rebus-slot, .rebus-idle, .rebus-work).
 //
-// It plays once per tab (sessionStorage); add ?intro to the URL to see it again. Any click, tap or
+// It plays every time the login page loads, refresh included (Shubham, 20 Nov). Any click, tap or
 // key press skips it, it never plays with reduced motion, and if the clip or the font isn't ready
 // within 1.2 s the page simply appears.
 ---
@@ -19,12 +19,8 @@
   (function () {
     try {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      var forced = /[?&]intro(=|&|$)/.test(location.search);
-      var seen = false;
-      try {
-        seen = sessionStorage.getItem("crafthq:intro") === "seen";
-      } catch (e) {}
-      if (forced || !seen) document.documentElement.setAttribute("data-intro", "pending");
+      // Every load, refresh included.
+      document.documentElement.setAttribute("data-intro", "pending");
     } catch (e) {}
   })();
 </script>
@@ -76,7 +72,6 @@
   const HOP_CLIP = 2000;
   const HOP_OFFSET = (HOP_CLIP - (T.land % HOP_CLIP)) % HOP_CLIP;
   const READY_WITHIN = 1200;
-  const SESSION_KEY = "crafthq:intro";
 
   const html = document.documentElement;
 
@@ -152,11 +147,6 @@
     function finish() {
       if (!running) return;
       stop();
-      try {
-        sessionStorage.setItem(SESSION_KEY, "seen");
-      } catch {
-        // Storage can be blocked; the intro then plays again next time, which is harmless.
-      }
     }
 
     // FLIP: measure where the Builder sits in the headline, start it at the centre of the screen,

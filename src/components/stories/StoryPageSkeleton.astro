@@ -1,0 +1,72 @@
+---
+// Shown at once while a story's page loads (its island renders in the browser only): the page's outline as
+// soft placeholders, and the mascot opening the story. Same layout as the page, so nothing jumps when it
+// arrives. No JavaScript needed. Still under reduced motion.
+const bar = "rounded-[8px] bg-[var(--skeleton)] animate-pulse motion-reduce:animate-none";
+---
+
+<main
+  id="main"
+  aria-busy="true"
+  aria-label="Opening the story"
+  class="mx-auto w-full max-w-[1344px] px-4 pt-4 md:flex md:h-[calc(100dvh-var(--bar-h))] md:flex-col md:overflow-hidden md:px-8"
+>
+  <!-- The header row: trail and name, then the page's buttons. -->
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-2 md:h-10 md:flex-nowrap">
+    <div class:list={[bar, "h-[18px] w-28"]}></div>
+    <div class:list={[bar, "order-3 h-7 basis-full md:order-none md:h-5 md:w-[min(360px,40%)] md:basis-auto"]}></div>
+    <div class="hidden flex-1 md:block"></div>
+    <div class:list={[bar, "ml-auto h-8 w-24 rounded-full md:ml-0"]}></div>
+  </div>
+
+  <div class="mt-3 md:flex md:min-h-0 md:flex-1 md:gap-8">
+    <div class="flex min-w-0 flex-1 flex-col">
+      <!-- The status row at the top of the chat. -->
+      <div class="flex h-10 flex-none items-center gap-2">
+        <img src="/images/bots/builder.webp" width="24" height="24" alt="" class="size-6 flex-none object-contain opacity-60" />
+        <div class:list={[bar, "h-3.5 w-36"]}></div>
+      </div>
+      <div class="flex w-full flex-1 flex-col gap-4 pt-4">
+        <div class="flex gap-2.5">
+          <div class:list={[bar, "size-8 rounded-full"]}></div>
+          <div class="flex flex-1 flex-col gap-1.5">
+            <div class:list={[bar, "h-3.5 w-28"]}></div>
+            <div class:list={[bar, "h-16 w-[min(520px,90%)] rounded-[16px]"]}></div>
+          </div>
+        </div>
+        <div class="flex gap-2.5">
+          <img src="/images/bots/builder.webp" width="32" height="32" alt="" class="size-8 flex-none object-contain opacity-60" />
+          <div class="flex flex-1 flex-col gap-1.5">
+            <div class:list={[bar, "h-3.5 w-20"]}></div>
+            <div class:list={[bar, "h-10 w-[min(440px,80%)] rounded-[16px]"]}></div>
+            <div class:list={[bar, "h-24 w-[min(300px,70%)] rounded-[16px]"]}></div>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <div class:list={[bar, "h-10 w-[min(320px,60%)] rounded-[18px]"]}></div>
+        </div>
+
+        <!-- The mascot opening the story. -->
+        <div class="mt-2 flex items-center gap-2.5">
+          <video autoplay loop muted playsinline poster="/images/bots/builder.webp" width="36" height="36" aria-hidden="true" class="size-9 flex-none object-contain motion-reduce:hidden">
+            <source src="/videos/bots/builder-idle.webm" type="video/webm" />
+            <source src="/videos/bots/builder-idle.mp4" type="video/mp4" />
+          </video>
+          <img src="/images/bots/builder.webp" width="36" height="36" alt="" class="hidden size-9 flex-none object-contain motion-reduce:block" />
+          <span class="text-[13px] leading-[18px] text-[var(--tx2)] animate-pulse motion-reduce:animate-none">Opening the story…</span>
+        </div>
+      </div>
+      <div class="w-full pt-2 pb-4">
+        <div class="h-12 rounded-[24px] border border-black/10 bg-white"></div>
+      </div>
+    </div>
+
+    <div class="hidden md:block md:w-[320px] md:flex-none md:border-l md:border-[var(--line)] md:pl-8">
+      <div class="flex flex-col gap-3 pt-1">
+        <div class:list={[bar, "h-3 w-16"]}></div>
+        <div class:list={[bar, "h-28 w-full rounded-[12px]"]}></div>
+        {[0, 1, 2].map(() => <div class:list={[bar, "h-5 w-44 opacity-60"]}></div>)}
+      </div>
+    </div>
+  </div>
+</main>

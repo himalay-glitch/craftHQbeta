@@ -9,7 +9,8 @@ import { clearStoryParam, NEEDS, readStoryParam, sortQueue, storyRef, URL_EVENT,
 import { ActivityPanel, type DetailsTab } from "./ActivityPanel";
 import { DashboardSkeleton } from "./DashboardSkeleton";
 import { FilterPill, type FilterOption } from "./FilterPill";
-import { NewStoryPanel } from "./NewStoryPanel";
+import { NewStoryDialog, type NewStoryInput } from "@/components/stories";
+import { addCreated, useCreatedStories } from "@/components/stories/created";
 import { QueueList } from "./QueueList";
 import { QueueMessage } from "./QueueMessage";
 import { QueueTable } from "./QueueTable";
@@ -77,6 +78,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const [localPanel, setLocalPanel] = useState<LocalPanel>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [nextId, setNextId] = useState(data.nextStoryId);
+  const [creating, setCreating] = useState(false);
+  const created = useCreatedStories();
 
   // A story being closed hides at once, before the Back navigation lands.
   const [closing, setClosing] = useState<number | null>(null);
@@ -256,12 +259,24 @@ export function Dashboard({ data }: { data: DashboardData }) {
     closePanel(after?.id);
   };
 
-  const createStory = ({ title }: { title: string; why: string; detail: string; ownerId: string }) => {
-    const id = nextId;
+  // One way to write a story everywhere: the Stories area's centred New story dialog. What's created here is
+  // kept with the stories created on the Stories page, so it shows on the board too.
+  const createStory = ({ title, why, detail, ownerId, files }: NewStoryInput) => {
+    const id = Math.max(nextId, ...created.map((s) => s.id + 1));
     setNextId(id + 1);
     setStories((ss) => [...ss, { id, title, status: "new" }]);
-    setLocalPanel(null);
-    showToast(`${storyRef(id)} added. The agent drafts the spec from it.`, { label: "Open", run: () => open(id) });
+    addCreated({
+      id,
+      title,
+      why: why || undefined,
+      detail: detail || undefined,
+      files: files.length ? files.map((f) => f.name) : undefined,
+      status: "new",
+      owner: data.people.find((p) => p.id === ownerId)?.initials,
+      updated: "just now",
+      updatedMinutes: 0,
+    });
+    showToast(`${storyRef(id)} added. The agent drafts the spec from it.`, { label: "Open", run: () => window.location.assign(`/stories/${storyRef(id)}`) });
   };
 
   const copyLink = () => {
@@ -303,7 +318,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
             {/* The project's name, not "Dashboard": the nav already says which page this is. */}
             {data.project}
           </h1>
-          <button type="button" className={BTN_PRIMARY} onClick={() => openLocal({ kind: "new" })}>
+          <button type="button" className={BTN_PRIMARY} onClick={() => setCreating(true)}>
             <Plus aria-hidden="true" size={16} strokeWidth={2} />
             New story
           </button>
@@ -415,17 +430,16 @@ export function Dashboard({ data }: { data: DashboardData }) {
             onOpenStory={open}
           />
         )}
-        {panel === "new" && (
-          <NewStoryPanel
-            key="new"
-            people={data.people}
-            viewerId={data.viewer.id}
-            isWide={isWide}
-            onClose={() => closePanel()}
-            onCreate={createStory}
-          />
-        )}
       </AnimatePresence>
+
+      <NewStoryDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        people={data.people}
+        viewerId={data.viewer.id}
+        onCreate={createStory}
+        onDiscard={(undo) => showToast("Draft discarded.", { label: "Undo", run: undo })}
+      />
 
       {/* With a panel open, toasts centre in the uncovered part of the page so they don't sit on the panel's buttons. */}
       <Toast toast={toast} onDismiss={dismissToast} offsetRight={panelOpenWide ? "var(--panel-w)" : "0px"} />

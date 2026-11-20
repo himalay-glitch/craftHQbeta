@@ -10,6 +10,7 @@ import { Toast, type ToastMessage } from "@/components/dashboard/Toast";
 import { addCreated, useCreatedStories } from "./created";
 import { setDraft } from "./draft";
 import { setView, useEmptyOverride, useView } from "./hooks";
+import { ownerOf, setStoryOwner, useStoryOwners } from "./owners";
 import { NewStoryDialog } from "./NewStoryDialog";
 import { storyColumns } from "./stage";
 import { StoriesBoard } from "./StoriesBoard";
@@ -28,6 +29,7 @@ export function Stories({ data }: { data: StoriesData }) {
   const emptyOverride = useEmptyOverride();
   const view = useView();
   const created = useCreatedStories();
+  const owners = useStoryOwners();
 
   const [justAdded, setJustAdded] = useState<number[]>([]);
   const [creating, setCreating] = useState(false);
@@ -38,7 +40,10 @@ export function Stories({ data }: { data: StoriesData }) {
   const focusAfterCreate = useRef<number | null>(null);
 
   // Stories created in this browser come first; `?state=empty` hides the sample ones, so creating can be tried.
-  const all = emptyOverride ? created : [...created, ...data.stories];
+  // An owner changed from a card's avatar replaces the one the story came with.
+  const all = (emptyOverride ? created : [...created, ...data.stories]).map((s) =>
+    s.id in owners ? { ...s, owner: ownerOf(s, owners) } : s,
+  );
   const nextId = Math.max(data.nextStoryId, ...created.map((s) => s.id + 1));
   const q = query.trim().toLowerCase();
   const shown = all.filter(
@@ -51,10 +56,10 @@ export function Stories({ data }: { data: StoriesData }) {
   // Owner: you first, then everyone who owns a story here, named when they're a teammate.
   const viewerInitials = data.viewer.initials;
   const names = new Map(data.people.map((p) => [p.initials, p.initials === viewerInitials ? "Me" : p.name]));
-  const owners = [viewerInitials, ...new Set(all.flatMap((s) => (s.owner && s.owner !== viewerInitials ? [s.owner] : [])))];
+  const ownerList = [viewerInitials, ...new Set(all.flatMap((s) => (s.owner && s.owner !== viewerInitials ? [s.owner] : [])))];
   const ownerOptions: FilterOption<string>[] = [
     { value: "anyone", label: "Anyone", count: all.length },
-    ...owners.map((i) => ({
+    ...ownerList.map((i) => ({
       value: i,
       label: names.get(i) ?? i,
       icon: <PersonAvatar initials={i} />,
@@ -118,6 +123,17 @@ export function Stories({ data }: { data: StoriesData }) {
     });
   };
 
+  const changeOwner = (id: number, initials: string | null) => {
+    const before = all.find((s) => s.id === id)?.owner ?? null;
+    if (before === initials) return;
+    setStoryOwner(id, initials);
+    const who = initials ? (initials === viewerInitials ? "you" : (data.people.find((p) => p.initials === initials)?.name ?? initials)) : null;
+    showToast(who ? `${storyRef(id)} is now owned by ${who}.` : `${storyRef(id)} has no owner now.`, {
+      label: "Undo",
+      run: () => setStoryOwner(id, before),
+    });
+  };
+
   const tryExample = (title: string) => {
     setDraft({ title });
     setCreating(true);
@@ -178,7 +194,14 @@ export function Stories({ data }: { data: StoriesData }) {
                   </button>
                 </div>
               ) : view === "board" ? (
-                <StoriesBoard columns={columns} justAdded={justAdded} onNew={() => setCreating(true)} />
+                <StoriesBoard
+                  columns={columns}
+                  justAdded={justAdded}
+                  onNew={() => setCreating(true)}
+                  people={data.people}
+                  viewerInitials={viewerInitials}
+                  onOwner={changeOwner}
+                />
               ) : (
                 <StoryList columns={columns} justAdded={justAdded} />
               )}

@@ -1,12 +1,13 @@
 import { motion } from "framer-motion";
-import { Plus, UserRound } from "lucide-react";
-import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
+import { Plus } from "lucide-react";
 import { storyRef } from "@/components/dashboard/format";
+import type { Person } from "@/types/dashboard";
 import type { StoryItem } from "@/types/stories";
+import { OwnerPicker } from "./OwnerPicker";
 import { storyStage, type StoryColumn } from "./stage";
 import { StageLabel } from "./StageLabel";
 
-interface StoriesBoardProps {
+interface StoriesBoardProps extends OwnerProps {
   columns: StoryColumn[];
   /** Created on this visit; their cards flash once when they appear. */
   justAdded: number[];
@@ -14,52 +15,62 @@ interface StoriesBoardProps {
   onNew: () => void;
 }
 
-/** A card is a link: every story opens on its own page (/stories/hq-N). */
-function StoryCard({ story, fresh }: { story: StoryItem; fresh: boolean }) {
+interface OwnerProps {
+  people: Person[];
+  viewerInitials: string;
+  onOwner: (id: number, initials: string | null) => void;
+}
+
+/** A card opens the story's own page (/stories/hq-N). The title is the link, stretched over the whole card,
+ *  so the owner's avatar can sit above it as its own button. */
+function StoryCard({ story, fresh, people, viewerInitials, onOwner }: { story: StoryItem; fresh: boolean } & OwnerProps) {
+  const ref = storyRef(story.id);
   return (
-    <li>
-      <a
-        href={`/stories/${storyRef(story.id)}`}
-        data-story-row={story.id}
-        className="relative block w-full overflow-hidden rounded-[12px] border border-[var(--card-line)] bg-white p-4 text-left shadow-[var(--shadow-card)] transition-[border-color,box-shadow] duration-[120ms] hover:border-[var(--card-line-h)] hover:shadow-[var(--shadow-card-h)]"
-      >
-        {/* A story created on this visit arrives tinted and fades to white. */}
-        {fresh && (
-          <motion.span
-            aria-hidden="true"
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 0 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-            className="pointer-events-none absolute inset-0 bg-[var(--row-sel)]"
-          />
-        )}
-        <span className="relative flex flex-col gap-3">
-          <span className="block">
-            <span className="line-clamp-3 text-[15px] leading-[22px] text-[var(--tx)]">{story.title}</span>
-            {story.why && <span className="mt-1 line-clamp-2 text-[13px] leading-[18px] text-[var(--tx2)]">{story.why}</span>}
+    <li
+      className="relative overflow-hidden rounded-[12px] border border-[var(--card-line)] bg-white p-4 text-left shadow-[var(--shadow-card)] transition-[border-color,box-shadow] duration-[120ms] hover:border-[var(--card-line-h)] hover:shadow-[var(--shadow-card-h)] has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-[var(--cta)]"
+    >
+      {/* A story created on this visit arrives tinted and fades to white. */}
+      {fresh && (
+        <motion.span
+          aria-hidden="true"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
+          className="pointer-events-none absolute inset-0 bg-[var(--row-sel)]"
+        />
+      )}
+      <div className="relative flex flex-col gap-3">
+        <a
+          href={`/stories/${ref}`}
+          data-story-row={story.id}
+          className="block outline-none after:absolute after:-inset-4 after:content-['']"
+        >
+          <span className="line-clamp-3 text-[15px] leading-[22px] text-[var(--tx)]">{story.title}</span>
+          {story.why && <span className="mt-1 line-clamp-2 text-[13px] leading-[18px] text-[var(--tx2)]">{story.why}</span>}
+          <span className="sr-only">
+            , {storyStage(story).text}, {story.owner ? `owner ${people.find((p) => p.initials === story.owner)?.name ?? story.owner}` : "no owner"}
           </span>
-          <span className="flex min-w-0">
-            <StageLabel stage={storyStage(story)} />
-          </span>
-          <span className="flex items-center justify-between gap-2">
-            {story.owner ? (
-              <>
-                <PersonAvatar initials={story.owner} size={24} />
-                <span className="sr-only">, owner {story.owner}</span>
-              </>
-            ) : (
-              <span className="flex size-6 items-center justify-center rounded-full border border-dashed border-[var(--ctl-h)] text-[var(--tx2)]">
-                <UserRound aria-hidden="true" size={12} strokeWidth={1.75} />
-                <span className="sr-only">, no owner</span>
-              </span>
-            )}
-            <span className="text-[12px] leading-4 text-[var(--tx2)] tabular-nums">
-              {storyRef(story.id)}
-              {story.updated && ` · ${story.updated}`}
-            </span>
-          </span>
+        </a>
+        <span aria-hidden="true" className="flex min-w-0">
+          <StageLabel stage={storyStage(story)} />
         </span>
-      </a>
+        <div className="flex items-center justify-between gap-2">
+          {/* Above the stretched link, so clicking it picks an owner instead of opening the story. */}
+          <span className="relative z-10 flex">
+            <OwnerPicker
+              owner={story.owner}
+              people={people}
+              viewerInitials={viewerInitials}
+              onChange={(initials) => onOwner(story.id, initials)}
+              storyLabel={ref}
+            />
+          </span>
+          <span className="text-[12px] leading-4 text-[var(--tx2)] tabular-nums">
+            {ref}
+            {story.updated && ` · ${story.updated}`}
+          </span>
+        </div>
+      </div>
     </li>
   );
 }
@@ -70,7 +81,7 @@ function StoryCard({ story, fresh }: { story: StoryItem; fresh: boolean }) {
  * Nothing is draggable: the agent moves stories between its own stages (DESIGN.md §5.2), which is also
  * why only Planning has "+ New story". Phones get one lane per screen, snapping.
  */
-export function StoriesBoard({ columns, justAdded, onNew }: StoriesBoardProps) {
+export function StoriesBoard({ columns, justAdded, onNew, ...owner }: StoriesBoardProps) {
   const fresh = new Set(justAdded);
   return (
     // Desktop: fills the space under the tabs and scrolls sideways inside it, never the page. A lane is as
@@ -93,7 +104,7 @@ export function StoriesBoard({ columns, justAdded, onNew }: StoriesBoardProps) {
             {col.stories.length > 0 ? (
               <ul className="m-0 flex list-none flex-col gap-2 p-0">
                 {col.stories.map((s) => (
-                  <StoryCard key={s.id} story={s} fresh={fresh.has(s.id)} />
+                  <StoryCard key={s.id} story={s} fresh={fresh.has(s.id)} {...owner} />
                 ))}
               </ul>
             ) : (

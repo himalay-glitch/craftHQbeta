@@ -95,6 +95,8 @@ export interface AskCard {
   label: string;
   title: string;
   meta?: string;
+  /** Where the decision moves the story, e.g. Planning → Building. */
+  move?: { from: string; to: string };
   primary?: { label: string; onClick: () => void };
   secondary?: { label: string; onClick: () => void };
 }
@@ -126,3 +128,48 @@ export interface StoryThreadData {
   entries: ThreadEntry[];
   facts: StoryFacts;
 }
+
+// ---- The activity log beside the conversation ----
+
+/** What the agent worked on: its pages, the build and what comes out of it, and stage changes. */
+export type ActivityKind = "read" | "spec" | "engineering" | "stage" | "build" | "checks" | "preview" | "screenshots" | "markup" | "pr";
+
+export type Device = "web" | "mobile";
+
+export interface ActivityItem {
+  id: string;
+  kind: ActivityKind;
+  /** "Specification page", "Screenshots · Mobile". */
+  title: string;
+  /** working: happening now. waiting: blocked on a person (never spins). info: a stage change or a person's action. */
+  state: "working" | "waiting" | "done" | "failed" | "info";
+  /** "Writing", "Edited with your note", "All 214 checks passed". */
+  detail: string;
+  at: string;
+  /** A build's steps done, of all. */
+  progress?: { done: number; total: number };
+  /** Screens made, for screenshots and markup. */
+  count?: number;
+  /** Which preview or screenshots. */
+  device?: Device;
+  /** Previews only: the preview machine. */
+  run?: "off" | "starting" | "on";
+  /** Epoch ms, set in handlers only: when it started working, or when a preview started starting or running. */
+  startedAt?: number;
+  /** Stage changes only: where the story moved, as the board's column names ("Planning" → "Building"). */
+  move?: { from: string; to: string };
+  /** Just finished (or a stage change just happened): shown at the top for a moment, then it goes down. */
+  settling?: boolean;
+  /** Epoch ms, set in handlers only: when it finished, so the ready list keeps the order things finished in. */
+  doneAt?: number;
+  /** Added on this visit: arrives with a little motion. */
+  fresh?: boolean;
+}
+
+/** What the activity column can do to a preview; the story page owns the state and the timers. */
+export interface PreviewActions {
+  start: (id: string) => void;
+  stop: (id: string) => void;
+  device: (id: string, d: Device) => void;
+}
+
