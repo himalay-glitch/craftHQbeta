@@ -1,0 +1,278 @@
+---
+// The login intro (DESIGN.md §8.8). The first time the login page opens in a browser tab, the page
+// starts blank, the Builder pops in at the centre and hops, then flies into its place in the
+// headline while the rest of the page fades in around it: about 2 s. The Builder that lands is the
+// headline's own RebusBot, moved with a FLIP transform, so nothing is swapped at the end.
+//
+// How the page uses it:
+// - Render <LoginIntro /> first inside <BaseLayout>, so its gate script runs before the page paints.
+// - Mark what fades in with data-intro-fade: "1" headline words, "2" subtitle, "3" form and header.
+// - The Builder is found by RebusBot's classes (.rebus-slot, .rebus-idle, .rebus-work).
+//
+// It plays once per tab (sessionStorage); add ?intro to the URL to see it again. Any click, tap or
+// key press skips it, it never plays with reduced motion, and if the clip or the font isn't ready
+// within 1.2 s the page simply appears.
+---
+
+<script is:inline>
+  // Gate: decides before the first paint, so the full page never flashes before the intro.
+  (function () {
+    try {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      var forced = /[?&]intro(=|&|$)/.test(location.search);
+      var seen = false;
+      try {
+        seen = sessionStorage.getItem("crafthq:intro") === "seen";
+      } catch (e) {}
+      if (forced || !seen) document.documentElement.setAttribute("data-intro", "pending");
+    } catch (e) {}
+  })();
+</script>
+
+<style is:global>
+  /* While the intro is pending or playing, everything except the Builder is hidden. */
+  html[data-intro] [data-intro-fade] {
+    opacity: 0;
+  }
+  /* Pending: the page is blank until the clip and the font are ready. */
+  html[data-intro="pending"] .rebus-slot {
+    opacity: 0;
+  }
+  html[data-intro] .rebus-slot {
+    pointer-events: none;
+  }
+  /* Safety net: if the script never starts the intro, show the page after 2.5 s anyway. */
+  html[data-intro="pending"] [data-intro-fade],
+  html[data-intro="pending"] .rebus-slot {
+    animation: login-intro-failsafe 0s 2.5s forwards;
+  }
+  @keyframes login-intro-failsafe {
+    to {
+      opacity: 1;
+    }
+  }
+</style>
+
+<script>
+  // DESIGN.md §3.7 tokens.
+  const EASE = {
+    out: "cubic-bezier(0.2, 0, 0, 1)", // things entering
+    inOut: "cubic-bezier(0.4, 0, 0.2, 1)", // things moving across the screen
+    plush: "cubic-bezier(0.34, 1.56, 0.64, 1)", // robots only
+  };
+  // Timing in ms. One hop on the blank page; the second hop carries the Builder into the headline.
+  const T = {
+    pop: 450, // pops in (--duration-playful)
+    flyAt: 1100, // starts flying home
+    land: 1800, // lands on the hop clip's squash, then stands up into the idle loop
+    swap: 120, // the hop clip cross-fades to the idle loop, like RebusBot's hover
+    fade: 300, // --duration-slow
+  };
+  // The text waits until the Builder has flown past the second line: its clip is blended with
+  // `darken`, so dark text under it would show through its body.
+  const FADE_AT: Record<string, number> = { "1": 1700, "2": 1780, "3": 1860 };
+  const DONE = Math.max(T.land + T.swap, FADE_AT["3"] + T.fade);
+  // builder-work is two hops in 2 s. Start it part-way in, so its loop ends exactly on landing.
+  const HOP_CLIP = 2000;
+  const HOP_OFFSET = (HOP_CLIP - (T.land % HOP_CLIP)) % HOP_CLIP;
+  const READY_WITHIN = 1200;
+  const SESSION_KEY = "crafthq:intro";
+
+  const html = document.documentElement;
+
+  type Parts = {
+    slot: HTMLElement;
+    bot: HTMLElement;
+    idle: HTMLVideoElement;
+    work: HTMLVideoElement;
+    fades: HTMLElement[];
+  };
+
+  function findParts(): Parts | null {
+    const slot = document.querySelector<HTMLElement>(".rebus-slot");
+    const bot = slot?.querySelector<HTMLElement>(".rebus-bot.is-active");
+    const idle = slot?.querySelector<HTMLVideoElement>("video.rebus-idle");
+    const work = slot?.querySelector<HTMLVideoElement>("video.rebus-work");
+    if (!slot || !bot || !idle || !work) return null;
+    return { slot, bot, idle, work, fades: Array.from(document.querySelectorAll<HTMLElement>("[data-intro-fade]")) };
+  }
+
+  function play(video: HTMLVideoElement, rate = 1) {
+    video.muted = true;
+    video.playbackRate = rate;
+    video.play().catch(() => {});
+  }
+
+  function within<V>(promise: Promise<V>, ms: number): Promise<V | "timeout"> {
+    return Promise.race([promise, new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms))]);
+  }
+
+  function whenVisible(): Promise<void> {
+    return new Promise((resolve) => {
+      if (!document.hidden) return resolve();
+      const onChange = () => {
+        if (document.hidden) return;
+        document.removeEventListener("visibilitychange", onChange);
+        resolve();
+      };
+      document.addEventListener("visibilitychange", onChange);
+    });
+  }
+
+  // Starts the hop clip and resolves once it's actually playing, so the motion starts in step with it.
+  function startHop(work: HTMLVideoElement): Promise<void> {
+    return new Promise((resolve) => {
+      work.addEventListener("playing", () => resolve(), { once: true });
+      work.currentTime = HOP_OFFSET / 1000;
+      play(work);
+    });
+  }
+
+  function createIntro(parts: Parts) {
+    const { slot, bot, idle, work, fades } = parts;
+    let anims: Animation[] = [];
+    let running = false;
+
+    // Back to the plain login page: nothing animating, the idle loop playing.
+    function stop() {
+      anims.forEach((a) => a.cancel());
+      anims = [];
+      running = false;
+      html.removeAttribute("data-intro");
+      work.pause();
+      work.currentTime = 0;
+      work.playbackRate = 1;
+      idle.playbackRate = 1;
+      if (idle.paused) {
+        idle.currentTime = 0;
+        play(idle);
+      }
+    }
+
+    function finish() {
+      if (!running) return;
+      stop();
+      try {
+        sessionStorage.setItem(SESSION_KEY, "seen");
+      } catch {
+        // Storage can be blocked; the intro then plays again next time, which is harmless.
+      }
+    }
+
+    // FLIP: measure where the Builder sits in the headline, start it at the centre of the screen,
+    // and animate it home.
+    function run(rate = 1) {
+      anims.forEach((a) => a.cancel());
+      html.setAttribute("data-intro", "playing");
+      running = true;
+
+      const r = slot.getBoundingClientRect();
+      const dx = window.innerWidth / 2 - (r.left + r.width / 2);
+      const dy = window.innerHeight * 0.46 - (r.top + r.height / 2);
+      // The Builder's visible size on the blank page; the clip fills 1.18× the slot.
+      const big = Math.min(176, window.innerWidth * 0.42, window.innerHeight * 0.32);
+      const s = big / (r.width * 1.18);
+      const from = `${dx}px ${dy}px`;
+
+      anims = [
+        slot.animate(
+          [
+            { translate: from, scale: s },
+            { translate: from, scale: s, offset: T.flyAt / T.land, easing: EASE.inOut },
+            { translate: "0px 0px", scale: 1 },
+          ],
+          { duration: T.land, fill: "both" },
+        ),
+        bot.animate(
+          [
+            { opacity: 0, transform: "scale(0.55) rotate(-12deg)" },
+            { opacity: 1, transform: "scale(1) rotate(0deg)" },
+          ],
+          { duration: T.pop, easing: EASE.plush, fill: "both" },
+        ),
+        work.animate([{ opacity: 1 }, { opacity: 1, offset: T.land / (T.land + T.swap) }, { opacity: 0 }], {
+          duration: T.land + T.swap,
+          fill: "both",
+        }),
+        ...fades.map((el) =>
+          el.animate([{ opacity: 0 }, { opacity: 1 }], {
+            duration: T.fade,
+            delay: FADE_AT[el.dataset.introFade ?? "3"] ?? FADE_AT["3"],
+            easing: EASE.out,
+            fill: "both",
+          }),
+        ),
+      ];
+
+      // Markers on the same clock as the motion, so skipping and slow motion keep them in step.
+      const landed = new Animation(new KeyframeEffect(null, [], { duration: T.land }), document.timeline);
+      landed.onfinish = () => {
+        if (!running) return;
+        idle.currentTime = 0;
+        play(idle, rate);
+      };
+      const done = new Animation(new KeyframeEffect(null, [], { duration: DONE }), document.timeline);
+      done.onfinish = finish;
+      anims.push(landed, done);
+
+      anims.forEach((a) => {
+        a.playbackRate = rate;
+        a.play();
+      });
+      idle.pause();
+      work.playbackRate = rate;
+    }
+
+    // Jump to the end: any click, tap or key press does this. Every animation ends on the page's
+    // normal state, so cancelling them is the same as finishing them.
+    function skip() {
+      finish();
+    }
+
+    // Freezes the intro at a moment, for checking it frame by frame in development.
+    function seek(ms: number) {
+      if (!running) run();
+      anims.forEach((a) => {
+        a.pause();
+        a.currentTime = ms;
+      });
+      work.pause();
+      idle.pause();
+      work.currentTime = ((HOP_OFFSET + Math.min(ms, T.land - 1)) % HOP_CLIP) / 1000;
+      idle.currentTime = Math.max(0, ms - T.land) / 1000;
+    }
+
+    return { run, stop, skip, seek, isRunning: () => running };
+  }
+
+  async function init() {
+    if (html.getAttribute("data-intro") !== "pending") return;
+    const parts = findParts();
+    if (!parts) return html.removeAttribute("data-intro");
+    const intro = createIntro(parts);
+
+    window.addEventListener("pointerdown", () => intro.skip());
+    window.addEventListener("keydown", () => intro.skip());
+    // A width change moves the landing spot. Height alone doesn't skip it: phones change it when
+    // the browser toolbar slides.
+    let lastWidth = window.innerWidth;
+    window.addEventListener("resize", () => {
+      if (window.innerWidth !== lastWidth) intro.skip();
+      lastWidth = window.innerWidth;
+    });
+
+    if (import.meta.env.DEV) {
+      Object.assign(window, { __introSeek: intro.seek, __introReplay: () => intro.run() });
+    }
+
+    // Wait for the final layout (the font) and the clip, but never longer than READY_WITHIN.
+    await whenVisible();
+    const fonts = await within(document.fonts.ready, READY_WITHIN);
+    if (fonts === "timeout" || html.getAttribute("data-intro") !== "pending") return intro.stop();
+    const hop = await within(startHop(parts.work), READY_WITHIN);
+    if (hop === "timeout" || html.getAttribute("data-intro") !== "pending") return intro.stop();
+    intro.run();
+  }
+
+  init();
+</script>

@@ -1,0 +1,141 @@
+/*
+ * Dashboard tokens, measured from the Asana "AI Teammates" reference (docs/design/dashboard-plan.md, §11).
+ * The dashboard follows that reference instead of DESIGN.md's scale; the exception is proposed in its own
+ * DESIGN.md pull request. Scoped here so src/styles/globals.css (a shared file) stays untouched.
+ *
+ * `.tokens` goes on the page and on anything Radix portals out of it (menus), so both see the values.
+ */
+.tokens {
+  --page: #ffffff;
+  --bar: #f9f9f9;
+  --tx: #1e1f21;
+  --tx2: #6d6e6f;
+  --line: #e8e8e8;
+  --card-line: #e3e3e3;
+  --card-line-h: #d9d9d9;
+  --ctl: #cbcbcb;
+  --ctl-h: #b5b5b5;
+  --ctl-bg-h: #f9f9f9;
+  --ctl-bg-on: #f5f5f5;
+  --row-h: #f7f7f7;
+  --row-sel: #eef3fd;
+  --row-sel-h: #e6edfc;
+  --av-bg: #f5f5f5;
+  --menu-h: #f5f5f5;
+  --skeleton: #f3f3f3;
+  --cta: #2f6fed;
+  --cta-h: #2459d6;
+  --green: #2f755d;
+  --red: #b3261e;
+  --red-bg: #fdecec;
+  --ink: #1e1f21;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-card-h: 0 4px 12px rgb(0 0 0 / 0.08);
+  --shadow-menu: 0 8px 24px rgb(0 0 0 / 0.12), 0 0 0 1px #e3e3e3;
+  --shadow-panel: -8px 0 24px rgb(0 0 0 / 0.08);
+  --bar-h: 48px;
+  --sidebar-w: 176px;
+  --panel-w: 480px;
+}
+
+.page {
+  background: var(--page);
+  color: var(--tx);
+}
+
+/* The site skips Tailwind's preflight, so form controls start from browser defaults. Kept in the base
+   layer so any utility class still wins. */
+@layer base {
+  .tokens :where(button, input, textarea, select) {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+  .tokens :where(button) {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-align: inherit;
+  }
+  .tokens :where(input, textarea, select) {
+    background: none;
+    border: 0;
+  }
+  .tokens :where(input, textarea)::placeholder {
+    color: var(--tx2);
+    opacity: 1;
+  }
+}
+
+/* The five stats in one row on desktop; they wrap on smaller screens. */
+.cards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 1024px) {
+  .cards {
+    gap: 16px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Menus: a short fade and 4 px drop in, a quicker fade out (Radix waits for the exit animation). */
+.menu[data-state="open"] {
+  animation: menu-in 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+.menu[data-state="closed"] {
+  animation: menu-out 80ms ease-in;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Loading placeholders breathe slowly. */
+.pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* The Stuck alert, on the chip and beside the Stuck card's label: a red ring grows 5 px out and fades,
+   every 2 s, then rests. */
+.alert,
+.alertIcon {
+  animation: alert 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes alert {
+  0% {
+    box-shadow: 0 0 0 0 rgb(179 38 30 / 0.4);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 5px rgb(179 38 30 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu[data-state="open"],
+  .menu[data-state="closed"],
+  .pulse,
+  .alert,
+  .alertIcon {
+    animation: none;
+  }
+  /* The chip keeps a still ring instead of the pulse; the icon needs none, its own circle is enough. */
+  .alert {
+    box-shadow: 0 0 0 1px rgb(179 38 30 / 0.45);
+  }
+}

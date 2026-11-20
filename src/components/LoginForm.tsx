@@ -36,7 +36,8 @@ export function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
-        window.location.assign("/");
+        // Straight to the dashboard: "/" still redirects to /login until astro.config.mjs points it here.
+        window.location.assign("/dashboard");
         return;
       }
       const body: LoginErrorBody | null = await res.json().catch(() => null);
