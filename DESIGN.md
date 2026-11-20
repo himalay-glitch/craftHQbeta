@@ -224,6 +224,15 @@ Rules:
 - Status colour is never used on its own (§7.12).
 - Marks sit on `bg-card` or `bg-background`, not on top of fills.
 
+#### Provider connection buttons
+
+A provider's connection button may wear that provider's own colours, but only that one button, only while it's the next step (§6.6), and only where the provider's brand rules allow it. Everything else stays in CraftHQ's colours.
+
+| Provider | Button | Text and mark | Why |
+|---|---|---|---|
+| GitHub | `bg-inverse` (`#111112`) | white text, GitHub's official white mark | GitHub allows its mark only in white, black, grey or green, unmodified |
+| Claude | `bg-brand-claude` `#c4522c`, hover `bg-brand-claude-hover` `#af4928` | white text, no logo | Claude's orange (`#d97757`, Anthropic's brand guidelines) deepened in the same hue so white text passes 4.5:1. The Claude logo needs Anthropic's approval and its own supplied files |
+
 #### Robot identity
 
 | Robot | Hue | Backdrop | Role |
@@ -785,26 +794,29 @@ Rules:
 
 Follow this pattern in onboarding, in Settings → Connections and in `ConnectAccountsModal`.
 
-- **Row:** the official logo (24 px), the name (`text-sm font-semibold`) with one muted line on what CraftHQ does with it, the status, and the action.
+- **Row:** the top line has the official logo (24 px), the name (`text-sm font-semibold`) and a status pill (§7.12), with the action on the right. Under the name, one muted line says what CraftHQ does with the connection. It runs the full width of the row and wraps with `text-pretty`, so no line ends on a single word. Once something has happened, that line shows the detail that matters instead: the account, or the reason it needs attention.
 - **States:**
 
 | State | Shows | Action |
 |---|---|---|
-| Not connected | "Not connected", muted (plus "Required" when it's needed) | **Connect**: primary for the next required one, secondary otherwise |
-| Connecting | a spinner and "Waiting for GitHub…" | Cancel |
-| Connected | a positive check and "Connected as @name" | ⋯ → Manage, Disconnect |
-| Needs attention | an attention icon and the reason ("Access expired", "Missing repository access") | **Reconnect** |
+| Not connected | a grey "Not connected" pill, and the purpose line | **Connect**: primary for the next required one, secondary otherwise |
+| Connecting | a "Connecting" pill with a spinner, and "Approve CraftHQ in the GitHub window that opened." | Cancel |
+| Connected | a green "Connected" pill, and the account under the name ("@name · 3 repositories") | ⋯ → Manage, Disconnect |
+| Needs attention | an amber "Needs attention" pill, and the reason under the name ("Access expired", "No repositories yet") | **Reconnect** |
 | Failed | a negative inline message: what happened and what to do next | Try again |
 
-- **Order:** required connections first, then optional ones. Show progress in words ("1 of 2 required connected").
+- **Order:** required connections first, then optional ones. Show progress in words ("1 of 2 connected").
+- **Required is the default:** don't label every row "Required". Say once, in the modal's description, that all of them are needed, and tag only an optional service "Optional" (the same rule as optional form fields, §6.14).
 - **Before connecting,** say in up to three plain bullets what CraftHQ will be able to do, with a link to the details.
 - **OAuth:** open the provider in a popup (or redirect, on phones).
-  - If the popup is blocked, show "Open GitHub sign-in" as a link.
+  - If the popup is blocked, show "No window? Open GitHub" as a link.
   - Cancelling or failing returns to Not connected with an inline message. It's never a dead end.
-- **Sign in, then paste a code** (how Claude connects):
-  - **Sign in with Claude** opens the provider's page in a new tab. The row then shows a code field, "Paste the code from Claude's sign-in page", in mono with pasting allowed, and **Connect**. Enter also submits.
+- **Connect, then paste a code** (how Claude connects):
+  - **Connect Claude ↗** opens Claude's page in a new tab, where the person signs in. The row then shows a "Code from Claude" field with the helper text "Claude opened in a new tab. Sign in there, then paste the code it shows.", in mono with pasting allowed, and **Connect**. Enter also submits.
   - The code is the one the provider's page shows after the person signs in. Never ask for a sign-in code from an email: that belongs on the provider's own page, and asking for it looks like phishing.
-  - A wrong code says "That code didn't work. Check it, or sign in again to get a new one." An expired code says "That code has expired. Sign in again to get a new one." Both offer **Sign in again**.
+  - A wrong code says "That code didn't work. Check it, or get a new one from Claude." An expired code says "That code has expired. Get a new one from Claude." Both offer **Open Claude again**.
+- **Button wording:** people are already signed in to CraftHQ when they connect accounts, so the buttons say **Connect GitHub ↗** or **Connect Claude ↗**, never "Sign in with…". "Sign in" appears only where it's literally true, on the provider's own page. The ↗ marks a button that opens a page outside CraftHQ.
+- **Connection buttons** follow §3.1 Provider connection buttons: GitHub's is black with its white mark, Claude's is Claude orange with white text.
 - **Keys,** if a service uses one:
   - Use a password-style mono field, and allow pasting.
   - After saving, show only the last four characters ("•••• 9fA2"), with **Replace key**.
@@ -815,7 +827,7 @@ Follow this pattern in onboarding, in Settings → Connections and in `ConnectAc
   - It takes `open` and `onClose`, and can be closed at any time. Finished connections stay connected.
   - A scrim click closes it only when nothing is in progress.
   - Width: `max-w-xl`, or `max-w-3xl` for more than four services.
-  - Footer (Proposed): "Do this later", then **Done**, which becomes available once the required connections are made.
+  - Footer: **Skip for now** closes it (the dashboard then reminds people to finish setup), and **Go to dashboard** appears once the required connections are made.
 
 ### 6.7 Empty states
 
@@ -943,7 +955,7 @@ A 24, 28 or 32 px square in the ghost style, with a 16 px icon. An `aria-label` 
   - `bg-field` with no border, `rounded-lg`, 32 px tall (md) or 28 px (sm), with `px-3`.
   - Text is `text-sm`, or `text-base` on touch screens (`pointer-coarse:text-base`) so iOS doesn't zoom in.
 - **Hover:** `bg-field-hover`.
-- **Focus:** a white fill, a 1.5 px `--focus` ring and a 4 px `--focus-ring` halo: the login field's focus, scaled down.
+- **Focus:** a white fill, a 1.5 px `--focus` ring and a 4 px `--focus-ring` halo (`focus:shadow-focus`): the login field's focus, scaled down.
 - **Label and help text:** the label sits above the field (`text-sm font-medium`, with a 6 px gap) and help text below it (muted `text-sm`). An error replaces the help text.
 - **Placeholder:** an example, never the label. App forms always show labels; only the login page hides them.
 - **Text area:** starts at 3 lines, grows to 12, then scrolls.
@@ -1301,7 +1313,7 @@ The target is WCAG 2.2 AA.
   - text: `text-foreground`, `text-muted-foreground`, `text-faint`, `text-on-inverse`, `text-primary-strong`
   - borders: `border-border`, `border-border-strong`
   - action: `bg-primary`, `bg-primary-strong`
-  - shadows: `shadow-raised`, `shadow-popover`, `shadow-overlay`, `shadow-drag`
+  - shadows: `shadow-raised`, `shadow-popover`, `shadow-overlay`, `shadow-drag`, and `shadow-focus` for the filled-field focus ring
   - other: the tone tokens, `rounded-robot`, `tracking-title`
 
   The tokens PR adds the ones that don't exist yet (§14).
