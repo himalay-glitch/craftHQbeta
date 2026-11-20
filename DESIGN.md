@@ -1,6 +1,6 @@
 # CraftHQ design system
 
-**Version 0.2 · 19 Nov 2026**
+**Version 0.3 · 20 Nov 2026**
 A shared file: change it only in its own pull request, approved by the other owner (see `CLAUDE.md`).
 
 ## Contents
@@ -446,7 +446,7 @@ Rules:
 - Animate `transform` and `opacity`, and use framer-motion `layout` for list changes. Don't animate width, height, top or left directly.
 - Only robots bounce (`--ease-plush`). Interface motion never overshoots.
 - Nothing loops on a work surface except the working indicator in the panel and in the Home "Working now" widget (§8.5), plus the skeleton pulse.
-- Page content doesn't animate in when a page loads.
+- Page content doesn't animate in when a page loads. The one exception is the login intro (§8.8).
 - **Reduced motion** (`prefers-reduced-motion: reduce`): movement becomes a fade of 150 ms or less, or nothing. Loops stop, and robot videos show their posters, as `RebusBot` already does.
 
 ---
@@ -1191,6 +1191,25 @@ The working ring (§7.13), the status label and the elapsed time show that a rob
 
 Show visible feedback within 100 ms of any input. Show progress for anything that takes more than a second. After 10 seconds, explain what's happening, and let the person leave and come back later.
 
+### 8.8 The login intro
+
+The first time someone opens the login page in a browser tab, the Builder introduces itself. The page starts blank, the Builder pops in at the centre and hops, then flies into its place in the headline while the rest of the page fades in around it.
+
+- **Timing:** about 2 s in all.
+  - The Builder pops in over 450 ms (`--ease-plush`) and hops.
+  - At 1.1 s it flies home over 700 ms (`--ease-in-out`) and lands at 1.8 s, on its hop clip's squash, then stands up into the idle loop.
+  - The headline, then the subtitle, then the form and header fade in from 1.7 s (300 ms each, `--ease-out`), once the Builder has passed the text. Its clip is blended with `darken`, so dark text under it would show through its body.
+- **The Builder that lands is the headline's own** (`RebusBot`), moved with a FLIP transform, so nothing is swapped at the end.
+- **Once per tab:** it plays on the first visit in a browser tab (`sessionStorage`), not on reloads. Adding `?intro` to the URL replays it.
+- **Never in the way:**
+  - Any click, tap or key press skips to the end.
+  - It doesn't play with reduced motion.
+  - If the clip or the font isn't ready within 1.2 s, the page appears without it.
+  - It isn't a loading screen (§6.8): it never waits on data.
+- **Don't use it elsewhere.** It's the brand's hello, on the brand surface people see before they sign in. Inside the app, page content doesn't animate in (§3.7).
+- **Why:** the first thing people see should be the crew they're hiring, not a form.
+  **In plain words:** "Our Builder says hello once, then gets out of your way."
+
 ---
 
 ## 9. Content and voice
@@ -1393,3 +1412,4 @@ Agreed on 19 Nov 2026, in the review of the pull request that added this documen
 |---|---|---|
 | 0.1 | 2026-11-19 | First draft: foundations, shell, views, patterns, components and rules. The Asana benchmark was checked against Asana's public help centre, developer docs, blog and forum. Proposed by shubhampatil-lab for review by himalay-glitch. |
 | 0.2 | 2026-11-19 | §15 decided: all ten recommendations, plus decision 11 (the app shell belongs to himalay-glitch). Statuses (§7.12), celebrations (§8.6) and shared building blocks (§12) are no longer Proposed. The app moved from Next.js to Astro: paths in §0 and §3, the font in §3.2, and the implementation rules in §12 updated. |
+| 0.3 | 2026-11-20 | §8.8 added: the login intro, the one exception to "page content doesn't animate in" (§3.7). |
