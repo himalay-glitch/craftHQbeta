@@ -1,7 +1,9 @@
 ---
-// The signed-in app shell: the top bar and the page under it. Owned by the dashboard owner (CLAUDE.md).
-// The design follows the Asana reference rather than DESIGN.md's sidebar (proposed in its own DESIGN.md PR).
+// The signed-in app shell: the top bar, the sidebar and the page beside it. Owned by the dashboard owner
+// (CLAUDE.md). The look follows the Asana reference: a full-width top bar with search and the account, and
+// a sidebar with the main links (docs/design/dashboard-plan.md, §3).
 import BaseLayout from "@/layouts/BaseLayout.astro";
+import { Sidebar } from "@/components/shell/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
 import tokens from "@/components/dashboard/tokens.module.css";
 import type { SearchItem, Viewer } from "@/types/dashboard";
@@ -24,6 +26,12 @@ const { title, viewer, search } = Astro.props;
       Skip to content
     </a>
     <TopBar client:load viewer={viewer} search={search} current={Astro.url.pathname} />
-    <slot />
+    <div class="flex">
+      {/* No client directive: the sidebar is plain links, rendered to HTML on the server. */}
+      <Sidebar current={Astro.url.pathname} />
+      <div class="min-w-0 flex-1">
+        <slot />
+      </div>
+    </div>
   </div>
 </BaseLayout>

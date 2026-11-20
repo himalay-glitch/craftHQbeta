@@ -31,18 +31,19 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
   return (
     // Boxed like the cards: 1 px #E3E3E3 on all sides, 12 px corners. `overflow-clip` rounds the corners
     // without making a scroll container, so the header still sticks under the top bar.
-    // The Action column gives way first when the table is narrow (for example, beside an open panel).
+    // The Action column gives way when the table is under 1000 px (a window under about 1240 px, beside the
+    // sidebar), where it would be too narrow to read; Story then takes its space. It's also in the panel.
     <div className="@container overflow-clip rounded-[12px] border border-[var(--card-line)]">
       <table className="w-full table-fixed border-separate border-spacing-0 text-left">
         <thead>
           <tr>
-            <th scope="col" className={`${TH} w-[34%] pl-4`}>
+            <th scope="col" className={`${TH} w-[34%] pl-4 @max-[999px]:w-auto`}>
               Story
             </th>
             <th scope="col" className={`${TH} w-[176px]`}>
               Next
             </th>
-            <th scope="col" className={`${TH} @max-[859px]:hidden`}>
+            <th scope="col" className={`${TH} @max-[999px]:hidden`}>
               Action
             </th>
             <th scope="col" className={`${TH} w-[72px]`}>
@@ -122,7 +123,7 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
                   <td className={TD}>
                     <NeedChip need={s.need!} />
                   </td>
-                  <td className={`${TD} truncate text-[var(--tx2)] @max-[859px]:hidden`} title={action}>
+                  <td className={`${TD} truncate text-[var(--tx2)] @max-[999px]:hidden`} title={action}>
                     {action}
                   </td>
                   <td className={TD}>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, CircleExclamationPoint } from "lucide-react";
 import styles from "./tokens.module.css";
 
 // Card anatomy measured from the reference: 12 px radius, 1 px #E3E3E3, a faint shadow, 12 × 16 px padding;
@@ -17,6 +17,7 @@ function StatCard({
   onClick,
   pressed,
   dot,
+  alert,
 }: {
   label: string;
   value: number;
@@ -25,6 +26,8 @@ function StatCard({
   /** For cards that filter the table: shown while their filter is on. */
   pressed?: boolean;
   dot?: boolean;
+  /** The Stuck chip's alert, beside the label: a red icon with the same soft ring pulsing out of it. */
+  alert?: boolean;
 }) {
   return (
     <button
@@ -34,9 +37,15 @@ function StatCard({
       className={`${CARD} ${pressed ? "border-[var(--cta)]" : "border-[var(--card-line)] hover:border-[var(--card-line-h)]"}`}
     >
       <span className="flex items-center justify-between gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
-        <span className="flex min-w-0 items-center gap-1.5 truncate">
+        {/* Only the label truncates, so the alert's ring isn't clipped. */}
+        <span className="flex min-w-0 items-center gap-1.5">
           {dot && <span aria-hidden="true" className="size-1.5 flex-none rounded-full bg-[var(--green)]" />}
-          {label}
+          {alert && (
+            <span aria-hidden="true" className={`${styles.alertIcon} inline-flex flex-none rounded-full text-[var(--red)]`}>
+              <CircleExclamationPoint size={14} strokeWidth={2} />
+            </span>
+          )}
+          <span className="truncate">{label}</span>
         </span>
         <ChevronRight
           aria-hidden="true"
@@ -91,7 +100,14 @@ export function SummaryCards(p: SummaryCardsProps) {
         onClick={p.onReview}
         pressed={p.active === "review"}
       />
-      <StatCard label="Stuck" value={p.stuck} sub="Not being picked up" onClick={p.onStuck} pressed={p.active === "stuck"} />
+      <StatCard
+        label="Stuck"
+        value={p.stuck}
+        sub="Not being picked up"
+        onClick={p.onStuck}
+        pressed={p.active === "stuck"}
+        alert={p.stuck > 0}
+      />
       <StatCard
         label="Running"
         value={runningTotal}

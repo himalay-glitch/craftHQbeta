@@ -1,5 +1,7 @@
+import { CircleExclamationPoint } from "lucide-react";
 import type { NeedKind } from "@/types/dashboard";
 import { needLabel } from "./format";
+import styles from "./tokens.module.css";
 
 // Four tiers; every pair is at least 5.7:1 (docs/design/dashboard-plan.md, §5).
 // Red: stuck. Amber: a decision is waiting. Blue: work to check or approve. Grey: give it direction.
@@ -13,10 +15,15 @@ const TONE: Record<NeedKind, string> = {
 };
 
 export function NeedChip({ need }: { need: NeedKind }) {
+  const stuck = need === "stuck";
   return (
     <span
-      className={`inline-flex h-[22px] max-w-full items-center truncate rounded-full px-2 text-[13px] leading-4 font-medium whitespace-nowrap ${TONE[need]}`}
+      className={`inline-flex h-[22px] max-w-full items-center gap-1 truncate rounded-full text-[13px] leading-4 font-medium whitespace-nowrap ${
+        stuck ? `${styles.alert} pr-2 pl-1.5` : "px-2"
+      } ${TONE[need]}`}
     >
+      {/* Stuck is the one tier nobody is moving, so it alone carries an alert: an icon and a soft red ring. */}
+      {stuck && <CircleExclamationPoint aria-hidden="true" size={13} strokeWidth={2} className="flex-none" />}
       {needLabel(need)}
     </span>
   );
