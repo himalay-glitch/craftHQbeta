@@ -1,0 +1,12 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import { Stories } from "@/components/stories/Stories";
+import { storiesData } from "./_sample-data";
+
+// The top bar's search gets a slim list; it's a separate island and can't share this page's state.
+const search = storiesData.stories.map(({ id, title, status }) => ({ id, title, status }));
+---
+
+<AppLayout title="Stories · CraftHQ" viewer={storiesData.viewer} search={search}>
+  <Stories client:load data={storiesData} />
+</AppLayout>

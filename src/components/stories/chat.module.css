@@ -1,0 +1,139 @@
+/*
+ * Motion for a story's conversation. Timings follow a calm, chat-app feel: new things rise 8 px and fade in
+ * over 360 ms; a message lands from its own corner (yours from the bottom right, everyone else's from the
+ * bottom left); nothing overshoots (DESIGN.md §3.7). Only the mascot moves on its own (§2.8).
+ * Everything stops under prefers-reduced-motion.
+ */
+
+.enter {
+  animation: enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.landMine {
+  transform-origin: 100% 100%;
+  animation: land-mine 360ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+@keyframes land-mine {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.94);
+  }
+}
+
+.landTheirs {
+  transform-origin: 0 100%;
+  animation: land-theirs 360ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+@keyframes land-theirs {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+
+/* "Thinking": three dots breathing in turn. */
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: dot 1.3s ease-in-out infinite;
+}
+.dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@keyframes dot {
+  0%,
+  55%,
+  100% {
+    opacity: 0.25;
+  }
+  25% {
+    opacity: 0.85;
+  }
+}
+
+/* A status label that changes ("Reading the plan" → "Running the checks") slides up into place. */
+.labelIn {
+  animation: label-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes label-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+/* A finished step's tick pops in. */
+.check {
+  animation: check 300ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+@keyframes check {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+/* Work in progress: a light passes along the words. */
+.shimmer {
+  background: linear-gradient(90deg, var(--tx2) 0%, var(--tx2) 38%, var(--tx) 50%, var(--tx2) 62%, var(--tx2) 100%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.4s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+/* The conversation scrolls without a visible bar, like a chat app. */
+.transcript {
+  scrollbar-width: none;
+}
+.transcript::-webkit-scrollbar {
+  display: none;
+}
+
+/* Messages fade out as they pass under the message box. */
+.fade {
+  background: linear-gradient(to top, #fff 0%, rgb(255 255 255 / 0.7) 45%, rgb(255 255 255 / 0) 100%);
+}
+
+.fadeTop {
+  background: linear-gradient(to bottom, #fff 0%, rgb(255 255 255 / 0) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter,
+  .landMine,
+  .landTheirs,
+  .labelIn,
+  .check {
+    animation: none;
+  }
+  .dot {
+    animation: none;
+    opacity: 0.5;
+  }
+  .shimmer {
+    animation: none;
+    background: none;
+    color: var(--tx2);
+  }
+}
