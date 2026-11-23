@@ -1,4 +1,5 @@
-import type { AskData, Block, Turn } from "@/types/ask";
+import type { AskData, Block, BotId, Turn } from "@/types/ask";
+import { TEAM } from "./team";
 
 // The demo's PM: no model behind it yet. It matches what you asked to a scripted answer built from the
 // project's own stories, and brings in a teammate for new work. Replace with the real agent later.
@@ -18,7 +19,7 @@ const pm = (blocks: Block[], delay = 650): Turn => ({ from: "pm", delay, blocks 
 /** The words a topic is recognised by, most specific first. */
 const TOPICS: [RegExp, (d: AskData, q: string) => Turn[]][] = [
   [/\bfix\b/i, fix],
-  [/\b(design|mock ?up|screens?|layout|ui|wireframe|look)\b/i, design],
+  [/\b(design|sketch|mock ?up|screens?|layout|ui|wireframe|look)\b/i, design],
   [/\b(build|engineer|implement|code|develop|make|add)\b/i, build],
   [/\b(test|check|qa|verify)\b/i, check],
   [/\b(merged?|shipped?|released?|done|finished|live)\b/i, merged],
@@ -31,6 +32,9 @@ const TOPICS: [RegExp, (d: AskData, q: string) => Turn[]][] = [
 export function answer(question: string, d: AskData): Turn[] {
   const q = question.trim();
   for (const [re, fn] of TOPICS) if (re.test(q)) return fn(d, q);
+  // A bot named on its own ("What is Builder doing?", "@Checker"): what it's on.
+  const named = q.match(/@?\b(pm|builder|designer|checker|fixer)\b/i)?.[1].toLowerCase() as BotId | undefined;
+  if (named) return botStatus(named);
   return [
     pm([
       {
@@ -93,6 +97,7 @@ function stuck(d: AskData): Turn[] {
     {
       from: "fixer",
       delay: 1800,
+      status: { now: `Restarting hq-${first.id}`, working: true },
       blocks: [
         {
           kind: "text",
@@ -123,7 +128,7 @@ function team(): Turn[] {
 }
 
 function design(d: AskData, q: string): Turn[] {
-  const what = topicOf(q, "design") || "settings page";
+  const what = topicOf(q, ["design", "sketch", "mock up"]) || "settings page";
   return [
     pm([
       { kind: "text", text: `Good idea. I’ve asked Designer to sketch a few directions for the ${what}, using ${d.project}’s existing screens.` },
@@ -132,6 +137,7 @@ function design(d: AskData, q: string): Turn[] {
     {
       from: "designer",
       delay: 2600,
+      status: { now: "Sent three directions", working: false },
       blocks: [
         { kind: "text", text: `Three directions for the ${what}. A keeps everything in one list, B groups it into cards, C splits sections from details.` },
         {
@@ -161,7 +167,7 @@ export function pickDesign(option: string, label: string, d: AskData): Turn[] {
 
 function build(d: AskData, q: string): Turn[] {
   // "Build it now" after picking a design means the settings page that was just written up.
-  const what = topicOf(q, "build") || (/\b(it|this|that)\b/i.test(q) ? "settings page" : "check-in reminders");
+  const what = topicOf(q, ["build", "add", "make", "implement", "code"]) || (/\b(it|this|that)\b/i.test(q) ? "settings page" : "check-in reminders");
   const story = { id: d.nextStoryId, title: capitalise(what) };
   return [
     pm([
@@ -171,6 +177,7 @@ function build(d: AskData, q: string): Turn[] {
     {
       from: "builder",
       delay: 2200,
+      status: { now: `Building hq-${story.id}`, working: true },
       blocks: [
         { kind: "text", text: "Started. Here’s where it is; I’ll post the preview when the Checker has passed it." },
         { kind: "steps", story, steps: ["Read the story and the screens", "Write the change", "Run the tests", "Open the pull request"] },
@@ -189,6 +196,7 @@ function check(d: AskData): Turn[] {
     {
       from: "checker",
       delay: 2400,
+      status: { now: `Checked hq-${story.id} · 1 to fix`, working: false },
       blocks: [
         { kind: "text", text: `Done. Nearly everything passes; one thing needs a fix before you review it.` },
         { kind: "checks", story, passed: 23, failed: 1, note: "On Android the event date shows as 11/20 instead of 20 Nov." },
@@ -208,6 +216,7 @@ function fix(d: AskData): Turn[] {
     {
       from: "builder",
       delay: 2000,
+      status: { now: `Fixing hq-${story.id}`, working: true },
       blocks: [
         { kind: "text", text: "Found it: the date used the phone’s short format. Switching it to “20 Nov” everywhere." },
         { kind: "steps", story, steps: ["Find where the date is formatted", "Use the app’s date format", "Run the tests", "Hand it to the Checker"] },
@@ -216,10 +225,38 @@ function fix(d: AskData): Turn[] {
   ];
 }
 
-/** The thing asked for, after the verb: "Design a settings page" → "settings page". Words a verb, not a thing. */
-function topicOf(q: string, verb: string) {
-  const m = q.match(new RegExp(`\\b${verb}\\s+(?:me\\s+)?(?:a|an|the|some)?\\s*(.+?)[.?!]*$`, "i"));
-  const t = m?.[1]?.trim();
-  return t && t.length <= 60 && !/^(it|this|that)\b/i.test(t) ? t : "";
+/** The thing asked for, after the first verb that appears: "Design a settings page" → "settings page". */
+function topicOf(q: string, verbs: string[]) {
+  for (const verb of verbs) {
+    const m = q.match(new RegExp(`\\b${verb}\\s+(?:me\\s+)?(?:a|an|the|some)?\\s*(.+?)[.?!]*$`, "i"));
+    const t = m?.[1]?.trim();
+    if (t) return t.length <= 60 && !/^(it|this|that)\b/i.test(t) ? t : "";
+  }
+  return "";
+}
+
+/** "What is Builder doing?": what each bot is on, from the team's own lines. */
+function botStatus(id: BotId): Turn[] {
+  const bot = TEAM[id];
+  const lines: Record<BotId, Block[]> = {
+    pm: [{ kind: "text", text: "That’s me. I’m here with you, and I keep an eye on every story so you don’t have to." }],
+    builder: [
+      { kind: "text", text: "Builder is building hq-54, your calendar of upcoming plans. It started a few minutes ago; the Checker gets it next." },
+      { kind: "stories", items: [{ id: 54, title: "Your calendar: see your upcoming plans", status: "building", detail: "Started 4m ago" }] },
+    ],
+    checker: [
+      { kind: "text", text: "Checker is testing hq-43 on web and Android against what the story asked for." },
+      { kind: "stories", items: [{ id: 43, title: "Creation flow revision", status: "checking", detail: "Started 1m ago" }] },
+    ],
+    fixer: [
+      { kind: "text", text: "Fixer is retrying the preview for hq-21. It failed to start this morning, so it’s trying again with more memory." },
+      { kind: "stories", items: [{ id: 21, title: "Test story", status: "failed", detail: "Retrying the preview" }] },
+    ],
+    designer: [
+      { kind: "text", text: "Designer is free right now. Want it to sketch something?" },
+      { kind: "suggest", items: ["Design a settings page", "Design an onboarding flow"] },
+    ],
+  };
+  return [pm(lines[id] ?? [{ kind: "text", text: `${bot.name} is ${bot.now.toLowerCase()}.` }])];
 }
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

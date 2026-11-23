@@ -6,7 +6,18 @@ import { TEAM } from "./team";
  * A bot's face in a soft circle of its own colour. The posters are composited on white, so they sit on the
  * tint with `mix-blend-mode: multiply`. Until a bot's render exists, a plush-looking blob in its colour stands in.
  */
-export function BotAvatar({ id, size = 28, className = "" }: { id: BotId; size?: number; className?: string }) {
+export function BotAvatar({
+  id,
+  size = 28,
+  bare = false,
+  className = "",
+}: {
+  id: BotId;
+  size?: number;
+  /** No tinted circle: the bot on its own (welcome cards, the PM hero). */
+  bare?: boolean;
+  className?: string;
+}) {
   const bot = TEAM[id];
   const [missing, setMissing] = useState(false);
   const img = useRef<HTMLImageElement>(null);
@@ -19,7 +30,7 @@ export function BotAvatar({ id, size = 28, className = "" }: { id: BotId; size?:
     <span
       aria-hidden="true"
       className={`relative inline-flex flex-none items-center justify-center overflow-hidden rounded-full ${className}`}
-      style={{ width: size, height: size, background: bot.tint }}
+      style={{ width: size, height: size, background: bare ? "transparent" : bot.tint }}
     >
       {missing ? (
         <span

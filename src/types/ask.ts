@@ -51,6 +51,15 @@ export interface Turn {
   from: BotId;
   delay: number;
   blocks: Block[];
+  /** What this bot is on once it has replied, for the Bots sidebar. */
+  status?: { now: string; working: boolean };
+}
+
+/** A bot's line in the Bots sidebar. `since` is when it started, for "4m". */
+export interface Activity {
+  now: string;
+  working: boolean;
+  since: number;
 }
 
 /** What the page hands the chat: the project's stories, already shaped for answers. */
