@@ -290,7 +290,8 @@ export function AskPM({ data }: { data: AskData }) {
             {thinking && <Thinking from={thinking} />}
           </div>
         )}
-        <div ref={end} />
+        {/* Scroll target: its margin keeps the newest message clear of the composer that floats over the bottom. */}
+        <div ref={end} className="scroll-mb-40" />
 
         {/* The composer stays at the bottom, on a white fade so the thread slides under it. */}
         <div className="sticky bottom-0 bg-gradient-to-t from-white from-70% to-transparent pt-6 pb-4">
