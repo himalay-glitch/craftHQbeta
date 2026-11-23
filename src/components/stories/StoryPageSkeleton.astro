@@ -1,13 +1,19 @@
 ---
-// Shown at once while a story's page loads (its island renders in the browser only): the page's outline as
-// soft placeholders, and the mascot opening the story. Same layout as the page (StoryPage.tsx), so nothing jumps
-// when it arrives: on desktop the stories list on the left when this viewer left it open, then the white builder
-// filling the rest, with the activity icon at the end of its header (the activity opens as a card over the chat).
-// Still under reduced motion.
-const pulse = "rounded-[8px] animate-pulse motion-reduce:animate-none";
-const bar = `${pulse} bg-[var(--skeleton)]`;
-// On the grey stories list the skeleton grey barely shows, so it uses the hover wash (DESIGN.md §3.1 `--hover`).
-const barOnGrey = `${pulse} bg-hover`;
+// Shown at once while a story's page loads (its island renders in the browser only): the page's outline, with the
+// trail and the story's name already in place, and the mascot opening the story. Same layout as the page
+// (StoryPage.tsx), so nothing jumps when it arrives: on desktop the stories list on the left when this viewer left it
+// open, then the white builder filling the rest, with the activity icon at the end of its header (the activity opens
+// as a card over the chat). Still under reduced motion.
+interface Props {
+  /** "hq-21": known from the address, so the trail is always real. */
+  storyRef: string;
+  /** The story's name when the server has the story; a story made in this browser only gets a placeholder. */
+  title?: string;
+}
+
+const { storyRef, title } = Astro.props;
+// Placeholders are the field wash (DESIGN.md §6.8), so they show on the white builder and the grey stories list alike.
+const bar = "rounded-[8px] bg-field animate-pulse motion-reduce:animate-none";
 // The builder's reading column (StoryPage.tsx `COLUMN`).
 const column = "md:mx-auto md:w-full md:max-w-[min(100%,max(1200px,70%))] md:px-4 lg:px-6";
 ---
@@ -31,26 +37,45 @@ const column = "md:mx-auto md:w-full md:max-w-[min(100%,max(1200px,70%))] md:px-
   <div class="hidden xl:flex-none xl:bg-[var(--bar)] xl:group-data-[stories]/sk:flex" data-sk="nav">
     <div class="flex w-[264px] flex-none flex-col border-r border-[var(--line)]">
       <div class="flex h-14 flex-none items-center px-4">
-        <div class:list={[barOnGrey, "h-3.5 w-20"]}></div>
+        <div class:list={[bar, "h-3.5 w-20"]}></div>
       </div>
       <div class="flex flex-col gap-2.5 px-4">
-        <div class:list={[barOnGrey, "h-3 w-24 opacity-70"]}></div>
-        {[0, 1, 2, 3, 4].map(() => <div class:list={[barOnGrey, "h-5 w-full"]}></div>)}
+        <div class:list={[bar, "h-3 w-24 opacity-70"]}></div>
+        {[0, 1, 2, 3, 4].map(() => <div class:list={[bar, "h-5 w-full"]}></div>)}
       </div>
     </div>
   </div>
 
   <!-- The builder. -->
   <div data-sk="builder" class="px-4 pt-4 pb-6 md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col md:bg-white md:p-0">
-    <!-- The header row: the stories list's button (1280 px and wider), the trail and the name, then Team, the page's
-         buttons and the activity icon (768 px and wider). As wide as the real ones, so they wrap where the page's do
-         (two rows on a phone, the name below). -->
+    <!-- The header row, as the page's: the stories list's button (1280 px and wider), the trail and the story's name
+         (real text, with the page's classes, so it wraps where the page's does), then Team, the page's buttons and the
+         activity icon (768 px and wider) as placeholders of their size. -->
     <div class="flex flex-none flex-wrap items-center gap-x-3 gap-y-1.5 md:px-4 md:py-3 lg:h-14 lg:flex-nowrap lg:px-6 lg:py-0">
       <div class="-ml-2 hidden size-8 flex-none items-center justify-center xl:flex">
         <div class:list={[bar, "size-4 rounded-[4px]"]}></div>
       </div>
-      <div data-sk="trail" class:list={[bar, "h-[18px] w-32"]}></div>
-      <div class:list={[bar, "order-3 h-7 basis-full lg:order-none lg:h-5 lg:w-[min(360px,40%)] lg:basis-auto"]}></div>
+      <nav aria-label="Breadcrumb" data-sk="trail" class="flex flex-none items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
+        <a href="/stories" class="inline-flex items-center gap-1.5 rounded-[4px] hover:text-[var(--tx)]">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m12 19-7-7 7-7"></path>
+            <path d="M19 12H5"></path>
+          </svg>
+          Stories
+        </a>
+        <span aria-hidden="true">/</span>
+        <span class="tabular-nums" aria-current="page">{storyRef}</span>
+        <span aria-hidden="true" class="hidden lg:inline">/</span>
+      </nav>
+      {
+        title ? (
+          <h1 class="order-3 m-0 basis-full text-[20px] leading-7 font-semibold tracking-[-0.015em] text-[var(--tx)] lg:order-none lg:min-w-0 lg:basis-auto lg:truncate lg:text-[17px] lg:leading-6 lg:tracking-[-0.01em]">
+            {title}
+          </h1>
+        ) : (
+          <div class:list={[bar, "order-3 h-7 basis-full lg:order-none lg:h-5 lg:w-[min(360px,40%)] lg:basis-auto"]} />
+        )
+      }
       <div class="hidden flex-1 lg:block"></div>
       <div class="ml-auto flex items-center gap-3 lg:ml-0">
         <div class:list={[bar, "h-8 w-[88px] rounded-full"]}></div>
@@ -90,14 +115,14 @@ const column = "md:mx-auto md:w-full md:max-w-[min(100%,max(1200px,70%))] md:px-
           <div class:list={[bar, "h-10 w-[min(320px,60%)] rounded-[18px]"]}></div>
         </div>
 
-        <!-- The mascot opening the story. -->
+        <!-- The mascot opening the story. The words hold still, so they stay readable (DESIGN.md §11, 4.5:1). -->
         <div class="mt-2 flex items-center gap-2.5">
           <video autoplay loop muted playsinline poster="/images/bots/builder.webp" width="36" height="36" aria-hidden="true" class="size-9 flex-none object-contain motion-reduce:hidden">
             <source src="/videos/bots/builder-idle.webm" type="video/webm" />
             <source src="/videos/bots/builder-idle.mp4" type="video/mp4" />
           </video>
           <img src="/images/bots/builder.webp" width="36" height="36" alt="" class="hidden size-9 flex-none object-contain motion-reduce:block" />
-          <span class="text-[13px] leading-[18px] text-[var(--tx2)] animate-pulse motion-reduce:animate-none">Opening the story…</span>
+          <span class="text-[13px] leading-[18px] text-[var(--tx2)]">Opening the story…</span>
         </div>
       </div>
       <!-- The message box. -->

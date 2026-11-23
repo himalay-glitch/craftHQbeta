@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { readStoryParam, URL_EVENT } from "@/components/dashboard/format";
+import { URL_EVENT } from "@/components/dashboard/format";
 import type { StoriesView } from "@/types/stories";
 
 // Browser state read without effects: the server render uses the fallback, then React switches.
@@ -33,9 +33,6 @@ function subscribeUrl(onChange: () => void) {
     window.removeEventListener(URL_EVENT, onChange);
   };
 }
-
-/** The open story, from `?story=hq-43`, so links, reloads and Back reopen it. */
-export const useUrlStory = () => useSyncExternalStore(subscribeUrl, () => readStoryParam(window.location.search), () => null);
 
 const readView = (): StoriesView => (new URLSearchParams(window.location.search).get("view") === "list" ? "list" : "board");
 

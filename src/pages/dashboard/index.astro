@@ -8,5 +8,13 @@ const search = dashboardData.stories.map(({ id, title, status }) => ({ id, title
 ---
 
 <AppLayout title="Dashboard · CraftHQ" viewer={dashboardData.viewer} search={search}>
+  <!-- A story opens on its own page now, not in a panel here (Shubham, 23 Nov). Old links to one (/dashboard?story=hq-21,
+       copied before, or the Ask PM chat's) go straight to it, before the dashboard draws. -->
+  <script is:inline>
+    {
+      const ref = new URLSearchParams(location.search).get("story");
+      if (ref && /^hq-\d+$/.test(ref)) location.replace("/stories/" + ref);
+    }
+  </script>
   <Dashboard client:load data={dashboardData} />
 </AppLayout>

@@ -3,9 +3,9 @@ import { AnimatePresence } from "framer-motion";
 import { Tooltip } from "radix-ui";
 import { Plus } from "lucide-react";
 import { ConnectAccountsModal } from "@/components/connect-accounts";
-import type { DashboardData, DashboardStateOverride, NeedKind, Story, StoryStatus } from "@/types/dashboard";
+import type { DashboardData, DashboardStateOverride, NeedKind } from "@/types/dashboard";
 import { BTN_PRIMARY } from "./classes";
-import { clearStoryParam, NEEDS, readStoryParam, sortQueue, storyRef, URL_EVENT, writeStoryParam, type SortMode } from "./format";
+import { NEEDS, sortQueue, storyRef, type SortMode } from "./format";
 import { ActivityPanel, type DetailsTab } from "./ActivityPanel";
 import { DashboardSkeleton } from "./DashboardSkeleton";
 import { FilterPill, type FilterOption } from "./FilterPill";
@@ -19,7 +19,6 @@ import { QueueMessage } from "./QueueMessage";
 import { QueueTable } from "./QueueTable";
 import { SetupBanner } from "./SetupBanner";
 import { useConnectionSetup } from "./setup";
-import { StoryPanel, type StoryAction } from "./StoryPanel";
 import { SummaryCards } from "./SummaryCards";
 import { Toast, type ToastMessage } from "./Toast";
 
@@ -38,16 +37,6 @@ function useStateOverride(): DashboardStateOverride {
   );
 }
 
-function subscribeUrl(onChange: () => void) {
-  window.addEventListener("popstate", onChange);
-  window.addEventListener(URL_EVENT, onChange);
-  return () => {
-    window.removeEventListener("popstate", onChange);
-    window.removeEventListener(URL_EVENT, onChange);
-  };
-}
-const useUrlStory = () => useSyncExternalStore(subscribeUrl, () => readStoryParam(window.location.search), () => null);
-
 const WIDE = "(min-width: 1024px)";
 function useIsWide() {
   return useSyncExternalStore(
@@ -61,16 +50,13 @@ function useIsWide() {
   );
 }
 
-const visibleStoryButton = (id: number) =>
-  Array.from(document.querySelectorAll<HTMLElement>(`[data-story="${id}"]`)).find((el) => el.offsetParent !== null);
-
 type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | null;
 type Show = "mine" | "team";
 
-/** The dashboard island: the five stats, the stories that need a person, and the panels that open from them. */
+/** The dashboard island: the five stats, the stories that need a person, and the agent's details panel. A story
+ *  opens on its own page (the builder), not in a panel here (Shubham, 23 Nov): that page is where its work happens. */
 export function Dashboard({ data }: { data: DashboardData }) {
   const override = useStateOverride();
-  const urlStory = useUrlStory();
   const isWide = useIsWide();
   const setup = useConnectionSetup();
 
@@ -80,12 +66,6 @@ export function Dashboard({ data }: { data: DashboardData }) {
     ...data.stories.map((s) => ({ ...s, ...sampleWorking[s.id] })),
     ...sampleFinished.filter((s) => (s.outcome === "merged" || s.pr?.state === "merged") && (s.updatedMinutes ?? Infinity) <= 2 * 1440),
   ]);
-  // Stories acted on here: their rows stay and show what happens next (waiting to start, building, merged).
-  const [changed, setChanged] = useState<ReadonlySet<number>>(() => new Set());
-  // Where each acted-on row was in the list, so it stays put while it changes (DESIGN.md §8.4: never move a row under
-  // the pointer); a re-sort or filter lets it go back to its group.
-  const [pinned, setPinned] = useState<ReadonlyMap<number, number>>(() => new Map());
-  const pickups = useRef(new Map<number, number>());
   const [show, setShow] = useState<Show>("mine");
   const [need, setNeed] = useState<"all" | NeedKind | "running">("all");
   const [sort, setSort] = useState<SortMode>("group");
@@ -95,19 +75,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const [creating, setCreating] = useState(false);
   const created = useCreatedStories();
 
-  // A story being closed hides at once, before the Back navigation lands.
-  const [closing, setClosing] = useState<number | null>(null);
-  const [lastUrlStory, setLastUrlStory] = useState(urlStory);
-  if (lastUrlStory !== urlStory) {
-    setLastUrlStory(urlStory);
-    setClosing(null);
-  }
-
   const toastKey = useRef(0);
   const returnFocus = useRef<HTMLElement | null>(null);
-  const focusAfterClose = useRef<number | null>(null);
-
-  const byId = useMemo(() => new Map(stories.map((s) => [s.id, s])), [stories]);
 
   // ---- What's listed (the prototype's counting) ----
   const needing = override === "empty" ? [] : stories.filter((s) => s.need);
@@ -122,10 +91,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
     () =>
       override === "empty"
         ? []
-        : stories
-            .filter((s) => !s.need && !s.live && (changed.has(s.id) || s.status === "done"))
-            .sort((a, b) => (a.updatedMinutes ?? 0) - (b.updatedMinutes ?? 0)),
-    [override, stories, changed],
+        : stories.filter((s) => !s.need && !s.live && s.status === "done").sort((a, b) => (a.updatedMinutes ?? 0) - (b.updatedMinutes ?? 0)),
+    [override, stories],
   );
   const running = {
     total: moving.length,
@@ -141,19 +108,11 @@ export function Dashboard({ data }: { data: DashboardData }) {
     if (need === "running") return sortQueue(timed, sort === "group" ? "updated-desc" : sort);
     if (need !== "all") return sortQueue(inShow.filter((s) => s.need === need), sort);
     if (sort !== "group") return sortQueue([...inShow, ...timed, ...settled], sort);
-    // The default order, with each acted-on row back where it was.
-    const base = [...sortQueue(inShow, "group"), ...timed, ...settled];
-    const rest = base.filter((s) => !pinned.has(s.id));
-    [...pinned].sort((a, b) => a[1] - b[1]).forEach(([id, at]) => {
-      const row = base.find((s) => s.id === id);
-      if (row) rest.splice(Math.min(at, rest.length), 0, row);
-    });
-    return rest;
-  }, [need, sort, inShow, moving, settled, pinned]);
+    return [...sortQueue(inShow, "group"), ...timed, ...settled];
+  }, [need, sort, inShow, moving, settled]);
   const filtersAreDefault = show === "mine" && need === "all";
 
-  const openStory = urlStory !== null && urlStory !== closing ? byId.get(urlStory) : undefined;
-  const panel: "story" | "details" | "new" | null = openStory ? "story" : (localPanel?.kind ?? null);
+  const panel: "details" | "new" | null = localPanel?.kind ?? null;
 
   // ---- Toasts ----
   const showToast = useCallback((message: string, action?: ToastMessage["action"]) => {
@@ -168,37 +127,17 @@ export function Dashboard({ data }: { data: DashboardData }) {
     if (active && !active.closest('[role="dialog"]')) returnFocus.current = active;
   };
 
-  const open = useCallback(
-    (id: number) => {
-      rememberFocus();
-      setLocalPanel(null);
-      writeStoryParam(id, urlStory === null ? "push" : "replace");
-    },
-    [urlStory],
-  );
+  // A story opens on its own page (the agent's details list opens them too).
+  const open = (id: number) => window.location.assign(`/stories/${storyRef(id)}`);
 
   const openLocal = (next: Exclude<LocalPanel, null>) => {
     rememberFocus();
-    if (urlStory !== null) {
-      setClosing(urlStory);
-      clearStoryParam();
-    }
     setLocalPanel(next);
   };
 
-  const closePanel = useCallback(
-    (focusStory?: number) => {
-      if (focusStory !== undefined) focusAfterClose.current = focusStory;
-      setLocalPanel(null);
-      if (urlStory !== null) {
-        setClosing(urlStory);
-        clearStoryParam();
-      }
-    },
-    [urlStory],
-  );
+  const closePanel = useCallback(() => setLocalPanel(null), []);
 
-  // When the last panel closes, focus goes back to where it came from, or to the next story after an action.
+  // When the panel closes, focus goes back to where it came from.
   const hadPanel = useRef(false);
   useEffect(() => {
     if (panel !== null) {
@@ -207,137 +146,22 @@ export function Dashboard({ data }: { data: DashboardData }) {
     }
     if (!hadPanel.current) return;
     hadPanel.current = false;
-    const target = focusAfterClose.current;
-    focusAfterClose.current = null;
-    const el =
-      (target !== null ? visibleStoryButton(target) : undefined) ??
-      (returnFocus.current?.isConnected ? returnFocus.current : undefined) ??
-      document.getElementById("dashboard-title");
+    const el = (returnFocus.current?.isConnected ? returnFocus.current : undefined) ?? document.getElementById("dashboard-title");
     el?.focus();
   }, [panel]);
 
-  // Esc closes the panel; ↑ ↓ (or J K) move through the list while a story is open.
+  // Esc closes the panel.
   useEffect(() => {
     if (panel === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       // Keys inside the connect-accounts modal (a <dialog>) belong to it, Esc included.
       if (target.closest('[role="menu"], [role="listbox"], [role="tablist"], dialog')) return;
-      if (e.key === "Escape") {
-        if (!e.defaultPrevented && !document.querySelector('[role="menu"]')) closePanel();
-        return;
-      }
-      if (panel !== "story" || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (target.closest("input, textarea, select, [contenteditable='true']")) return;
-      const delta = e.key === "ArrowDown" || e.key === "j" ? 1 : e.key === "ArrowUp" || e.key === "k" ? -1 : 0;
-      if (!delta) return;
-      e.preventDefault();
-      const index = visible.findIndex((s) => s.id === urlStory);
-      const nextStory = visible[index + delta];
-      if (!nextStory) return;
-      writeStoryParam(nextStory.id, "replace");
-      visibleStoryButton(nextStory.id)?.scrollIntoView({ block: "nearest" });
+      if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector('[role="menu"]')) closePanel();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [panel, visible, urlStory, closePanel]);
-
-  useEffect(() => {
-    const pending = pickups.current;
-    return () => pending.forEach((t) => window.clearTimeout(t));
-  }, []);
-
-  // ---- Acting on a story ----
-  const act = (story: Story, action: StoryAction) => {
-    const ref = storyRef(story.id);
-    let status: StoryStatus;
-    let message: string;
-    switch (action.type) {
-      case "accept":
-        status = "done";
-        message = `${ref} accepted and moved to Done.`;
-        break;
-      case "approve":
-        status = "approved";
-        message = `${ref} approved. Builder starts on it in a moment.`;
-        break;
-      case "defaults":
-        status = "approved";
-        message = `Defaults kept for ${ref}, and it’s approved.`;
-        break;
-      case "restart":
-        status = "in_progress";
-        message = `Restarting ${ref}. Builder is back on it.`;
-        break;
-      case "plan":
-        status = "planning";
-        message = `${ref} moved to Planning.`;
-        break;
-      case "cancel":
-        status = "cancelled";
-        message = `${ref} cancelled.`;
-        break;
-      case "note":
-        if (action.intent === "changes") {
-          status = "approved";
-          message = `Changes sent. Builder picks up ${ref}.`;
-        } else if (action.intent === "question") {
-          status = "planning";
-          message = `Question sent. Asker replies on ${ref}.`;
-        } else if (story.need === "stuck") {
-          // A note doesn't unstick anything on its own; the story stays on the list.
-          showToast(`Note sent on ${ref}.`);
-          return;
-        } else {
-          status = "planning";
-          message = `Note sent. Asker picks up ${ref}.`;
-        }
-        break;
-    }
-
-    const index = visible.findIndex((s) => s.id === story.id);
-    const after = visible[index + 1] ?? visible[index - 1];
-    // The row stays and says what happens next: a robot back at work, merged, or cancelled.
-    const live = status === "in_progress" ? { phase: "implement" as const, startedAt: Date.now() } : status === "planning" ? { phase: "plan" as const, startedAt: Date.now() } : undefined;
-    setChanged((c) => new Set(c).add(story.id));
-    if (need === "all" && sort === "group" && index >= 0) setPinned((m) => new Map(m).set(story.id, index));
-    setStories((ss) =>
-      ss.map((s) =>
-        s.id === story.id
-          ? {
-              ...s,
-              status,
-              need: undefined,
-              waitingOn: undefined,
-              live,
-              ...(status === "done" ? { outcome: "merged" as const, pr: { state: "merged" as const } } : {}),
-              updated: "just now",
-              updatedMinutes: 0,
-            }
-          : s,
-      ),
-    );
-    // Approved: the Builder picks it up a moment later, in the same row.
-    if (status === "approved") {
-      window.clearTimeout(pickups.current.get(story.id));
-      pickups.current.set(
-        story.id,
-        window.setTimeout(() => {
-          pickups.current.delete(story.id);
-          setStories((ss) => ss.map((s) => (s.id === story.id && s.status === "approved" ? { ...s, status: "in_progress", live: { phase: "implement", startedAt: Date.now() } } : s)));
-        }, 2500),
-      );
-    }
-    showToast(message, {
-      label: "Undo",
-      run: () => {
-        window.clearTimeout(pickups.current.get(story.id));
-        pickups.current.delete(story.id);
-        setStories((ss) => ss.map((s) => (s.id === story.id ? story : s)));
-      },
-    });
-    closePanel(after?.id);
-  };
+  }, [panel, closePanel]);
 
   // One way to write a story everywhere: the Stories area's centred New story dialog. What's created here is
   // kept with the stories created on the Stories page, so it shows on the board too.
@@ -357,13 +181,6 @@ export function Dashboard({ data }: { data: DashboardData }) {
       updatedMinutes: 0,
     });
     showToast(`${storyRef(id)} added. The agent drafts the spec from it.`, { label: "Open", run: () => window.location.assign(`/stories/${storyRef(id)}`) });
-  };
-
-  const copyLink = () => {
-    navigator.clipboard
-      .writeText(window.location.href)
-      .then(() => showToast("Link copied."))
-      .catch(() => showToast("Couldn’t copy the link. Copy it from the address bar."));
   };
 
   // ---- Filters ----
@@ -480,16 +297,14 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   <div className="hidden md:block">
                     <QueueTable
                       stories={visible}
-                      selectedId={openStory?.id ?? null}
                       sort={sort}
                       onSort={() =>
                         setSort((s) => (s === "group" ? "updated-desc" : s === "updated-desc" ? "updated-asc" : "group"))
                       }
-                      onOpen={open}
                     />
                   </div>
                   <div className="md:hidden">
-                    <QueueList stories={visible} onOpen={open} />
+                    <QueueList stories={visible} />
                   </div>
                 </>
               )}
@@ -499,16 +314,6 @@ export function Dashboard({ data }: { data: DashboardData }) {
       </main>
 
       <AnimatePresence>
-        {panel === "story" && openStory && (
-          <StoryPanel
-            key="story"
-            story={openStory}
-            isWide={isWide}
-            onClose={() => closePanel()}
-            onAct={(action) => act(openStory, action)}
-            onCopyLink={copyLink}
-          />
-        )}
         {panel === "details" && localPanel?.kind === "details" && (
           <ActivityPanel
             key="details"

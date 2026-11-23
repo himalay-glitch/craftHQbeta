@@ -9,10 +9,8 @@ import { Tip } from "./Tip";
 interface QueueTableProps {
   /** Stories that need a person first, then the ones robots are working on, then what just finished. */
   stories: LiveRow[];
-  selectedId: number | null;
   sort: SortMode;
   onSort: () => void;
-  onOpen: (id: number) => void;
 }
 
 // Header row 36 px: 12/16 grey, regular, sentence case, a 1 px #E8E8E8 rule. Sticky under the top bar.
@@ -24,8 +22,9 @@ const TD = "h-[46px] border-b border-[var(--line)] px-3 align-middle text-[15px]
 
 const ARIA_SORT = { group: undefined, "updated-desc": "descending", "updated-asc": "ascending" } as const;
 
-/** The stories that need a person, on screens 768 px and wider. A real table; each row opens its story. */
-export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueTableProps) {
+/** The stories that need a person, on screens 768 px and wider. A real table; each row opens its story's page (the
+ *  builder), not a side panel (Shubham, 23 Nov): the story page is where everything about a story happens. */
+export function QueueTable({ stories, sort, onSort }: QueueTableProps) {
   const reduced = useReducedMotion();
   const SortIcon = sort === "updated-desc" ? ArrowDown : sort === "updated-asc" ? ArrowUp : ArrowUpDown;
 
@@ -33,7 +32,7 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
     // Boxed like the cards: 1 px #E3E3E3 on all sides, 12 px corners. `overflow-clip` rounds the corners
     // without making a scroll container, so the header still sticks under the top bar.
     // The Action column gives way when the table is under 1000 px (a window under about 1120 px beside the rail, 1240 px with the
-    // sidebar open), where it would be too narrow to read; Story then takes its space. It's also in the panel.
+    // sidebar open), where it would be too narrow to read; Story then takes its space. The story's page says it too.
     <div className="@container overflow-clip rounded-[12px] border border-[var(--card-line)]">
       <table className="w-full table-fixed border-separate border-spacing-0 text-left">
         <thead>
@@ -88,37 +87,29 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
         <tbody className="[&>tr:last-child>td]:border-b-0">
           <AnimatePresence initial={false}>
             {stories.map((s) => {
-              const selected = s.id === selectedId;
               const action = rowAction(s);
+              const href = `/stories/${storyRef(s.id)}`;
               return (
                 <motion.tr
                   key={s.id}
                   layout={reduced ? false : "position"}
                   exit={{ opacity: 0, transition: { duration: 0.15 } }}
                   transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
-                  onClick={() => onOpen(s.id)}
-                  className={`cursor-pointer transition-colors duration-[80ms] ${
-                    selected
-                      ? "bg-[var(--row-sel)] hover:bg-[var(--row-sel-h)]"
-                      : "hover:bg-[var(--row-h)] has-[:focus-visible]:bg-[var(--row-h)]"
-                  }`}
+                  // The whole row opens the story's page. Its name is the real link, for the keyboard, a new tab and
+                  // copying the address; clicks on it (or on anything else you can press in the row) are its own.
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("a, button")) return;
+                    if (e.metaKey || e.ctrlKey) window.open(href, "_blank", "noopener");
+                    else window.location.assign(href);
+                  }}
+                  className="cursor-pointer transition-colors duration-[80ms] hover:bg-[var(--row-h)] has-[:focus-visible]:bg-[var(--row-h)]"
                 >
                   <td className={`${TD} pl-4`}>
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="w-11 flex-none text-[13px] text-[var(--tx2)] tabular-nums">{storyRef(s.id)}</span>
-                      <button
-                        type="button"
-                        data-story={s.id}
-                        aria-current={selected ? "true" : undefined}
-                        title={s.title}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpen(s.id);
-                        }}
-                        className="min-w-0 truncate rounded-[4px] text-left text-[var(--tx)]"
-                      >
+                      <a href={href} data-story={s.id} title={s.title} className="min-w-0 truncate rounded-[4px] text-[var(--tx)]">
                         {s.title}
-                      </button>
+                      </a>
                     </span>
                   </td>
                   <td className={TD}>

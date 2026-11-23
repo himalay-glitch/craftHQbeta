@@ -210,8 +210,13 @@ function NowRow({
           </span>
         </p>
         {status && (
-          // Wraps rather than cutting off: it's often the reason something stopped, and there's no tooltip here.
-          <p key={item.detail} className={`m-0 line-clamp-2 text-xs ${tone} ${item.fresh ? chat.labelIn : ""}`}>
+          // Wraps rather than cutting off. Why something failed shows in full; anything else stops at two lines, with the
+          // whole of it in a tooltip (DESIGN.md §3.2).
+          <p
+            key={item.detail}
+            title={item.state === "failed" ? undefined : status}
+            className={`m-0 text-xs ${item.state === "failed" ? "" : "line-clamp-2"} ${tone} ${item.fresh ? chat.labelIn : ""}`}
+          >
             {status}
             <span className="sr-only">{stateWord(item)}</span>
           </p>
@@ -296,20 +301,23 @@ const LINE_BUTTON = `${LINE} transition-colors duration-[120ms] hover:bg-hover f
 /** `holdName`: never narrower than a short name like "Preview", so buttons beside it move down instead of squeezing it. */
 function LineText({ title, detail, proof, running, holdName }: { title: string; detail: string; proof?: boolean; running?: boolean; holdName?: boolean }) {
   return (
-    // The name and what it is now share a line when they fit; in the narrow column the state goes under the name, so
-    // neither is cut short. Only a name longer than the whole row still truncates, hence the tooltip (DESIGN.md §3.2).
+    // The name and what it is now share a line when they fit; in a narrow space the state goes under the name, so
+    // neither is cut short. The name keeps its dot beside it. Only a name longer than the whole row still truncates,
+    // hence the tooltip (DESIGN.md §3.2).
     <span
       title={detail ? `${title} · ${detail}` : title}
       className={`relative flex flex-1 flex-wrap items-baseline gap-x-1.5 ${holdName ? "min-w-[4.5rem]" : "min-w-0"}`}
     >
-      <span className="max-w-full min-w-0 truncate text-sm font-medium text-[var(--tx)]">{title}</span>
-      {proof && (
-        <>
-          <span aria-hidden="true" className="size-1.5 flex-none -translate-y-px self-center rounded-full bg-[#d97706]" />
-          <span className="sr-only">, waiting on you</span>
-        </>
-      )}
-      {running && <span aria-hidden="true" className="size-1.5 flex-none self-center rounded-full bg-[var(--green)]" />}
+      <span className="flex max-w-full min-w-0 items-baseline gap-1.5">
+        <span className="min-w-0 truncate text-sm font-medium text-[var(--tx)]">{title}</span>
+        {proof && (
+          <>
+            <span aria-hidden="true" className="size-1.5 flex-none -translate-y-px self-center rounded-full bg-[#d97706]" />
+            <span className="sr-only">, waiting on you</span>
+          </>
+        )}
+        {running && <span aria-hidden="true" className="size-1.5 flex-none self-center rounded-full bg-[var(--green)]" />}
+      </span>
       <span className="max-w-full min-w-0 truncate text-xs text-[var(--tx2)]">{detail}</span>
     </span>
   );
@@ -334,14 +342,15 @@ function OutputRow({ item, proof, preview, onSoon }: { item: ActivityItem; proof
   // The preview: started, opened and stopped right on its line (it costs server time, so Stop is never faded).
   if (item.kind === "preview") {
     return (
-      // Where the column is too narrow for the name and the buttons side by side, the buttons go on a line of their
-      // own under it, on the right.
+      // Where the name and the buttons don't fit side by side, the buttons go on a line of their own under it, on the
+      // right. Below 18rem (phones under about 330 px) that holds in every state, so starting or stopping a preview
+      // never reshapes the row, and Play comes back where Stop was.
       <div className={`${LINE} flex-wrap gap-y-1`}>
         {flash}
         <Tile item={item} size={24} badge={false} />
         {/* Off, the play button already says it's ready to try; the words would only be cut short beside it. */}
         <LineText title="Preview" detail={!item.run || item.run === "off" ? "" : item.detail} proof={proof} running={item.run === "on"} holdName />
-        <span className="ml-auto flex">
+        <span className="ml-auto flex @max-[18rem]:basis-full @max-[18rem]:justify-end">
           <PreviewInline item={item} preview={preview} onSoon={onSoon} />
         </span>
       </div>
@@ -384,8 +393,12 @@ function ChecksRow({ items, proof }: { items: ActivityItem[]; proof: boolean }) 
           {items.map((it) => (
             <li key={it.id} className="flex items-baseline gap-2 text-xs">
               <CircleCheck aria-hidden="true" size={12} strokeWidth={2} className="flex-none translate-y-0.5 text-[var(--green)]" />
-              <span className="font-medium text-[var(--tx)]">{it.title}</span>
-              <span className="min-w-0 truncate text-[var(--tx2)]">{it.detail}</span>
+              {/* The name stays whole and its result goes under it when they don't fit side by side, like the lines
+                  above; the tooltip has both (DESIGN.md §3.2). */}
+              <span title={it.detail ? `${it.title} · ${it.detail}` : it.title} className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+                <span className="max-w-full min-w-0 truncate font-medium text-[var(--tx)]">{it.title}</span>
+                <span className="max-w-full min-w-0 truncate text-[var(--tx2)]">{it.detail}</span>
+              </span>
             </li>
           ))}
         </ul>
@@ -416,7 +429,8 @@ export function Outputs({ items, yours, preview, onSoon }: ActivityProps) {
       {ready.length === 0 ? (
         <p className="m-0 mt-1 text-xs text-[var(--tx2)]">Finished pages, previews and code land here.</p>
       ) : (
-        <div className="-mx-2 mt-0.5 flex flex-col">
+        // A size container: the Preview line lays out by the width it's given (the card, or the phone's Activity).
+        <div className="@container -mx-2 mt-0.5 flex flex-col">
           {lines.map((it) => (
             <div key={it.id} className={dim && !(it.kind === "preview" && it.run === "on") ? chat.dim : undefined}>
               <OutputRow item={it} proof={isProof(it, yours)} preview={preview} onSoon={onSoon} />

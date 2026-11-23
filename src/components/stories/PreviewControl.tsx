@@ -32,7 +32,9 @@ export function DeviceSwitch({ device, onChange, compact }: { device: Device; on
     requestAnimationFrame(() => group.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus());
   };
   return (
-    <div role="radiogroup" aria-label="Preview on" onKeyDown={onKeyDown} className={`ml-auto flex rounded-full bg-field p-0.5 pointer-coarse:h-11 ${compact ? "h-6" : "h-7"}`}>
+    // On touch screens each choice is at least 44 px square (DESIGN.md §3.3): the group drops its inset there, so it's
+    // 44 px tall like the buttons beside it and a row keeps its height whichever buttons it shows.
+    <div role="radiogroup" aria-label="Preview on" onKeyDown={onKeyDown} className={`ml-auto flex rounded-full bg-field p-0.5 pointer-coarse:h-11 pointer-coarse:p-0 ${compact ? "h-6" : "h-7"}`}>
       {DEVICES.map(({ value, label }) => (
         <button
           key={value}
@@ -41,7 +43,7 @@ export function DeviceSwitch({ device, onChange, compact }: { device: Device; on
           aria-checked={device === value}
           tabIndex={device === value ? 0 : -1}
           onClick={() => onChange(value)}
-          className={`flex items-center rounded-full text-[12px] leading-4 ${compact ? "px-2" : "px-2.5"} transition-[background-color,color,box-shadow] duration-[120ms] ${device === value ? "bg-white font-medium text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-[var(--tx2)] hover:text-[var(--tx)]"}`}
+          className={`flex items-center justify-center rounded-full text-[12px] leading-4 pointer-coarse:min-w-11 ${compact ? "px-2" : "px-2.5"} transition-[background-color,color,box-shadow] duration-[120ms] ${device === value ? "bg-white font-medium text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-[var(--tx2)] hover:text-[var(--tx)]"}`}
         >
           {label}
         </button>
@@ -77,7 +79,7 @@ export function PreviewButtons({ item, failed, preview, onSoon }: PreviewButtons
   }
   if (item.run === "starting") {
     return (
-      <button type="button" onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
+      <button type="button" aria-label={`Cancel preview on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
         Cancel
       </button>
     );
@@ -158,7 +160,12 @@ export function PreviewInline({ item, preview, onSoon }: { item: ActivityItem; p
     return (
       <span className="relative flex flex-none items-center gap-1.5">
         <LoaderCircle aria-hidden="true" size={14} strokeWidth={1.75} className="animate-spin text-[var(--tx2)] [animation-duration:0.8s] motion-reduce:animate-none" />
-        <button type="button" onClick={() => preview.stop(item.id)} className="h-7 rounded-full px-2 text-[12px] leading-4 text-[var(--tx2)] hover:bg-black/[0.05] hover:text-[var(--tx)]">
+        <button
+          type="button"
+          aria-label={`Cancel preview on ${where}`}
+          onClick={() => preview.stop(item.id)}
+          className="h-7 rounded-full px-2 text-[12px] leading-4 text-[var(--tx2)] hover:bg-black/[0.05] hover:text-[var(--tx)] pointer-coarse:h-11 pointer-coarse:px-3"
+        >
           Cancel
         </button>
       </span>

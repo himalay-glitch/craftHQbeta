@@ -4,8 +4,8 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { NEED_STATUS, storyRef } from "./format";
 import { PersonAvatar } from "./PersonAvatar";
 
-/** The stories below 768 px: two-line rows (title, then status, ID and update time). */
-export function QueueList({ stories, onOpen }: { stories: LiveRow[]; onOpen: (id: number) => void }) {
+/** The stories below 768 px: two-line rows (title, then status, ID and update time). Each opens the story's page. */
+export function QueueList({ stories }: { stories: LiveRow[] }) {
   const reduced = useReducedMotion();
   return (
     <ul className="-mx-4 border-t border-[var(--line)]">
@@ -18,10 +18,9 @@ export function QueueList({ stories, onOpen }: { stories: LiveRow[]; onOpen: (id
             transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
             className="border-b border-[var(--line)]"
           >
-            <button
-              type="button"
+            <a
+              href={`/stories/${storyRef(s.id)}`}
               data-story={s.id}
-              onClick={() => onOpen(s.id)}
               className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-[80ms] active:bg-[var(--row-h)]"
             >
               <span className="min-w-0 flex-1">
@@ -34,7 +33,7 @@ export function QueueList({ stories, onOpen }: { stories: LiveRow[]; onOpen: (id
                 </span>
               </span>
               {s.owner && <PersonAvatar initials={s.owner} size={24} />}
-            </button>
+            </a>
           </motion.li>
         ))}
       </AnimatePresence>

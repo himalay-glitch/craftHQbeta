@@ -2,11 +2,10 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Search } from "lucide-react";
 import type { SearchItem } from "@/types/dashboard";
 import { ICON_BTN } from "@/components/dashboard/classes";
-import { STATUS_LABEL, storyRef, writeStoryParam } from "@/components/dashboard/format";
+import { STATUS_LABEL, storyRef } from "@/components/dashboard/format";
 
 /**
- * Story search in the top bar (a combobox). `/` focuses it. Choosing a result opens that story's
- * panel on the dashboard through the URL, which the dashboard island listens to.
+ * Story search in the top bar (a combobox). `/` focuses it. Choosing a result opens that story's page.
  * Below 1024 px it's an icon that expands into a field across the bar.
  */
 export function SearchBox({ items }: { items: SearchItem[] }) {
@@ -44,8 +43,7 @@ export function SearchBox({ items }: { items: SearchItem[] }) {
     setOpen(false);
     setExpanded(false);
     inputRef.current?.blur();
-    if (window.location.pathname.replace(/\/$/, "") === "/dashboard") writeStoryParam(id, "push");
-    else window.location.assign(`/dashboard?story=${storyRef(id)}`);
+    window.location.assign(`/stories/${storyRef(id)}`);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
