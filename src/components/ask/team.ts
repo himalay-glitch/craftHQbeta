@@ -23,7 +23,6 @@ export const TEAM: Record<BotId, Bot> = {
     colour: "#2B88F1",
     tint: "#E3EEFD",
     poster: "/images/bots/team/builder",
-    video: "/videos/bots/builder-idle",
   },
   designer: {
     id: "designer",

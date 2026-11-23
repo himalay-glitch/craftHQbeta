@@ -56,7 +56,7 @@ function Welcome({ data, onAsk }: { data: AskData; onAsk: (q: string) => void })
           className="absolute inset-[-40%] rounded-full blur-2xl"
           style={{ background: `radial-gradient(circle, ${TEAM.pm.tint} 0%, rgb(253 226 212 / 0.6) 45%, transparent 70%)` }}
         />
-        <BotAvatar id="pm" size={124} bare className="overflow-visible!" />
+        <BotAvatar id="pm" size={124} bare animate className="overflow-visible!" />
       </div>
       <h1 className="mt-5 text-[34px] leading-10 font-semibold tracking-[-0.025em] text-[var(--tx)]">Hi {data.firstName}, what’s up?</h1>
       <p className="mt-2 text-[15px] leading-6 text-[var(--tx2)]">How can I help with {data.project} today?</p>
