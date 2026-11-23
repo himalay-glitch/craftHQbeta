@@ -253,8 +253,15 @@ function botStatus(id: BotId): Turn[] {
       { kind: "stories", items: [{ id: 21, title: "Test story", status: "failed", detail: "Retrying the preview" }] },
     ],
     designer: [
-      { kind: "text", text: "Designer is free right now. Want it to sketch something?" },
-      { kind: "suggest", items: ["Design a settings page", "Design an onboarding flow"] },
+      {
+        kind: "text",
+        text: "Designer is sketching hq-23, the onboarding value slider and language switch. Two of the three screens are drawn; you’ll get directions to pick from in a few minutes.",
+      },
+      {
+        kind: "stories",
+        items: [{ id: 23, title: "Onboarding value slider and language switch", status: "draft", detail: "Designer sketching · 2 of 3 screens" }],
+      },
+      { kind: "suggest", items: ["Design a settings page", "What’s happening right now?"] },
     ],
   };
   return [pm(lines[id] ?? [{ kind: "text", text: `${bot.name} is ${bot.now.toLowerCase()}.` }])];

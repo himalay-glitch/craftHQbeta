@@ -29,7 +29,7 @@ export const TEAM: Record<BotId, Bot> = {
     name: "Designer",
     role: "Design",
     does: "Sketches screens and flows, and offers a few directions to pick from.",
-    now: "Free",
+    now: "Designing hq-23",
     colour: "#8B6CF0",
     tint: "#EFEAFE",
     poster: "/images/bots/designer.webp",

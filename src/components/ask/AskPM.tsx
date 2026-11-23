@@ -36,7 +36,7 @@ function startingActivity(t: number): Record<BotId, Activity> {
   return {
     pm: { now: "Talking with you", working: false, since: t },
     builder: { now: "Building hq-54", working: true, since: t - 4 * 60000 },
-    designer: { now: "Free", working: false, since: t },
+    designer: { now: "Designing hq-23", working: true, since: t - 7 * 60000 },
     checker: { now: "Checking hq-43", working: true, since: t - 60000 },
     fixer: { now: "Retrying hq-21", working: true, since: t },
   };
