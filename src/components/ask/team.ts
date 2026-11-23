@@ -1,7 +1,8 @@
 import type { Bot, BotId } from "@/types/ask";
 
 // The demo team. The PM is the one you talk to; it answers from the stories and brings in the others.
-// Posters live in public/images/bots/ (the Builder's is the login page's own). Renders: design/renders/bots_v010.
+// Faces: public/images/bots/team/<id>-{128,256,384}.webp, from the plush renders in design/renders/bots_v011
+// (design/blender/crafthq_team_v002.blend). Colours are the renders' measured coats.
 export const TEAM: Record<BotId, Bot> = {
   pm: {
     id: "pm",
@@ -9,9 +10,9 @@ export const TEAM: Record<BotId, Bot> = {
     role: "Project manager",
     does: "Knows every story. Answers your questions and hands new work to the right bot.",
     now: "Listening",
-    colour: "#E9B018",
-    tint: "#FDF4D7",
-    poster: "/images/bots/pm.webp",
+    colour: "#F5B82E",
+    tint: "#FDF3D6",
+    poster: "/images/bots/team/pm",
   },
   builder: {
     id: "builder",
@@ -21,7 +22,7 @@ export const TEAM: Record<BotId, Bot> = {
     now: "Building hq-54",
     colour: "#2B88F1",
     tint: "#E3EEFD",
-    poster: "/images/bots/builder.webp",
+    poster: "/images/bots/team/builder",
     video: "/videos/bots/builder-idle",
   },
   designer: {
@@ -30,9 +31,9 @@ export const TEAM: Record<BotId, Bot> = {
     role: "Design",
     does: "Sketches screens and flows, and offers a few directions to pick from.",
     now: "Designing hq-23",
-    colour: "#8B6CF0",
-    tint: "#EFEAFE",
-    poster: "/images/bots/designer.webp",
+    colour: "#8952EA",
+    tint: "#EFE8FD",
+    poster: "/images/bots/team/designer",
   },
   checker: {
     id: "checker",
@@ -40,9 +41,9 @@ export const TEAM: Record<BotId, Bot> = {
     role: "Testing",
     does: "Tests every change against what the story asked for, on web and phones.",
     now: "Checking hq-43",
-    colour: "#22B573",
-    tint: "#E2F6EC",
-    poster: "/images/bots/checker.webp",
+    colour: "#2FC565",
+    tint: "#E1F7E8",
+    poster: "/images/bots/team/checker",
   },
   fixer: {
     id: "fixer",
@@ -50,9 +51,9 @@ export const TEAM: Record<BotId, Bot> = {
     role: "Fixes failed builds",
     does: "Picks up anything that failed, retries it and tells you what it found.",
     now: "Retrying hq-21",
-    colour: "#E8553E",
-    tint: "#FDE8E4",
-    poster: "/images/bots/fixer.webp",
+    colour: "#E93B3B",
+    tint: "#FDE6E6",
+    poster: "/images/bots/team/fixer",
   },
 };
 

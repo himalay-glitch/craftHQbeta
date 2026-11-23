@@ -43,9 +43,12 @@ export function BotAvatar({
           }}
         />
       ) : (
+        // Pre-shrunk copies (128/256/384 px) so the browser never shrinks far: crisp from 22 px avatars to the hero.
         <img
           ref={img}
-          src={bot.poster}
+          src={`${bot.poster}-256.webp`}
+          srcSet={`${bot.poster}-128.webp 128w, ${bot.poster}-256.webp 256w, ${bot.poster}-384.webp 384w`}
+          sizes={`${Math.round(size * 1.18)}px`}
           width={size * 2}
           height={size * 2}
           alt=""

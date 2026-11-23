@@ -15,7 +15,7 @@ export interface Bot {
   /** Its fur colour (the avatar's backdrop tint and accents). */
   colour: string;
   tint: string;
-  /** Still, composited on white. Missing files fall back to a soft blob in its colour. */
+  /** Its face, as a path without the size: `<poster>-128.webp`, `-256` and `-384` exist (on white). */
   poster: string;
   /** Optional idle loop, as .webm and .mp4 without the extension. */
   video?: string;
