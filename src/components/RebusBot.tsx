@@ -4,7 +4,11 @@ export type RebusBotItem = {
   key: string;
   /** Short role shown in the chip while the bot is working (hover). */
   role: string;
-  /** Clip paths without extension; each is published as .webm (VP9) and .mp4 (H.264). */
+  /**
+   * Clip paths without extension; each is published as .webm (VP9) and .mp4 (H.264), at 288 px, plus a 144 px
+   * `-1x` copy for 1x screens. Browsers shrink video crudely, so each screen gets a clip about twice the slot's
+   * size and the thin glasses and helmet edges stay clean (design/renders/bots_v009/resize.py).
+   */
   idle: string;
   work: string;
   poster: string;
@@ -13,6 +17,8 @@ export type RebusBotItem = {
 };
 
 const CYCLE_MS = 4200;
+/** Screens under 1.5x get the 144 px clips; everything else the 288 px ones. */
+const ONE_X = "(max-resolution: 1.49dppx)";
 const REDUCED = "(prefers-reduced-motion: reduce)";
 
 function usePrefersReducedMotion() {
@@ -99,6 +105,8 @@ export function RebusBot({ bots }: { bots: RebusBotItem[] }) {
                 disablePictureInPicture
                 tabIndex={-1}
               >
+                <source src={`${bot.idle}-1x.webm`} type="video/webm" media={ONE_X} />
+                <source src={`${bot.idle}-1x.mp4`} type="video/mp4" media={ONE_X} />
                 <source src={`${bot.idle}.webm`} type="video/webm" />
                 <source src={`${bot.idle}.mp4`} type="video/mp4" />
               </video>
@@ -114,6 +122,8 @@ export function RebusBot({ bots }: { bots: RebusBotItem[] }) {
                 disablePictureInPicture
                 tabIndex={-1}
               >
+                <source src={`${bot.work}-1x.webm`} type="video/webm" media={ONE_X} />
+                <source src={`${bot.work}-1x.mp4`} type="video/mp4" media={ONE_X} />
                 <source src={`${bot.work}.webm`} type="video/webm" />
                 <source src={`${bot.work}.mp4`} type="video/mp4" />
               </video>
