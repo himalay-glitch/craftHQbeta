@@ -1,13 +1,11 @@
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { PanelLeft } from "lucide-react";
-import { Tooltip } from "radix-ui";
 import { TOOLTIP } from "@/components/dashboard/classes";
-import styles from "@/components/dashboard/tokens.module.css";
 import { NAV, currentPath, type NavItem } from "./nav";
 
-// DESIGN.md §4.3: a 56 px rail of icons with tooltips; `[` or the PanelLeft button opens it to the labelled
-// sidebar, and the choice is remembered. The width lives on <html data-sidebar>, set before paint by AppLayout's
-// inline script, so the page never jumps on load; every width-dependent style keys off that attribute.
+// DESIGN.md §4.3: a 56 px rail of icons with their names on hover; `[` or the PanelLeft button opens it to the
+// labelled sidebar, and the choice is remembered. The width lives on <html data-sidebar>, set before paint by
+// AppLayout's inline script, so the page never jumps on load; every width-dependent style keys off that attribute.
 const SIDEBAR_KEY = "crafthq.sidebar";
 const EVENT = "crafthq:sidebar";
 
@@ -28,51 +26,51 @@ function setExpanded(next: boolean) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-/** A tooltip to the right of a rail icon (Radix, DESIGN.md §15 decision 4). Only shown while it's a rail. */
-function RailTip({ label, show, children }: { label: ReactNode; show: boolean; children: ReactNode }) {
-  if (!show) return children;
-  return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content side="right" sideOffset={8} collisionPadding={8} className={`${styles.tokens} ${TOOLTIP}`}>
-          {label}
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
-  );
-}
-
-// 32 px items (DESIGN.md §3.3). As a rail: a 40 px square-ish target with the 16 px icon centred. Opened: the
-// icon, an 8 px gap and the 14/20 label. Hover is a 4% black fill; the current page a 6% fill and a dark icon.
+// 32 px items (DESIGN.md §3.3). As a rail: a 40 px wide target with the 16 px icon centred. Opened: the icon, an
+// 8 px gap and the 14/20 label. Hover is a 4% black fill; the current page a 6% fill and a dark icon.
 const ITEM =
-  "group flex h-8 items-center justify-center rounded-[6px] text-[14px] leading-5 text-[var(--tx)] transition-colors " +
+  "peer group flex h-8 items-center justify-center rounded-[6px] text-[14px] leading-5 text-[var(--tx)] transition-colors " +
   "duration-[120ms] [html[data-sidebar=expanded]_&]:justify-start [html[data-sidebar=expanded]_&]:gap-2 " +
   "[html[data-sidebar=expanded]_&]:px-2";
 const LABEL = "hidden truncate [html[data-sidebar=expanded]_&]:block";
 
-function Item({ item, current, rail }: { item: NavItem; current: boolean; rail: boolean }) {
+// The rail's names: the dark tooltip, 12 px to the right of the icon, shown at once on hover or keyboard focus.
+// Plain CSS rather than a Radix tooltip, so it works from the first paint, before any script, with no delay;
+// the link's own aria-label carries the name for screen readers, so this copy is hidden from them.
+const NAME =
+  `${TOOLTIP} pointer-events-none absolute top-1/2 left-full ml-3 -translate-y-1/2 whitespace-nowrap opacity-0 ` +
+  "transition-opacity duration-100 peer-hover:opacity-100 peer-focus-visible:opacity-100 motion-reduce:transition-none " +
+  "[html[data-sidebar=expanded]_&]:hidden";
+
+function RailName({ children }: { children: ReactNode }) {
+  return (
+    <span aria-hidden="true" className={NAME}>
+      {children}
+    </span>
+  );
+}
+
+function Item({ item, current }: { item: NavItem; current: boolean }) {
   const Icon = item.icon;
   return (
-    <li>
-      <RailTip label={item.label} show={rail}>
-        <a
-          href={item.href}
-          aria-label={item.label}
-          aria-current={current ? "page" : undefined}
-          className={`${ITEM} ${current ? "bg-black/[0.06] font-medium" : "hover:bg-black/[0.04]"}`}
-        >
-          <Icon
-            aria-hidden="true"
-            size={16}
-            strokeWidth={1.75}
-            className={`flex-none ${current ? "text-[var(--tx)]" : "text-[var(--tx2)] group-hover:text-[var(--tx)]"}`}
-          />
-          <span aria-hidden="true" className={LABEL}>
-            {item.label}
-          </span>
-        </a>
-      </RailTip>
+    <li className="relative">
+      <a
+        href={item.href}
+        aria-label={item.label}
+        aria-current={current ? "page" : undefined}
+        className={`${ITEM} ${current ? "bg-black/[0.06] font-medium" : "hover:bg-black/[0.04]"}`}
+      >
+        <Icon
+          aria-hidden="true"
+          size={16}
+          strokeWidth={1.75}
+          className={`flex-none ${current ? "text-[var(--tx)]" : "text-[var(--tx2)] group-hover:text-[var(--tx)]"}`}
+        />
+        <span aria-hidden="true" className={LABEL}>
+          {item.label}
+        </span>
+      </a>
+      <RailName>{item.label}</RailName>
     </li>
   );
 }
@@ -85,7 +83,6 @@ export function Sidebar({ current }: { current: string }) {
   const path = currentPath(current);
   // The server can't see the saved choice, so it renders the rail; the attribute already has the right width.
   const expanded = useSyncExternalStore(subscribe, isExpanded, () => false);
-  const rail = !expanded;
 
   // `[` toggles it from anywhere, except while typing or with a modifier held (DESIGN.md §8.1).
   useEffect(() => {
@@ -102,44 +99,36 @@ export function Sidebar({ current }: { current: string }) {
 
   const list = (foot: boolean) =>
     NAV.filter((item) => !!item.foot === foot).map((item) => (
-      <Item key={item.href} item={item} current={path === item.href} rail={rail} />
+      <Item key={item.href} item={item} current={path === item.href} />
     ));
-  const toggleLabel = expanded ? "Collapse sidebar" : "Expand sidebar";
 
+  // z-20 is the sidebar's layer (DESIGN.md §3.5), so the names float over the page beside it.
   return (
-    <Tooltip.Provider delayDuration={300} skipDelayDuration={200}>
-      <nav
-        aria-label="Main"
-        className="sticky top-[var(--bar-h)] hidden h-[calc(100dvh-var(--bar-h))] w-[var(--sidebar-w)] flex-none flex-col justify-between self-start overflow-hidden bg-[var(--bar)] px-2 py-3 transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none lg:flex"
-      >
-        <ul className="flex flex-col gap-0.5">{list(false)}</ul>
-        <ul className="flex flex-col gap-0.5">
-          {list(true)}
-          <li>
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <button
-                  type="button"
-                  aria-label={toggleLabel}
-                  aria-expanded={expanded}
-                  onClick={() => setExpanded(!expanded)}
-                  className={`${ITEM} w-full text-[var(--tx2)] hover:bg-black/[0.04] hover:text-[var(--tx)]`}
-                >
-                  <PanelLeft aria-hidden="true" size={16} strokeWidth={1.75} className="flex-none" />
-                  <span aria-hidden="true" className={LABEL}>
-                    Collapse
-                  </span>
-                </button>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content side="right" sideOffset={8} collisionPadding={8} className={`${styles.tokens} ${TOOLTIP}`}>
-                  {toggleLabel} <kbd className="ml-1 font-sans opacity-70">[</kbd>
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          </li>
-        </ul>
-      </nav>
-    </Tooltip.Provider>
+    <nav
+      aria-label="Main"
+      className="sticky top-[var(--bar-h)] z-20 hidden h-[calc(100dvh-var(--bar-h))] w-[var(--sidebar-w)] flex-none flex-col justify-between self-start bg-[var(--bar)] px-2 py-3 transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none lg:flex"
+    >
+      <ul className="flex flex-col gap-0.5">{list(false)}</ul>
+      <ul className="flex flex-col gap-0.5">
+        {list(true)}
+        <li className="relative">
+          <button
+            type="button"
+            aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+            aria-expanded={expanded}
+            onClick={() => setExpanded(!expanded)}
+            className={`${ITEM} w-full text-[var(--tx2)] hover:bg-black/[0.04] hover:text-[var(--tx)]`}
+          >
+            <PanelLeft aria-hidden="true" size={16} strokeWidth={1.75} className="flex-none" />
+            <span aria-hidden="true" className={LABEL}>
+              Collapse
+            </span>
+          </button>
+          <RailName>
+            Expand sidebar <kbd className="ml-1 font-sans opacity-70">[</kbd>
+          </RailName>
+        </li>
+      </ul>
+    </nav>
   );
 }
