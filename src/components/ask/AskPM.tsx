@@ -247,7 +247,7 @@ export function AskPM({ data }: { data: AskData }) {
             <span className="font-medium text-[var(--tx)]">Ask PM</span>
             <span className="text-[var(--tx2)]"> · {data.project}</span>
           </p>
-          <ul className="flex -space-x-1.5" aria-label="Team">
+          <ul className="flex list-none -space-x-1.5" aria-label="Team">
             {TEAM_ORDER.filter((id) => id !== "pm").map((id) => (
               <li key={id} title={`${TEAM[id].name} · ${TEAM[id].now}`}>
                 <BotAvatar id={id} size={26} className="ring-2 ring-white" />

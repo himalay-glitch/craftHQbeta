@@ -7,7 +7,7 @@ export function BotsPage() {
     <main id="main" className="mx-auto w-full max-w-[1100px] px-8 pt-6 pb-16">
       <h1 className="text-[21px] leading-7 font-medium text-[var(--tx)]">Bots</h1>
       <p className="mt-1 text-[14px] leading-5 text-[var(--tx2)]">You talk to the PM. It brings in whoever the work needs.</p>
-      <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="mt-6 grid list-none grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {TEAM_ORDER.map((id) => {
           const bot = TEAM[id];
           const working = !/^(free|listening)$/i.test(bot.now);

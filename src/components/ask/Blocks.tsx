@@ -13,7 +13,7 @@ const CARD = "overflow-hidden rounded-[14px] border border-[var(--card-line)] bg
 
 function Stories({ items }: { items: StoryRef[] }) {
   return (
-    <ul className={`${CARD} divide-y divide-[var(--line)]`}>
+    <ul className={`${CARD} list-none divide-y divide-[var(--line)]`}>
       {items.map((s) => (
         <li key={s.id}>
           <a
@@ -184,7 +184,7 @@ function Steps({ story, steps }: { story: { id: number; title: string }; steps: 
           style={{ width: `${((at + 0.5) / steps.length) * 100}%`, backgroundColor: TEAM.builder.colour }}
         />
       </div>
-      <ol className="mt-3 space-y-1.5">
+      <ol className="mt-3 list-none space-y-1.5">
         {steps.map((s, i) => (
           <li key={s} className="flex items-center gap-2 text-[13px] leading-[18px]">
             {i < at ? (
@@ -230,7 +230,7 @@ function Checks({ story, passed, failed, note }: { story: { id: number; title: s
 
 function Team() {
   return (
-    <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <ul className="grid list-none grid-cols-1 gap-2 sm:grid-cols-2">
       {TEAM_ORDER.map((id) => {
         const bot = TEAM[id];
         return (
