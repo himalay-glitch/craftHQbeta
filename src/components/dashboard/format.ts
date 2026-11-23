@@ -1,4 +1,5 @@
 import type { NeedKind, Story, StoryStatus } from "@/types/dashboard";
+import type { TicketStatus } from "@/types/status";
 
 export const storyRef = (id: number) => `hq-${id}`;
 
@@ -22,8 +23,21 @@ export const NEEDS: { kind: NeedKind; label: string; hint: string }[] = [
   { kind: "next", label: "Say what to do next", hint: "No step applies. Add a note with what you want, or move its status." },
 ];
 
-export const needLabel = (kind: NeedKind) => NEEDS.find((n) => n.kind === kind)!.label;
 export const needHint = (kind: NeedKind) => NEEDS.find((n) => n.kind === kind)!.hint;
+
+/**
+ * Each group's story as a shared ticket status (DESIGN.md §7.12), so the dashboard and Stories name it alike. The
+ * groups stay the queue's order, filter and cards; a status never says "you", so every group that waits on a
+ * person is Needs input, and the Action column says what input. Stuck stories stopped on a failed preview or check.
+ */
+export const NEED_STATUS: Record<NeedKind, TicketStatus> = {
+  stuck: "failed",
+  review: "in_review",
+  decision: "needs_input",
+  planning: "needs_input",
+  triage: "needs_input",
+  next: "needs_input",
+};
 
 /** The review instruction every review story shares; the table shows only instructions that differ from it. */
 const SAME_REVIEW = "Move the story back to Approved to have this built.";

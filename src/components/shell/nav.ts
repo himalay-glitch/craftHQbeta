@@ -1,4 +1,4 @@
-import { BookOpen, LayoutDashboard, ListTodo, PanelsTopLeft, Settings, type LucideIcon } from "lucide-react";
+import { BookOpen, Bot, LayoutDashboard, ListTodo, MessageCircle, PanelsTopLeft, Settings, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -8,10 +8,13 @@ export interface NavItem {
   foot?: boolean;
 }
 
-// The prototype's links. Only the dashboard is built; the others are shown as agreed and lead nowhere yet.
+// Ask PM first: the one place to ask what's happening. Then the prototype's links; Feature pages and Docs
+// lead nowhere yet.
 export const NAV: NavItem[] = [
+  { href: "/ask", label: "Ask PM", icon: MessageCircle },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/stories", label: "Stories", icon: ListTodo },
+  { href: "/bots", label: "Bots", icon: Bot },
   { href: "/pages", label: "Feature pages", icon: PanelsTopLeft },
   { href: "/docs", label: "Docs", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings, foot: true },

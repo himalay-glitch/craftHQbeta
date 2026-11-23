@@ -1,10 +1,10 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { RowStatus, rowWaitingOn, type LiveRow } from "@/components/stories/RowStatus";
-import { storyRef } from "./format";
-import { NeedChip } from "./NeedChip";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { NEED_STATUS, storyRef } from "./format";
 import { PersonAvatar } from "./PersonAvatar";
 
-/** The stories below 768 px: two-line rows (title, then chip, ID and update time). */
+/** The stories below 768 px: two-line rows (title, then status, ID and update time). */
 export function QueueList({ stories, onOpen }: { stories: LiveRow[]; onOpen: (id: number) => void }) {
   const reduced = useReducedMotion();
   return (
@@ -27,7 +27,7 @@ export function QueueList({ stories, onOpen }: { stories: LiveRow[]; onOpen: (id
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] leading-[22px] text-[var(--tx)]">{s.title}</span>
                 <span className="mt-1 flex items-center gap-2">
-                  {s.need ? <NeedChip need={s.need} /> : <RowStatus story={s} />}
+                  {s.need ? <StatusPill status={NEED_STATUS[s.need]} /> : <RowStatus story={s} />}
                   <span className="truncate text-[13px] leading-[18px] text-[var(--tx2)] tabular-nums">
                     {[storyRef(s.id), s.need ? s.waitingOn : rowWaitingOn(s), s.updated].filter(Boolean).join(" · ")}
                   </span>

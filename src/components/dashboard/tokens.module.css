@@ -34,8 +34,12 @@
   --shadow-menu: 0 8px 24px rgb(0 0 0 / 0.12), 0 0 0 1px #e3e3e3;
   --shadow-panel: -8px 0 24px rgb(0 0 0 / 0.08);
   --bar-h: 48px;
-  --sidebar-w: 176px;
+  /* DESIGN.md §4.3: a 56 px rail of icons; opened (`[` or the toggle, remembered) it shows labels. */
+  --sidebar-w: 56px;
   --panel-w: 480px;
+}
+:global(html[data-sidebar="expanded"]) .tokens {
+  --sidebar-w: 176px;
 }
 
 .page {
@@ -110,9 +114,7 @@
   }
 }
 
-/* The Stuck alert, on the chip and beside the Stuck card's label: a red ring grows 5 px out and fades,
-   every 2 s, then rests. */
-.alert,
+/* The Stuck alert beside the Stuck card's label: a red ring grows 5 px out and fades, every 2 s, then rests. */
 .alertIcon {
   animation: alert 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
@@ -130,12 +132,7 @@
   .menu[data-state="open"],
   .menu[data-state="closed"],
   .pulse,
-  .alert,
   .alertIcon {
     animation: none;
-  }
-  /* The chip keeps a still ring instead of the pulse; the icon needs none, its own circle is enough. */
-  .alert {
-    box-shadow: 0 0 0 1px rgb(179 38 30 / 0.45);
   }
 }

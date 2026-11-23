@@ -1,8 +1,8 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
 import { RowStatus, rowStateKey, rowWaitingOn, type LiveRow } from "@/components/stories/RowStatus";
-import { rowAction, storyRef, type SortMode } from "./format";
-import { NeedChip } from "./NeedChip";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { NEED_STATUS, rowAction, storyRef, type SortMode } from "./format";
 import { PersonAvatar } from "./PersonAvatar";
 import { Tip } from "./Tip";
 
@@ -32,8 +32,8 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
   return (
     // Boxed like the cards: 1 px #E3E3E3 on all sides, 12 px corners. `overflow-clip` rounds the corners
     // without making a scroll container, so the header still sticks under the top bar.
-    // The Action column gives way when the table is under 1000 px (a window under about 1240 px, beside the
-    // sidebar), where it would be too narrow to read; Story then takes its space. It's also in the panel.
+    // The Action column gives way when the table is under 1000 px (a window under about 1120 px beside the rail, 1240 px with the
+    // sidebar open), where it would be too narrow to read; Story then takes its space. It's also in the panel.
     <div className="@container overflow-clip rounded-[12px] border border-[var(--card-line)]">
       <table className="w-full table-fixed border-separate border-spacing-0 text-left">
         <thead>
@@ -42,7 +42,7 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
               Story
             </th>
             <th scope="col" className={`${TH} w-[176px]`}>
-              Next
+              Status
             </th>
             <th scope="col" className={`${TH} @max-[999px]:hidden`}>
               Action
@@ -122,8 +122,8 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
                     </span>
                   </td>
                   <td className={TD}>
-                    {/* Needs a person: the need chip. Otherwise what's happening: a robot at work (it turns), merged,
-                        waiting to start. It changes in place, with a short fade. */}
+                    {/* Needs a person: his status pill (DESIGN.md §7.12). Otherwise what's happening: a robot at work (it
+                        turns), merged, waiting to start. It changes in place, with a short fade. */}
                     <AnimatePresence initial={false} mode="wait">
                       <motion.span
                         key={rowStateKey(s)}
@@ -136,7 +136,7 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
                         }}
                         exit={{ opacity: 0, transition: { duration: 0.1 } }}
                       >
-                        {s.need ? <NeedChip need={s.need} /> : <RowStatus story={s} />}
+                        {s.need ? <StatusPill status={NEED_STATUS[s.need]} /> : <RowStatus story={s} />}
                       </motion.span>
                     </AnimatePresence>
                   </td>

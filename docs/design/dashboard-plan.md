@@ -21,19 +21,20 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
 │ CraftHQ                          ( ⌕ Search            )                           (AD) │ 48 top bar #F9F9F9
-├────────────────┬─────────────────────────────────────────────────────────────────────────┤
-│ ▦ Dashboard    │ WePop                                                  ( + New story )  │ sidebar 176 #F9F9F9
-│ ☰ Stories      │ ┌ Needs you ┐ ┌ Ready to review ┐ ┌ Stuck ┐ ┌ ● Running ┐ ┌ Queued ┐      │ five stat cards
-│ ▭ Feature pages│ │ 12        │ │ 5               │ │ 2     │ │ 9         │ │ 0      │      │
-│ ▯ Docs         │ └───────────┘ └─────────────────┘ └───────┘ └───────────┘ └────────┘      │
-│                │ ( Show: Mine ⌄ ) ( Filter ⌄ )                                           │ pills 30
-│                │ ┌ Story ──────────── Next ─────── Action ──────────── Owner  Waiting on  Updated ┐
-│                │ │ hq-21 Test story    (Stuck)      Preview could not…                      │ rows 46
-│                │ │ hq-43 Creation…     (Review)     Move the story b…   (E)   You   just now │
-│                │ │ hq-28 Crew size…    (Decision)   Answer decision…   (MS)   You     8d ago │
-│                │ └──────────────────────────────────────────────────────────────────────┘ │
-│ ⚙ Settings     │                                                                         │
-└────────────────┴─────────────────────────────────────────────────────────────────────────┘
+├────┬─────────────────────────────────────────────────────────────────────────────────────┤
+│ ▦  │ WePop                                                              ( + New story )  │ rail 56 #F9F9F9
+│ ☰  │ ┌ Needs you ┐ ┌ Ready to review ┐ ┌ Stuck ┐ ┌ ● Running ┐ ┌ Queued ┐                  │ five stat cards
+│ ▭  │ │ 12        │ │ 5               │ │ 2     │ │ 9         │ │ 0      │                  │
+│ ▯  │ └───────────┘ └─────────────────┘ └───────┘ └───────────┘ └────────┘                  │
+│    │ ( Show: Mine ⌄ ) ( Filter ⌄ )                                                       │ pills 30
+│    │ ┌ Story ──────────── Status ───── Action ──────────── Owner  Waiting on  Updated ┐   │
+│    │ │ hq-21 Test story    (Failed)     Preview could not…                      │       │ rows 46
+│    │ │ hq-43 Creation…     (In review)  Move the story b…   (E)   You   just now │       │
+│    │ │ hq-28 Crew size…    (Needs input) Answer decision…  (MS)   You     8d ago │       │
+│    │ └──────────────────────────────────────────────────────────────────────┘       │
+│ ⚙  │                                                                                     │
+│ ◫  │ ← `[` or ◫ opens the sidebar to 176 px with labels                                  │
+└────┴─────────────────────────────────────────────────────────────────────────────────────┘
                                       clicking a row opens the story panel (480 px) →
 ```
 
@@ -43,7 +44,8 @@ Beside the sidebar, content is capped at 1280 px and centred, with 32 px side pa
 
 ### Top bar and sidebar (`TopBar`, `Sidebar`, `nav.ts`, `SearchBox`, `AvatarMenu`)
 - **Top bar:** 48 px, `#F9F9F9`, sticky, the full width of the window, as in Asana. The glass wordmark on the left (24 px tall; `public/dashboard/crafthq-logo-glass.webp`, from #6), search in the middle, the account menu on the right.
-- **Sidebar** (Asana's, slimmer): 176 px, just wider than the longest label (Feature pages), on the same grey, under the top bar and sticky, from 1024 px. The prototype's links, each with a 16 px lucide icon: Dashboard (`LayoutDashboard`), Stories (`ListTodo`), Feature pages (`PanelsTopLeft`), Docs (`BookOpen`); Settings (`Settings`) is pinned to the bottom. Items are 32 px, inset 8 px, 14/20 dark labels with grey icons; hover is a 4% black fill, and the current page a 6% fill with a medium label and a dark icon. It's rendered on the server with no script. Its icons line up with the wordmark, 16 px from the edge.
+- **Sidebar:** a **56 px rail** of icons (`DESIGN.md` §4.3's collapsed rail), on the same grey, under the top bar and sticky, from 1024 px. The prototype's links, each a 16 px lucide icon: Dashboard (`LayoutDashboard`), Stories (`ListTodo`), Feature pages (`PanelsTopLeft`), Docs (`BookOpen`); Settings (`Settings`) and the toggle (`PanelLeft`) are pinned to the bottom. Items are 32 px with the icon centred; hover is a 4% black fill, the current page a 6% fill with a dark icon. Hovering or focusing an icon shows its name at once, in the dark tooltip style, 12 px to its right. It's plain CSS, so it works from the first paint with no delay; every link keeps its name for screen readers.
+- **Opening it:** `[` (not while typing) or the toggle opens it to 176 px with 14/20 labels beside the icons, and the choice is remembered per browser. The width is set on `<html data-sidebar>` by an inline script before the page paints, so it never jumps on load; `--sidebar-w` follows it (the toast centres with it). It's plain links in the HTML and hydrates when idle, for the toggle and `[`.
 - **Below 1024 px** there's no sidebar; the same links, with their icons, are in the top bar's menu.
 - **Search:** a 32 px pill field. `/` focuses it. It searches every story by title or ID, and choosing one opens its panel on the dashboard through the URL (`?story=hq-43`). Below 1024 px it collapses to an icon.
 - **Account menu** (Radix): name, email, the workspace line from the prototype, Settings, Sign out (goes to `/login` until there's a sign-out endpoint).
@@ -69,19 +71,19 @@ A card whose filter is on has a blue edge. Values are never coloured.
 ### Table (`QueueTable`)
 - Boxed: 1 px `#E3E3E3` edge, 12 px corners; `overflow: clip` keeps the header sticky under the top bar.
 - Header 36 px, 12/16 grey. Rows 46 px, 15/22, 1 px `#E8E8E8` rules. Text starts 16 px in, level with the card labels.
-- Columns: **Story** (ID and title), **Next** (the group as a chip), **Action** (the story's own instruction or its extra line; the shared "Move the story back to Approved…" line isn't repeated), **Owner** (initials), **Waiting on** (You, rtdp, Deepak Tewatia; empty for Stuck), **Updated** (sortable: newest, oldest, back to the group order).
+- Columns: **Story** (ID and title), **Status** (the shared status pill), **Action** (the story's own instruction or its extra line; the shared "Move the story back to Approved…" line isn't repeated), **Owner** (initials), **Waiting on** (You, rtdp, Deepak Tewatia; empty for Stuck), **Updated** (sortable: newest, oldest, back to the group order).
 - Default order: the prototype's groups (Stuck, Review, Decision, Planning, Triage, Say what to do next), then its own order.
-- Action gives way when the table is under 1000 px (a window under about 1240 px, beside the sidebar), where it would be too narrow to read; Story then takes its space. The full text is in the story panel.
+- Action gives way when the table is under 1000 px (a window under about 1120 px beside the rail, 1240 px with the sidebar open), where it would be too narrow to read; Story then takes its space. The full text is in the story panel.
 
 - No pagination or infinite scroll: the list is meant to reach zero.
 
-**Chip tones** (each pair at least 5.7:1): Stuck red (`#B3261E` on `#FDECEC`); Decision amber (`#8A5300` on `#FDF3DC`); Review and Planning blue (`#1F57C3` on `#E9F0FE`); Triage and Say what to do next grey (`#4A4B4D` on `#F0F0F0`).
+**Status:** one look for the whole app, so the dashboard and Stories name a story alike: the shared `StatusPill` (`src/components/ui/`, `DESIGN.md` §7.12), with its tones and icons. A status never says "you", so the groups map to statuses (`NEED_STATUS` in `format.ts`): Stuck → **Failed** (each stopped on a failed preview or check); Review → **In review**; Decision, Planning, Triage and Say what to do next → **Needs input**, with the Action column saying what input. The groups still set the order, the Filter menu and the cards.
 
-**Stuck alert:** Stuck is the one group nobody is moving, so it alone carries an alert: on its chip wherever it appears (table, story panel), and beside the Stuck card's label while the count is above 0. The chip gets a 13 px `CircleExclamationPoint` before the word; the card a 14 px one in red. A red ring grows 5 px out of each and fades (from 40% opacity, over the first 70% of a 2 s cycle, then a rest). With reduced motion the chip keeps a still 1 px red ring and the card's icon stands alone.
+**Stuck alert:** Stuck is the one group nobody is moving, so its card carries an alert while the count is above 0: a 14 px red `CircleExclamationPoint` beside the label, with a red ring that grows 5 px out and fades (from 40% opacity, over the first 70% of a 2 s cycle, then a rest). With reduced motion the icon stands alone. In the rows, Stuck stories show the shared Failed pill.
 
 ### Panels (`SidePanel`, `StoryPanel`, `ActivityPanel`, `NewStoryPanel`)
 - 480 px from the right, under the top bar. On screens 1024 px and wider it floats over the page with its shadow, with no scrim: the table keeps its full width underneath and stays clickable. Below that it covers the page with a scrim. Slides in over 200 ms; fades with reduced motion.
-- **Story panel:** the story's facts (Next, Stage, Waiting on, Owner, Open items, Updated), "Latest from the agent", and the group's actions, worded as in the prototype: Review → Accept · Done / Ask for changes; Planning → Approve and build / Ask a question; Decision → Let the defaults stand / Answer in a note; Stuck → Restart / Add a note; Triage → Move to planning / Cancel story; Say what to do next → Add a note. Notes open a box pinned to the bottom ("Notes get a reply. Code changes only after you approve.").
+- **Story panel:** the story's facts (Status, Stage, Waiting on, Owner, Open items, Updated), "Latest from the agent", and the group's actions, worded as in the prototype: Review → Accept · Done / Ask for changes; Planning → Approve and build / Ask a question; Decision → Let the defaults stand / Answer in a note; Stuck → Restart / Add a note; Triage → Move to planning / Cancel story; Say what to do next → Add a note. Notes open a box pinned to the bottom ("Notes get a reply. Code changes only after you approve.").
 - **Details panel:** the prototype's two tabs. With the agent: loop tick, Running and Queued, the running stories. Recent activity: the agent's runs, plus About and the version.
 - **New story:** Title, Why, Detail, Owner and Files, as in the prototype; only Title is required.
 - The open story is in the URL, so links, reloads and Back reopen it. ↑/↓ (or J/K) move between stories, Esc closes and returns focus to the row. Copy link copies the URL.
@@ -112,7 +114,7 @@ Focus always shows a 2 px blue outline. Every animation has a reduced-motion ver
 
 ## 5. Accessibility
 
-Real table semantics with `aria-sort`; every row reachable with Tab and opened with Enter; panels are labelled dialogs that take and return focus; toasts are announced politely; chips always carry words; a "Skip to content" link; text contrast at least 4.5:1 (the lowest pair is grey text on a hovered row, 4.77:1).
+Real table semantics with `aria-sort`; every row reachable with Tab and opened with Enter; panels are labelled dialogs that take and return focus; toasts are announced politely; status pills always carry words; a "Skip to content" link; text contrast at least 4.5:1 (the lowest pair is grey text on a hovered row, 4.77:1).
 
 ## 6. Measured from the reference
 
@@ -131,7 +133,7 @@ The screenshot is at 2×; values are halved. They live in `src/components/dashbo
 
 ## 7. Where this differs from DESIGN.md
 
-The look follows the reference rather than `DESIGN.md`'s scale. A `DESIGN.md` exception PR, for review before it's sent, will record: hex values and arbitrary sizes scoped to the dashboard; a full-width top bar above the sidebar, holding search and the account menu (§4.2 has no top bar on desktop and puts search in the sidebar); the prototype's links in the sidebar in place of §4.3's items; 15 px table text, 13 px labels and 46 px rows; outlined pill controls; circle avatars; blue chips for Review and Planning; the prototype's wording ("story", "the agent") instead of §4.1's.
+The look follows the reference rather than `DESIGN.md`'s scale. A `DESIGN.md` exception PR, for review before it's sent, will record: hex values and arbitrary sizes scoped to the dashboard; a full-width top bar above the sidebar, holding search and the account menu (§4.2 has no top bar on desktop and puts search in the sidebar); the prototype's links in the sidebar in place of §4.3's items, opening to 176 px instead of 240 px (the 56 px rail matches §4.3); the rail's names are CSS labels rather than Radix tooltips (§15 decision 4), so they show instantly and before any script; 15 px table text, 13 px labels and 46 px rows; outlined pill controls; circle avatars; the prototype's wording ("story", "the agent") instead of §4.1's.
 
 ## 8. Still to do
 

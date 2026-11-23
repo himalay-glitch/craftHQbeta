@@ -4,8 +4,8 @@ import type { LiveRun } from "@/types/stories";
 import { CircleExclamationPoint, Link } from "lucide-react";
 import type { NeedKind, Story } from "@/types/dashboard";
 import { BTN_PRIMARY, BTN_SECONDARY, ICON_BTN } from "./classes";
-import { needHint, STATUS_LABEL, storyRef } from "./format";
-import { NeedChip } from "./NeedChip";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { NEED_STATUS, needHint, STATUS_LABEL, storyRef } from "./format";
 import { PersonAvatar } from "./PersonAvatar";
 import { SidePanel } from "./SidePanel";
 import { Tip } from "./Tip";
@@ -173,8 +173,8 @@ export function StoryPanel({ story, isWide, onClose, onAct, onCopyLink }: StoryP
     >
       <dl className="mt-4 grid grid-cols-[104px_minmax(0,1fr)]">
         {need && (
-          <Field label="Next">
-            <NeedChip need={need} />
+          <Field label="Status">
+            <StatusPill status={NEED_STATUS[need]} />
           </Field>
         )}
         <Field label="Stage">{STATUS_LABEL[story.status]}</Field>
