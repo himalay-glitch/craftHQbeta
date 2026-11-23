@@ -34,8 +34,12 @@
   --shadow-menu: 0 8px 24px rgb(0 0 0 / 0.12), 0 0 0 1px #e3e3e3;
   --shadow-panel: -8px 0 24px rgb(0 0 0 / 0.08);
   --bar-h: 48px;
-  --sidebar-w: 176px;
+  /* DESIGN.md §4.3: a 56 px rail of icons; opened (`[` or the toggle, remembered) it shows labels. */
+  --sidebar-w: 56px;
   --panel-w: 480px;
+}
+:global(html[data-sidebar="expanded"]) .tokens {
+  --sidebar-w: 176px;
 }
 
 .page {
