@@ -48,12 +48,12 @@ export function BotAvatar({
           ref={img}
           src={`${bot.poster}-256.webp`}
           srcSet={`${bot.poster}-128.webp 128w, ${bot.poster}-256.webp 256w, ${bot.poster}-384.webp 384w`}
-          sizes={`${Math.round(size * 1.18)}px`}
+          sizes={`${Math.round(size * 1.04)}px`}
           width={size * 2}
           height={size * 2}
           alt=""
           onError={() => setMissing(true)}
-          className="size-[118%] max-w-none object-contain mix-blend-multiply"
+          className="size-[104%] max-w-none object-contain mix-blend-multiply"
           draggable={false}
         />
       )}
