@@ -10,13 +10,13 @@ export const dashboardData: DashboardData = {
   project: "WePop",
   viewer: {
     id: "me",
-    name: "Aakash Dhar",
-    initials: "AD",
-    email: "aakash.dhar@betacraft.io",
+    name: "Josh",
+    initials: "J",
+    email: "josh@wepop.app",
     workspace: "Workspace asleep · wakes by itself when a story needs it",
   },
   people: [
-    { id: "me", name: "Aakash Dhar", initials: "AD" },
+    { id: "me", name: "Josh", initials: "J" },
     { id: "deepak", name: "Deepak Tewatia", initials: "DT" },
     { id: "rtdp", name: "rtdp", initials: "R" },
   ],

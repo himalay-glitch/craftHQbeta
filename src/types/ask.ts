@@ -44,6 +44,20 @@ export interface ChatMessage {
   id: string;
   from: "me" | BotId;
   blocks: Block[];
+  /** When it was sent, ms since the epoch (older saved chats may not have it). */
+  at?: number;
+  /** Files sent with your message (demo: name and size only). */
+  files?: { name: string; size: number }[];
+}
+
+/** A past chat in the history. `updatedAt` is ms since the epoch. */
+export interface SavedChat {
+  id: string;
+  title: string;
+  updatedAt: number;
+  messages: ChatMessage[];
+  /** A removed chat's marker (keeps example chats from coming back). */
+  deleted?: boolean;
 }
 
 /** One reply from a bot, after it "thinks" for `delay` ms. */
