@@ -252,6 +252,20 @@ export function AskPM({ data }: { data: AskData }) {
     [busy, data, play],
   );
 
+  // Arriving from a bot in the sidebar (/ask?about=builder): ask what it's doing, once, and tidy the URL.
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (arrived.current) return;
+    arrived.current = true;
+    const url = new URL(window.location.href);
+    const about = url.searchParams.get("about");
+    if (!about || !(about in TEAM)) return;
+    url.searchParams.delete("about");
+    window.history.replaceState(window.history.state, "", url);
+    const question = `What is ${TEAM[about as BotId].name} doing?`;
+    window.setTimeout(() => ask(question), 0); // after mount, not during it
+  }, [ask]);
+
   const actions: BlockActions = {
     onAsk: ask,
     onPickDesign: (id, label) => {

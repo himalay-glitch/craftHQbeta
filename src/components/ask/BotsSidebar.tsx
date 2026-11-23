@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, LoaderCircle, Plus, Search } from "lucide-react";
+import { LoaderCircle, Plus, Search } from "lucide-react";
 import type { Activity, BotId } from "@/types/ask";
 import { BotAvatar } from "./BotAvatar";
 import { TEAM, TEAM_ORDER } from "./team";
@@ -50,16 +50,8 @@ export function BotsSidebar({
       aria-label="Bots"
       className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] lg:flex"
     >
-      <div className="flex items-center justify-between px-5 pt-5">
+      <div className="flex h-8 items-center px-5 pt-5">
         <h2 className="text-[17px] leading-6 font-semibold tracking-[-0.01em] text-[var(--tx)]">Bots</h2>
-        <a
-          href="/bots"
-          aria-label="All bots"
-          title="All bots"
-          className="inline-flex size-8 items-center justify-center rounded-full bg-[#F4F4F5] text-[var(--tx2)] transition-colors hover:bg-[#EAEAEC] hover:text-[var(--tx)]"
-        >
-          <Bot aria-hidden="true" size={16} strokeWidth={1.75} />
-        </a>
       </div>
 
       <div className="px-5 pt-4">
