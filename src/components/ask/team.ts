@@ -2,7 +2,8 @@ import type { Bot, BotId } from "@/types/ask";
 
 // The demo team. The PM is the one you talk to; it answers from the stories and brings in the others.
 // Faces: public/images/bots/team/<id>-{128,256,384}.webp, from the plush renders in design/renders/bots_v011
-// (design/blender/crafthq_team_v002.blend). Colours are the renders' measured coats.
+// (design/blender/crafthq_team_v002.blend); the Builder is the original furry blue one from the login page
+// (design/renders/bots_v009). Colours are the renders' measured coats.
 export const TEAM: Record<BotId, Bot> = {
   pm: {
     id: "pm",
