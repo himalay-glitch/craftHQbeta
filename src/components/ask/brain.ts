@@ -34,6 +34,12 @@ function addressee(q: string): BotId | null {
   return m ? (m[1].toLowerCase() as BotId) : null;
 }
 
+/** Does the script have a real answer for this, rather than its "here's what I can do" reply? */
+export function understands(question: string) {
+  const q = question.trim();
+  return !!addressee(q) || [FIX, DESIGN, BUILD, CHECK, MERGED, STUCK, REVIEW, TEAMQ, OVERVIEW].some((re) => re.test(q));
+}
+
 export function answer(question: string, d: AskData): Turn[] {
   const q = question.trim();
   const to = addressee(q);

@@ -5,7 +5,7 @@ import { MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
 import type { Activity, AskData, BotId, ChatMessage, Turn } from "@/types/ask";
 import { AskPanel, type ListedChat } from "./AskPanel";
 import type { BlockActions } from "./Blocks";
-import { answer, pickDesign } from "./brain";
+import { answer, pickDesign, understands } from "./brain";
 import { BotAvatar } from "./BotAvatar";
 import { Composer } from "./Composer";
 import { deleteChat, newChatId, newMessageId, saveChat, seedChats, titleOf, useSavedChats } from "./history";
@@ -194,7 +194,8 @@ export function AskPM({ data }: { data: AskData }) {
         { id: newMessageId(), from: "me", blocks: [{ kind: "text", text }], at: Date.now(), ...(files.length ? { files } : {}) },
       ]);
       setInput("");
-      const turns = text ? answer(text, data) : [];
+      // With files, a note the script doesn't follow just gets the PM's acknowledgement, not its generic reply.
+      const turns = text && (!files.length || understands(text)) ? answer(text, data) : [];
       play(files.length ? [filesNote(files), ...turns] : turns);
       field.current?.focus();
     },
