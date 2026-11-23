@@ -151,3 +151,6 @@ These follow the cues from the reference the user shared (a plush bot with round
 - **Fix:** each lens now carries the same stylised glare, a soft double streak (half-transparent, self-lit) at the upper-left edge, clear of the eyes. Both lenses read as lit by one light.
 - **Rims:** rebuilt as clean rings in each lens' plane. The old swept tubes twisted and left a small pinch near the top.
 - Renders are in `design/renders/bots_v008/`.
+
+## Render logs
+The red Builder's render logs (`design/renders/bots_v001/` to `bots_v008/`) were deleted on 2026-11-23, when the Builder turned blue. The "Renders are in …" lines above are kept as history only.
