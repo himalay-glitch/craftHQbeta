@@ -349,7 +349,9 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
                 </div>
               )}
               {entry.run && entry.run.length > 0 && (
-                <div className={land}>
+                // `max-w-full`: no wider than the chat, so a long summary ends in "…" instead of pushing a phone
+                // screen sideways.
+                <div className={`max-w-full ${land}`}>
                   <RunFold phases={entry.run} />
                 </div>
               )}

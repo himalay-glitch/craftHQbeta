@@ -16,16 +16,16 @@ import chat from "./chat.module.css";
 import { CancelStoryDialog } from "./CancelStoryDialog";
 import { findCreated } from "./created";
 import { LIVE_WORDS } from "./LiveLine";
-import { OwnerPicker } from "./OwnerPicker";
 import { PHASE_LABEL } from "./phases";
 import { names } from "./RichText";
 import { PreviewRow } from "./PreviewControl";
 import { columnLabel, statusMoves, type StatusMove } from "./stage";
 import { MORE_BUTTON_ID, StatusLine, StatusMenu } from "./StatusMenu";
 import { StoryDecision } from "./StoryDecision";
-import { ownerOf, setStoryOwner, useStoryOwners } from "./owners";
+import { ownerOf, useStoryOwners } from "./owners";
 import { COMPOSER_INPUT_ID, StoryComposer } from "./StoryComposer";
-import { StoryNav } from "./StoryNav";
+import { ActivityCorner } from "./ActivityCorner";
+import { StoryNav, StoryNavToggle } from "./StoryNav";
 import { StoryRail } from "./StoryRail";
 import { StoryThread } from "./StoryThread";
 import { TeamButton, TeamChip } from "./TeamButton";
@@ -88,10 +88,12 @@ const BUILD_PHASES: RunPhase[] = [
 /** How long something that just finished stays on top of the activity column before it goes down. */
 const SETTLE_MS = 1500;
 
-/** Desktop: the chat's reading column, centred in the white sheet (about 760 px of text, like a chat app). The
- *  status row, the thread and the message box all use it, so they line up. Sheet padding is 16 px below 1024 px
- *  and 24 px above (DESIGN.md §3.3). */
-const COLUMN = "md:mx-auto md:w-full md:max-w-[808px] md:px-4 lg:px-6";
+/** Desktop: the chat's column in the white sheet. The columns beside it keep fixed widths and the chat takes the
+ *  rest of the screen (Shubham, 23 Nov): the whole sheet up to 1200 px, then 70% of it, centred, so a big monitor
+ *  still gets a bigger chat while the agent's side and yours stay within one glance. Bubbles and cards keep their
+ *  own widths, so lines stay readable (DESIGN.md §3.2, about 70 characters). The status row, the thread and the
+ *  message box all use it, so they line up. Sheet padding is 16 px below 1024 px and 24 px above (DESIGN.md §3.3). */
+const COLUMN = "md:mx-auto md:w-full md:max-w-[min(100%,max(1200px,70%))] md:px-4 lg:px-6";
 
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now()}-${(seq += 1)}`;
@@ -249,7 +251,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const facts = !changed
     ? initial.facts
     : { ...moved, checks: moved.checks.state === "passed" && initial.facts.checks.state === "passed" ? initial.facts.checks : moved.checks };
-  const files: FileRef[] = entries.flatMap((e) => (e.kind === "message" && e.files ? e.files : []));
   const index = data.stories.findIndex((s) => s.id === story.id);
   const prev = index > 0 ? data.stories[index - 1] : undefined;
   const next = index >= 0 ? data.stories[index + 1] : undefined;
@@ -267,17 +268,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     el.scrollTo({ top: el.scrollHeight, behavior: firstScroll.current ? "auto" : "smooth" });
     firstScroll.current = false;
   }, [entries, busy, atBottom]);
-
-  const changeOwner = (initials: string | null) => {
-    const before = ownerInitials ?? null;
-    if (before === initials) return;
-    setStoryOwner(story.id, initials);
-    const who = initials ? (initials === data.viewer.initials ? "you" : (data.people.find((p) => p.initials === initials)?.name ?? initials)) : null;
-    showToast(who ? `Owner changed to ${who}.` : "This story has no owner now.", {
-      label: "Undo",
-      run: () => setStoryOwner(story.id, before),
-    });
-  };
 
   const later = (ms: number, fn: () => void) => {
     const t = window.setTimeout(fn, ms);
@@ -916,20 +906,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       restartInChat={state.need === "stuck"}
       epoch={epoch}
       preview={preview}
-      facts={facts}
-      owner={
-        <OwnerPicker
-          owner={ownerInitials}
-          people={data.people}
-          viewerInitials={data.viewer.initials}
-          onChange={changeOwner}
-          storyLabel={storyRef(story.id)}
-          size={20}
-          withName
-        />
-      }
-      updated={changed ? "Just now" : story.updated}
-      files={files}
       onSoon={(m) => showToast(m)}
     />
   );
@@ -948,12 +924,14 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
 
   return (
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
-      {/* Desktop: a builder workspace, full height, in three columns split by hairlines that run from the top bar to the
-          bottom of the window: the stories on the left (1280 px and wider), the builder in the middle, the activity on
-          the right. The builder is the one white surface; the columns beside it sit on the top bar's grey, like
-          sidebars. Each column scrolls on its own, and the message box stays pinned under the conversation. Phones
-          scroll as one white page, the activity folded under "Activity". */}
-      <main id="main" className="md:flex md:h-[calc(100dvh-var(--bar-h))] md:overflow-hidden md:border-t md:border-[var(--line)]">
+      {/* Desktop: a builder workspace, full height: the chat with the agent is the page (Shubham, 23 Nov). The stories
+          list can open on the left (1280 px and wider, from the header's first button), split off by a hairline that
+          runs from the top bar to the bottom of the window; the activity opens from the icon in the header's top-right
+          corner, as a card over the chat. The builder is the one white surface. It scrolls on its own, and the message
+          box stays pinned under the conversation. `relative` makes the frame hold everything absolutely positioned
+          inside it (screen-reader text too), so nothing can stretch the page past the window. Phones scroll as one
+          white page, the activity folded under "Activity". */}
+      <main id="main" className="md:relative md:flex md:h-[calc(100dvh-var(--bar-h))] md:overflow-hidden md:border-t md:border-[var(--line)]">
         {/* The activity column's one announcement line: finishes only (the chat already says when work starts). */}
         <p role="status" className="sr-only">
           {said}
@@ -965,6 +943,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
               the page's buttons. The name is the page's heading, the last step of the trail. Narrower (phones, and the
               sheet beside the activity at 768–1023 px): the trail and the buttons, then the name on its own row. */}
           <header className="flex flex-none flex-wrap items-center gap-x-3 gap-y-1.5 md:px-4 md:py-3 lg:h-14 lg:flex-nowrap lg:px-6 lg:py-0">
+            <StoryNavToggle />
             <nav aria-label="Breadcrumb" className="flex flex-none items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
               <a href="/stories" className="inline-flex items-center gap-1.5 rounded-[4px] hover:text-[var(--tx)]">
                 <ArrowLeft aria-hidden="true" size={14} strokeWidth={1.75} />
@@ -1017,6 +996,13 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
               </Tip>
               {/* The status moves (DESIGN.md §4.5: More in the header). The everyday next step is the chat's decision. */}
               <StatusMenu moves={statusMoves(state.status, state.need === "stuck")} locked={locked} onMove={changeStatus} onCatchUp={catchUp} storyLabel={ref} />
+              {/* In the corner: the activity, as one icon that lights up while something is happening. It opens into
+                  the activity card, over the chat. */}
+              <span className="ml-1.5 flex max-md:hidden">
+                <ActivityCorner items={activity} yours={yours}>
+                  {rail(false)}
+                </ActivityCorner>
+              </span>
             </span>
           </header>
 
@@ -1147,12 +1133,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
             </div>
           </section>
         </div>
-
-        {/* The activity, on the grey beside the builder. Narrow, so the builder gets the room: 256 px, then 288 px from
-            1024 (the board's column width, DESIGN.md §5.2). */}
-        <aside aria-label="Activity and details" className="hidden md:block md:w-64 md:flex-none md:overflow-y-auto md:border-l md:border-[var(--line)] md:bg-[var(--bar)] md:px-3 md:pb-4 lg:w-72 lg:px-4">
-          {rail(true)}
-        </aside>
       </main>
 
       <Toast toast={toast} onDismiss={dismissToast} offsetRight="0px" />

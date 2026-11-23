@@ -293,11 +293,16 @@ const LINE = "group relative flex min-h-9 w-full items-center gap-2.5 rounded-lg
 // Hover is a 4% black wash (DESIGN.md §3.1 `--hover`), so it shows on the grey canvas as well as on white.
 const LINE_BUTTON = `${LINE} transition-colors duration-[120ms] hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--cta)]`;
 
-function LineText({ title, detail, proof, running }: { title: string; detail: string; proof?: boolean; running?: boolean }) {
+/** `holdName`: never narrower than a short name like "Preview", so buttons beside it move down instead of squeezing it. */
+function LineText({ title, detail, proof, running, holdName }: { title: string; detail: string; proof?: boolean; running?: boolean; holdName?: boolean }) {
   return (
-    // The whole line in a tooltip, in case it's cut short (DESIGN.md §3.2).
-    <span title={detail ? `${title} · ${detail}` : title} className="relative flex min-w-0 flex-1 items-baseline gap-1.5">
-      <span className="max-w-[70%] shrink-0 truncate text-sm font-medium text-[var(--tx)]">{title}</span>
+    // The name and what it is now share a line when they fit; in the narrow column the state goes under the name, so
+    // neither is cut short. Only a name longer than the whole row still truncates, hence the tooltip (DESIGN.md §3.2).
+    <span
+      title={detail ? `${title} · ${detail}` : title}
+      className={`relative flex flex-1 flex-wrap items-baseline gap-x-1.5 ${holdName ? "min-w-[4.5rem]" : "min-w-0"}`}
+    >
+      <span className="max-w-full min-w-0 truncate text-sm font-medium text-[var(--tx)]">{title}</span>
       {proof && (
         <>
           <span aria-hidden="true" className="size-1.5 flex-none -translate-y-px self-center rounded-full bg-[#d97706]" />
@@ -305,7 +310,7 @@ function LineText({ title, detail, proof, running }: { title: string; detail: st
         </>
       )}
       {running && <span aria-hidden="true" className="size-1.5 flex-none self-center rounded-full bg-[var(--green)]" />}
-      <span className="min-w-0 truncate text-xs text-[var(--tx2)]">{detail}</span>
+      <span className="max-w-full min-w-0 truncate text-xs text-[var(--tx2)]">{detail}</span>
     </span>
   );
 }
@@ -329,12 +334,16 @@ function OutputRow({ item, proof, preview, onSoon }: { item: ActivityItem; proof
   // The preview: started, opened and stopped right on its line (it costs server time, so Stop is never faded).
   if (item.kind === "preview") {
     return (
-      <div className={LINE}>
+      // Where the column is too narrow for the name and the buttons side by side, the buttons go on a line of their
+      // own under it, on the right.
+      <div className={`${LINE} flex-wrap gap-y-1`}>
         {flash}
         <Tile item={item} size={24} badge={false} />
         {/* Off, the play button already says it's ready to try; the words would only be cut short beside it. */}
-        <LineText title="Preview" detail={!item.run || item.run === "off" ? "" : item.detail} proof={proof} running={item.run === "on"} />
-        <PreviewInline item={item} preview={preview} onSoon={onSoon} />
+        <LineText title="Preview" detail={!item.run || item.run === "off" ? "" : item.detail} proof={proof} running={item.run === "on"} holdName />
+        <span className="ml-auto flex">
+          <PreviewInline item={item} preview={preview} onSoon={onSoon} />
+        </span>
       </div>
     );
   }

@@ -1,85 +1,108 @@
 ---
 // Shown at once while a story's page loads (its island renders in the browser only): the page's outline as
 // soft placeholders, and the mascot opening the story. Same layout as the page (StoryPage.tsx), so nothing jumps
-// when it arrives: on desktop the white chat sheet on the grey canvas, its header row inside it, and the activity
-// column beside it with no box. No JavaScript needed. Still under reduced motion.
-const bar = "rounded-[8px] bg-[var(--skeleton)] animate-pulse motion-reduce:animate-none";
-// The chat's reading column (StoryPage.tsx `COLUMN`).
-const column = "md:mx-auto md:w-full md:max-w-[808px] md:px-4 lg:px-6";
+// when it arrives: on desktop the stories list on the left when this viewer left it open, then the white builder
+// filling the rest, with the activity icon at the end of its header (the activity opens as a card over the chat).
+// Still under reduced motion.
+const pulse = "rounded-[8px] animate-pulse motion-reduce:animate-none";
+const bar = `${pulse} bg-[var(--skeleton)]`;
+// On the grey stories list the skeleton grey barely shows, so it uses the hover wash (DESIGN.md §3.1 `--hover`).
+const barOnGrey = `${pulse} bg-hover`;
+// The builder's reading column (StoryPage.tsx `COLUMN`).
+const column = "md:mx-auto md:w-full md:max-w-[min(100%,max(1200px,70%))] md:px-4 lg:px-6";
 ---
 
-<main id="main" aria-busy="true" aria-label="Opening the story" class="md:h-[calc(100dvh-var(--bar-h))] md:overflow-hidden md:bg-[var(--bar)]">
-  <div class="mx-auto w-full max-w-[1344px] px-4 pt-4 pb-6 md:flex md:h-full md:gap-6 md:px-8 md:py-2 lg:gap-8">
-    <div class="flex min-w-0 flex-col md:min-h-0 md:flex-1 md:rounded-xl md:border md:border-[var(--line)] md:bg-white">
-      <!-- The header row: the trail and the name, then Team and the page's buttons. The name gets its own row below 1024 px. -->
-      <!-- As wide as the real trail and buttons, so they wrap where the page's do (two rows on a phone). -->
-      <div class="flex flex-none flex-wrap items-center gap-x-3 gap-y-1.5 md:px-4 md:py-3 lg:h-14 lg:flex-nowrap lg:px-6 lg:py-0">
-        <div class:list={[bar, "h-[18px] w-32"]}></div>
-        <div class:list={[bar, "order-3 h-7 basis-full lg:order-none lg:h-5 lg:w-[min(360px,40%)] lg:basis-auto"]}></div>
-        <div class="hidden flex-1 lg:block"></div>
-        <div class="ml-auto flex items-center gap-3 lg:ml-0">
-          <div class:list={[bar, "h-8 w-[88px] rounded-full"]}></div>
-          <div class:list={[bar, "h-5 w-32 opacity-60"]}></div>
-        </div>
+<main
+  id="main"
+  aria-busy="true"
+  aria-label="Opening the story"
+  class="group/sk md:relative md:flex md:h-[calc(100dvh-var(--bar-h))] md:overflow-hidden md:border-t md:border-[var(--line)]"
+>
+  <!-- Whether this viewer left the stories list open (panels.ts), read before anything below is drawn. Blocked storage
+       or nothing saved: put away, as the page does. -->
+  <script is:inline>
+    try {
+      if (JSON.parse(localStorage.getItem("crafthq:story-panels") || "null")?.stories === true)
+        document.currentScript.parentElement.setAttribute("data-stories", "");
+    } catch {}
+  </script>
+
+  <!-- The stories list (1280 px and wider), only when it was left open (StoryNav). -->
+  <div class="hidden xl:flex-none xl:bg-[var(--bar)] xl:group-data-[stories]/sk:flex" data-sk="nav">
+    <div class="flex w-[264px] flex-none flex-col border-r border-[var(--line)]">
+      <div class="flex h-14 flex-none items-center px-4">
+        <div class:list={[barOnGrey, "h-3.5 w-20"]}></div>
       </div>
-
-      <!-- Phones: the folded Activity. -->
-      <div class="mt-3 flex h-[58px] items-center rounded-[12px] border border-[var(--card-line)] px-4 md:hidden">
-        <div class:list={[bar, "h-3.5 w-40"]}></div>
+      <div class="flex flex-col gap-2.5 px-4">
+        <div class:list={[barOnGrey, "h-3 w-24 opacity-70"]}></div>
+        {[0, 1, 2, 3, 4].map(() => <div class:list={[barOnGrey, "h-5 w-full"]}></div>)}
       </div>
+    </div>
+  </div>
 
-      <div class="mt-3 flex min-w-0 flex-1 flex-col md:mt-0 md:min-h-0">
-        <!-- The status row at the top of the chat. -->
-        <div class:list={["flex h-10 flex-none items-center gap-2", column]}>
-          <div class:list={[bar, "size-2 rounded-full"]}></div>
-          <div class:list={[bar, "h-3.5 w-36"]}></div>
-        </div>
-        <div class:list={["flex flex-1 flex-col gap-4 pt-4", column]}>
-          <div class="flex gap-2.5">
-            <div class:list={[bar, "size-8 rounded-full"]}></div>
-            <div class="flex flex-1 flex-col gap-1.5">
-              <div class:list={[bar, "h-3.5 w-28"]}></div>
-              <div class:list={[bar, "h-16 w-[min(520px,90%)] rounded-[16px]"]}></div>
-            </div>
-          </div>
-          <div class="flex gap-2.5">
-            <img src="/images/bots/builder.webp" width="32" height="32" alt="" class="size-8 flex-none object-contain opacity-60" />
-            <div class="flex flex-1 flex-col gap-1.5">
-              <div class:list={[bar, "h-3.5 w-20"]}></div>
-              <div class:list={[bar, "h-10 w-[min(440px,80%)] rounded-[16px]"]}></div>
-              <div class:list={[bar, "h-24 w-[min(300px,70%)] rounded-[16px]"]}></div>
-            </div>
-          </div>
-          <div class="flex justify-end">
-            <div class:list={[bar, "h-10 w-[min(320px,60%)] rounded-[18px]"]}></div>
-          </div>
-
-          <!-- The mascot opening the story. -->
-          <div class="mt-2 flex items-center gap-2.5">
-            <video autoplay loop muted playsinline poster="/images/bots/builder.webp" width="36" height="36" aria-hidden="true" class="size-9 flex-none object-contain motion-reduce:hidden">
-              <source src="/videos/bots/builder-idle.webm" type="video/webm" />
-              <source src="/videos/bots/builder-idle.mp4" type="video/mp4" />
-            </video>
-            <img src="/images/bots/builder.webp" width="36" height="36" alt="" class="hidden size-9 flex-none object-contain motion-reduce:block" />
-            <span class="text-[13px] leading-[18px] text-[var(--tx2)] animate-pulse motion-reduce:animate-none">Opening the story…</span>
-          </div>
-        </div>
-        <!-- The message box. -->
-        <div class:list={["flex-none pt-2 pb-4", column]}>
-          <div class="h-12 rounded-[24px] border border-black/10 bg-white"></div>
-        </div>
+  <!-- The builder. -->
+  <div data-sk="builder" class="px-4 pt-4 pb-6 md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col md:bg-white md:p-0">
+    <!-- The header row: the stories list's button (1280 px and wider), the trail and the name, then Team, the page's
+         buttons and the activity icon (768 px and wider). As wide as the real ones, so they wrap where the page's do
+         (two rows on a phone, the name below). -->
+    <div class="flex flex-none flex-wrap items-center gap-x-3 gap-y-1.5 md:px-4 md:py-3 lg:h-14 lg:flex-nowrap lg:px-6 lg:py-0">
+      <div class="-ml-2 hidden size-8 flex-none items-center justify-center xl:flex">
+        <div class:list={[bar, "size-4 rounded-[4px]"]}></div>
+      </div>
+      <div data-sk="trail" class:list={[bar, "h-[18px] w-32"]}></div>
+      <div class:list={[bar, "order-3 h-7 basis-full lg:order-none lg:h-5 lg:w-[min(360px,40%)] lg:basis-auto"]}></div>
+      <div class="hidden flex-1 lg:block"></div>
+      <div class="ml-auto flex items-center gap-3 lg:ml-0">
+        <div class:list={[bar, "h-8 w-[88px] rounded-full"]}></div>
+        <div class:list={[bar, "h-5 w-32 opacity-60"]}></div>
+        <div data-sk="activity" class="hidden size-8 rounded-full border border-[var(--ctl)] bg-white md:block"></div>
       </div>
     </div>
 
-    <!-- The activity column: on the canvas, no box, as wide as the page's. -->
-    <div class="hidden md:block md:w-64 md:flex-none lg:w-72">
-      <div class="flex h-14 items-center">
-        <div class:list={[bar, "h-3.5 w-16"]}></div>
+    <!-- Phones: the folded Activity. -->
+    <div class="mt-3 flex h-[58px] items-center rounded-[12px] border border-[var(--card-line)] px-4 md:hidden">
+      <div class:list={[bar, "h-3.5 w-40"]}></div>
+    </div>
+
+    <div class="mt-3 flex min-w-0 flex-1 flex-col md:mt-0 md:min-h-0">
+      <!-- The status row at the top of the chat. -->
+      <div data-sk="status" class:list={["flex h-10 flex-none items-center gap-2", column]}>
+        <div class:list={[bar, "size-2 rounded-full"]}></div>
+        <div class:list={[bar, "h-3.5 w-36"]}></div>
       </div>
-      <div class="flex flex-col gap-3">
-        <div class:list={[bar, "h-28 w-full rounded-xl"]}></div>
-        <div class:list={[bar, "mt-3 h-3 w-20 opacity-60"]}></div>
-        {[0, 1, 2].map(() => <div class:list={[bar, "h-5 w-44 opacity-60"]}></div>)}
+      <div class:list={["flex flex-1 flex-col gap-4 pt-4", column]}>
+        <div class="flex gap-2.5">
+          <div class:list={[bar, "size-8 rounded-full"]}></div>
+          <div class="flex flex-1 flex-col gap-1.5">
+            <div class:list={[bar, "h-3.5 w-28"]}></div>
+            <div class:list={[bar, "h-16 w-[min(520px,90%)] rounded-[16px]"]}></div>
+          </div>
+        </div>
+        <div class="flex gap-2.5">
+          <img src="/images/bots/builder.webp" width="32" height="32" alt="" class="size-8 flex-none object-contain opacity-60" />
+          <div class="flex flex-1 flex-col gap-1.5">
+            <div class:list={[bar, "h-3.5 w-20"]}></div>
+            <div class:list={[bar, "h-10 w-[min(440px,80%)] rounded-[16px]"]}></div>
+            <div class:list={[bar, "h-24 w-[min(300px,70%)] rounded-[16px]"]}></div>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <div class:list={[bar, "h-10 w-[min(320px,60%)] rounded-[18px]"]}></div>
+        </div>
+
+        <!-- The mascot opening the story. -->
+        <div class="mt-2 flex items-center gap-2.5">
+          <video autoplay loop muted playsinline poster="/images/bots/builder.webp" width="36" height="36" aria-hidden="true" class="size-9 flex-none object-contain motion-reduce:hidden">
+            <source src="/videos/bots/builder-idle.webm" type="video/webm" />
+            <source src="/videos/bots/builder-idle.mp4" type="video/mp4" />
+          </video>
+          <img src="/images/bots/builder.webp" width="36" height="36" alt="" class="hidden size-9 flex-none object-contain motion-reduce:block" />
+          <span class="text-[13px] leading-[18px] text-[var(--tx2)] animate-pulse motion-reduce:animate-none">Opening the story…</span>
+        </div>
+      </div>
+      <!-- The message box. -->
+      <div data-sk="composer" class:list={["flex-none pt-2 pb-4", column]}>
+        <div class="h-12 rounded-[24px] border border-black/10 bg-white"></div>
       </div>
     </div>
   </div>
