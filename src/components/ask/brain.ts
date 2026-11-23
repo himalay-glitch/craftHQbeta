@@ -297,7 +297,7 @@ function status(id: BotId): Turn[] {
 function topicOf(q: string, verbs: string[]) {
   const text = q.replace(/@?\b(pm|builder|designer|checker|fixer)\b[,:]?\s*/gi, "");
   for (const verb of verbs) {
-    const m = text.match(new RegExp(`\\b${verb}\\s+(?:me\\s+)?(?:a|an|the|some)?\\s*(.+?)[.?!]*$`, "i"));
+    const m = text.match(new RegExp(`\\b${verb}\\s+(?:me\\s+)?(?:(?:an|a|the|some)\\s+)?(.+?)[.?!]*$`, "i"));
     const t = m?.[1]?.trim();
     if (t) return t.length <= 60 && !/^(it|this|that)\b/i.test(t) ? t : "";
   }
