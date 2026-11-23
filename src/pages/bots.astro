@@ -1,0 +1,12 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import { BotsPage } from "@/components/ask/BotsPage";
+import { dashboardData as d } from "./dashboard/_sample-data";
+
+const search = d.stories.map(({ id, title, status }) => ({ id, title, status }));
+---
+
+<AppLayout title="Bots · CraftHQ" viewer={d.viewer} search={search}>
+  {/* Hydrated only so a bot whose render isn't in yet falls back to its colour. */}
+  <BotsPage client:load />
+</AppLayout>
