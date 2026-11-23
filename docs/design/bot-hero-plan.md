@@ -151,3 +151,16 @@ These follow the cues from the reference the user shared (a plush bot with round
 - **Fix:** each lens now carries the same stylised glare, a soft double streak (half-transparent, self-lit) at the upper-left edge, clear of the eyes. Both lenses read as lit by one light.
 - **Rims:** rebuilt as clean rings in each lens' plane. The old swept tubes twisted and left a small pinch near the top.
 - Renders are in `design/renders/bots_v008/`.
+
+## v10: the Builder turns blue (2026-11-23)
+- **Colour:** the fur is the OpenDots blue, `#2B88F1` (43, 136, 241). It was calibrated by measuring the fur in renders: the median comes out at (46, 137, 243). Roots are darker and tips brighter and a little more cyan, so the coat has depth.
+- **Face:** no pink cheeks (the felt blush is hidden). A front fill pushed the centre of the face close to the top of the blue, where the view transform blends it toward white and it reads as lavender. A hue-vs-hue grade on the blues fixes that (`huefix.py`, in OKLCH: it keeps each pixel's lightness and chroma and only pulls its hue toward the reference). It's a per-pixel colour mapping, so it can't flicker.
+- **Fur:** thicker strands (0.2 mm), 60 children, more under-brim thinning so no cyan shows at the helmet's edge, and neutral fur-only copies of the warm key and pink rim lights.
+- **Quality:** 512², 384 samples, adaptive (0.008), clamped (direct 4, indirect 2), OIDN with albedo and normals, a fixed seed. This removes the "TV static" of the old 40-sample, 256² clips.
+- **Clips:** `builder-idle` (60 frames, 2.5 s) and `builder-work` (48 frames, 2 s), composited on white, graded, and encoded as VP9 WebM and H.264 MP4. The poster is `public/images/bots/builder.webp` (512 px).
+- **Sizes:** browsers shrink video with plain bilinear sampling, so the 512 px render shown in the 67 px headline shimmered, and the glasses rims and helmet edge went jagged on 1× screens. The frames are now shrunk ahead of time (`resize.py`: Lanczos-3 in linear light) to about twice the slot's size on each kind of screen: **288 px** (`builder-idle`, `builder-work`; also enough for the intro's 176 px Builder) and **144 px** for 1× screens (`-1x`, picked by `<source media>` in `RebusBot`). The WebMs are 58 KB / 51 KB (1×) and 190 KB / 164 KB (2×).
+- **Re-rendering:** `design/renders/bots_v009/run.sh`, which can resume after an interruption and keeps the Mac awake. It opens `crafthq_bots_v001.blend` read-only through `look_v2_final.py`; `encode.py` makes the clips. Frames are gitignored.
+- **Still to do:** the Builder's identity colour in `DESIGN.md` §3.1 and `globals.css` (`--bot-builder`, still coral) needs a shared-file PR with Shubham. The Asker's sky blue then sits close to it.
+
+## Render logs
+The red Builder's render logs (`design/renders/bots_v001/` to `bots_v008/`) were deleted on 2026-11-23, when the Builder turned blue. The "Renders are in …" lines above are kept as history only.
