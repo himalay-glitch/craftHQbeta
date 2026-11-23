@@ -56,6 +56,18 @@ export function saveChat(chat: SavedChat) {
   window.dispatchEvent(new Event(EVENT));
 }
 
+/** Removes a chat. It leaves a marker, so an example chat that isn't stored stays gone too. */
+export function deleteChat(id: string) {
+  const next = [{ id, title: "", updatedAt: 0, messages: [], deleted: true }, ...read().filter((c) => c.id !== id)];
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    cachedRaw = undefined;
+    cached = next;
+  }
+  window.dispatchEvent(new Event(EVENT));
+}
+
 export const newChatId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 export const newMessageId = () => `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 

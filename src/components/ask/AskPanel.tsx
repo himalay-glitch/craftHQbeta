@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { LoaderCircle, Plus, Search } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { LoaderCircle, Plus, Search, Trash2 } from "lucide-react";
 import type { Activity, BotId, ChatMessage, SavedChat } from "@/types/ask";
 import { BotAvatar } from "./BotAvatar";
 import { TEAM, TEAM_ORDER } from "./team";
@@ -42,6 +42,16 @@ function botsIn(messages: ChatMessage[]): BotId[] {
 
 export type ListedChat = SavedChat & { agoMinutes?: number };
 
+/** When a chat was last touched: stored chats carry a time, the examples an age. */
+const touched = (c: ListedChat, now: number) => c.updatedAt || now - (c.agoMinutes ?? 0) * 60000;
+
+/** "Today", "Yesterday" or "Earlier", by the calendar. */
+function dayGroup(t: number, now: number) {
+  const day = (x: number) => new Date(x).setHours(0, 0, 0, 0);
+  const d = Math.round((day(now) - day(t)) / 86400000);
+  return d <= 0 ? "Today" : d === 1 ? "Yesterday" : "Earlier";
+}
+
 /**
  * The panel beside the chat (after the reference's chat-history panel), with two tabs. Chats: every past chat,
  * newest first, with who took part and when; click one to open it and carry on. Bots: each bot at work, live as
@@ -51,6 +61,7 @@ export function AskPanel({
   chats,
   currentId,
   onOpenChat,
+  onDeleteChat,
   activity,
   onAskAbout,
   onNewChat,
@@ -58,6 +69,7 @@ export function AskPanel({
   chats: ListedChat[];
   currentId: string | null;
   onOpenChat: (chat: ListedChat) => void;
+  onDeleteChat: (chat: ListedChat) => void;
   activity: Record<BotId, Activity>;
   onAskAbout: (id: BotId) => void;
   onNewChat: () => void;
@@ -77,7 +89,9 @@ export function AskPanel({
   }, []);
 
   const q = query.trim().toLowerCase();
-  const shownChats = chats.filter((c) => !q || `${c.title} ${lastLine(c.messages)}`.toLowerCase().includes(q));
+  const shownChats = chats
+    .filter((c) => !q || `${c.title} ${lastLine(c.messages)}`.toLowerCase().includes(q))
+    .sort((x, y) => (now === null ? 0 : touched(y, now) - touched(x, now)));
   const shownBots = TEAM_ORDER.filter((id) => !q || `${TEAM[id].name} ${TEAM[id].role} ${activity[id].now}`.toLowerCase().includes(q));
 
   const TAB = "h-8 flex-1 rounded-full px-3 text-[13px] leading-[18px] font-medium transition-colors duration-[120ms]";
@@ -115,30 +129,48 @@ export function AskPanel({
 
       {tab === "chats" ? (
         <ul role="tabpanel" aria-label="Chats" className="mt-3 flex-1 list-none space-y-0.5 overflow-y-auto px-2 pb-3">
-          {shownChats.map((c) => {
+          {shownChats.map((c, i) => {
             const bots = botsIn(c.messages).slice(0, 3);
-            const when = now === null ? "" : ago(c.updatedAt ? now - c.updatedAt : (c.agoMinutes ?? 0) * 60000);
+            const t = now === null ? 0 : touched(c, now);
+            const group = now === null ? "" : dayGroup(t, now);
+            const prevGroup = i === 0 || now === null ? "" : dayGroup(touched(shownChats[i - 1], now), now);
             const open = c.id === currentId;
             return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenChat(c)}
-                  aria-current={open ? "true" : undefined}
-                  className={`w-full rounded-[14px] px-3 py-2.5 text-left transition-colors duration-[120ms] ${open ? "bg-[#F1F1F3]" : "hover:bg-[#F6F6F7]"}`}
-                >
-                  <span className="block truncate text-[14px] leading-5 font-medium text-[var(--tx)]">{c.title}</span>
-                  <span className="mt-0.5 block truncate text-[12px] leading-4 text-[var(--tx2)]">{lastLine(c.messages)}</span>
-                  <span className="mt-2 flex items-center justify-between">
-                    <span className="flex -space-x-1.5">
-                      {bots.map((id) => (
-                        <BotAvatar key={id} id={id} size={22} className="ring-2 ring-white" />
-                      ))}
+              <Fragment key={c.id}>
+                {group && group !== prevGroup && (
+                  <li aria-hidden="true" className="px-3 pt-3 pb-1 text-[11px] leading-4 font-medium tracking-[0.02em] text-[var(--tx2)] uppercase first:pt-1">
+                    {group}
+                  </li>
+                )}
+                <li className="group/chat relative">
+                  <button
+                    type="button"
+                    onClick={() => onOpenChat(c)}
+                    aria-current={open ? "true" : undefined}
+                    className={`w-full rounded-[14px] px-3 py-2.5 text-left transition-colors duration-[120ms] ${open ? "bg-[#F1F1F3]" : "hover:bg-[#F6F6F7]"}`}
+                  >
+                    <span className="block truncate pr-6 text-[14px] leading-5 font-medium text-[var(--tx)]">{c.title}</span>
+                    <span className="mt-0.5 block truncate text-[12px] leading-4 text-[var(--tx2)]">{lastLine(c.messages)}</span>
+                    <span className="mt-2 flex items-center justify-between">
+                      <span className="flex -space-x-1.5">
+                        {bots.map((id) => (
+                          <BotAvatar key={id} id={id} size={22} className="ring-2 ring-white" />
+                        ))}
+                      </span>
+                      <span className="text-[11px] leading-4 text-[var(--tx2)] tabular-nums">{now === null ? "" : ago(now - t)}</span>
                     </span>
-                    <span className="text-[11px] leading-4 text-[var(--tx2)] tabular-nums">{when}</span>
-                  </span>
-                </button>
-              </li>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteChat(c)}
+                    aria-label={`Delete “${c.title}”`}
+                    title="Delete chat"
+                    className="absolute top-2 right-2 inline-flex size-7 items-center justify-center rounded-full text-[var(--tx2)] opacity-0 transition-[opacity,background-color] duration-[120ms] group-hover/chat:opacity-100 hover:bg-black/5 hover:text-[var(--red)] focus-visible:opacity-100"
+                  >
+                    <Trash2 aria-hidden="true" size={14} strokeWidth={1.75} />
+                  </button>
+                </li>
+              </Fragment>
             );
           })}
           {shownChats.length === 0 && (

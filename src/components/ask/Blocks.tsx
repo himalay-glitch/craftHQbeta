@@ -158,30 +158,35 @@ function Designs({
   );
 }
 
-/** The Builder's steps, ticking over while you watch (each ~1.6 s), ending on the last step at work. */
+/**
+ * The Builder's steps, ticking over while you watch (each ~1.6 s). When the last one is done the story moves on to
+ * review: every step is ticked, the bar is full and the pill says In review.
+ */
 function Steps({ story, steps }: { story: { id: number; title: string }; steps: string[] }) {
   const [at, setAt] = useState(0);
   const [secs, setSecs] = useState(0);
+  const done = at >= steps.length;
   useEffect(() => {
-    const step = window.setInterval(() => setAt((a) => Math.min(a + 1, steps.length - 1)), 1600);
+    if (done) return;
+    const step = window.setInterval(() => setAt((a) => Math.min(a + 1, steps.length)), 1600);
     const clock = window.setInterval(() => setSecs((s) => s + 1), 1000);
     return () => {
       window.clearInterval(step);
       window.clearInterval(clock);
     };
-  }, [steps.length]);
+  }, [steps.length, done]);
   const elapsed = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m`;
   return (
     <div className={`${CARD} px-3.5 py-3`}>
       <div className="flex items-center gap-3">
         <span className="w-12 flex-none text-[13px] text-[var(--tx2)] tabular-nums">hq-{story.id}</span>
         <span className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[var(--tx)]">{story.title}</span>
-        <StatusPill status="building" elapsed={elapsed} />
+        {done ? <StatusPill status="in_review" /> : <StatusPill status="building" elapsed={elapsed} />}
       </div>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-[#F0F0F2]">
         <div
-          className={`h-full rounded-full transition-[width] duration-700 ease-out ${styles.sheen}`}
-          style={{ width: `${((at + 0.5) / steps.length) * 100}%`, backgroundColor: TEAM.builder.colour }}
+          className={`h-full rounded-full transition-[width] duration-700 ease-out ${done ? "" : styles.sheen}`}
+          style={{ width: `${done ? 100 : ((at + 0.5) / steps.length) * 100}%`, backgroundColor: done ? "var(--success)" : TEAM.builder.colour }}
         />
       </div>
       <ol className="mt-3 list-none space-y-1.5">
