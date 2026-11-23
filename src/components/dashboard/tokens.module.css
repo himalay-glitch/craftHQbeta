@@ -34,6 +34,7 @@
   --shadow-menu: 0 8px 24px rgb(0 0 0 / 0.12), 0 0 0 1px #e3e3e3;
   --shadow-panel: -8px 0 24px rgb(0 0 0 / 0.08);
   --bar-h: 48px;
+  --sidebar-w: 176px;
   --panel-w: 480px;
 }
 
@@ -109,10 +110,32 @@
   }
 }
 
+/* The Stuck alert, on the chip and beside the Stuck card's label: a red ring grows 5 px out and fades,
+   every 2 s, then rests. */
+.alert,
+.alertIcon {
+  animation: alert 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes alert {
+  0% {
+    box-shadow: 0 0 0 0 rgb(179 38 30 / 0.4);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 5px rgb(179 38 30 / 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu[data-state="open"],
   .menu[data-state="closed"],
-  .pulse {
+  .pulse,
+  .alert,
+  .alertIcon {
     animation: none;
+  }
+  /* The chip keeps a still ring instead of the pulse; the icon needs none, its own circle is enough. */
+  .alert {
+    box-shadow: 0 0 0 1px rgb(179 38 30 / 0.45);
   }
 }

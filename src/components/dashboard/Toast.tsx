@@ -30,7 +30,7 @@ export function Toast({ toast, onDismiss, offsetRight }: { toast: ToastMessage |
       role="status"
       aria-live="polite"
       style={{ right: offsetRight }}
-      className="pointer-events-none fixed bottom-6 left-0 z-[60] flex justify-center px-4 transition-[right] duration-200"
+      className="pointer-events-none fixed bottom-6 left-0 z-[60] lg:left-[var(--sidebar-w)] flex justify-center px-4 transition-[right] duration-200"
     >
       <AnimatePresence>
         {toast && (
