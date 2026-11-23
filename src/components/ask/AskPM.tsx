@@ -124,15 +124,14 @@ const MORE = ["What merged this week?", "What’s stuck, and why?", "Who’s on 
 function Welcome({ data, onAsk }: { data: AskData; onAsk: (q: string) => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
-      <div className="relative">
+      {/* The glow floats with the PM, inside one layer, so the poster's white melts into it (multiply). */}
+      <div className={`relative ${styles.bob}`}>
         <span
           aria-hidden="true"
           className="absolute inset-[-40%] rounded-full blur-2xl"
           style={{ background: `radial-gradient(circle, ${TEAM.pm.tint} 0%, rgb(253 226 212 / 0.6) 45%, transparent 70%)` }}
         />
-        <div className={`relative ${styles.bob}`}>
-          <BotAvatar id="pm" size={124} bare />
-        </div>
+        <BotAvatar id="pm" size={124} bare className="overflow-visible!" />
       </div>
       <h1 className="mt-5 text-[34px] leading-10 font-semibold tracking-[-0.025em] text-[var(--tx)]">Hi {data.firstName}, what’s up?</h1>
       <p className="mt-2 text-[15px] leading-6 text-[var(--tx2)]">How can I help with {data.project} today?</p>
