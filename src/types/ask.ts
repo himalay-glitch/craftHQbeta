@@ -17,7 +17,7 @@ export interface Bot {
   tint: string;
   /** Its face, as a path without the size: `<poster>-128.webp`, `-256` and `-384` exist (on white). */
   poster: string;
-  /** Optional idle loop, as .webm and .mp4 without the extension. */
+  /** Optional idle loop, without the extension: `.webm`/`.mp4` at 288 px, plus `-1x` copies at 144 px for 1x screens. */
   video?: string;
 }
 
