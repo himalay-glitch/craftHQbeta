@@ -273,7 +273,16 @@ export function AskPM({ data }: { data: AskData }) {
     field.current?.focus();
   };
 
-  const mention = (id: BotId) => setInput((v) => `${v.trim() ? `${v.trimEnd()} ` : ""}@${TEAM[id].name} `);
+  // Adds "@Builder " and puts the cursor after it, once the menu has closed and handed focus back.
+  const mention = (id: BotId) => {
+    setInput((v) => `${v.trim() ? `${v.trimEnd()} ` : ""}@${TEAM[id].name} `);
+    window.setTimeout(() => {
+      const el = field.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }, 0);
+  };
 
   // The textarea grows with what you type, up to about six lines.
   useLayoutEffect(() => {
@@ -313,7 +322,7 @@ export function AskPM({ data }: { data: AskData }) {
               onClick={reset}
               aria-label="New chat"
               title="New chat"
-              className="absolute top-3 right-3 z-10 inline-flex size-8 items-center justify-center rounded-full bg-white/80 text-[var(--tx2)] backdrop-blur transition-colors hover:bg-[#F4F4F5] hover:text-[var(--tx)] xl:hidden"
+              className="absolute top-3 right-3 z-10 inline-flex size-8 items-center justify-center rounded-full bg-white/80 text-[var(--tx2)] backdrop-blur transition-colors hover:bg-[#F4F4F5] hover:text-[var(--tx)] lg:hidden"
             >
               <SquarePen aria-hidden="true" size={16} strokeWidth={1.75} />
             </button>
@@ -383,10 +392,7 @@ export function AskPM({ data }: { data: AskData }) {
                       align="start"
                       sideOffset={8}
                       className={MENU_CONTENT}
-                      onCloseAutoFocus={(e) => {
-                        e.preventDefault();
-                        field.current?.focus();
-                      }}
+                      onCloseAutoFocus={(e) => e.preventDefault()}
                     >
                       {(["builder", "designer", "checker", "fixer"] as BotId[]).map((id) => (
                         <DropdownMenu.Item key={id} className={`${MENU_ITEM} h-11`} onSelect={() => mention(id)}>

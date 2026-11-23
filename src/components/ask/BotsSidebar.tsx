@@ -48,7 +48,7 @@ export function BotsSidebar({
   return (
     <aside
       aria-label="Bots"
-      className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] xl:flex"
+      className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] lg:flex"
     >
       <div className="flex items-center justify-between px-5 pt-5">
         <h2 className="text-[17px] leading-6 font-semibold tracking-[-0.01em] text-[var(--tx)]">Bots</h2>
