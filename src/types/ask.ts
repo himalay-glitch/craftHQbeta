@@ -46,6 +46,14 @@ export interface ChatMessage {
   blocks: Block[];
 }
 
+/** A past chat in the history. `updatedAt` is ms since the epoch. */
+export interface SavedChat {
+  id: string;
+  title: string;
+  updatedAt: number;
+  messages: ChatMessage[];
+}
+
 /** One reply from a bot, after it "thinks" for `delay` ms. */
 export interface Turn {
   from: BotId;

@@ -1,8 +1,9 @@
-import type { AskData, Block, BotId, Turn } from "@/types/ask";
-import { TEAM } from "./team";
+import type { AskData, Block, BotId, StoryRef, Turn } from "@/types/ask";
 
-// The demo's PM: no model behind it yet. It matches what you asked to a scripted answer built from the
-// project's own stories, and brings in a teammate for new work. Replace with the real agent later.
+// The demo's team: no model behind it yet. What you asked is matched to a scripted answer built from the
+// project's own stories. The bot it concerns answers in its own voice: name a bot (or click it) and that bot
+// replies; questions in a bot's own area go to it (review → Checker, stuck → Fixer, merged → Builder). The PM
+// keeps the overview and the team, and routes new work you didn't give to anyone. Replace with the real agents later.
 
 export const SUGGESTIONS = [
   "What’s happening right now?",
@@ -14,42 +15,63 @@ export const SUGGESTIONS = [
 ];
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const pm = (blocks: Block[], delay = 650): Turn => ({ from: "pm", delay, blocks });
+const say = (from: BotId, blocks: Block[], delay = 700, status?: Turn["status"]): Turn => ({ from, delay, blocks, status });
+const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** The words a topic is recognised by, most specific first. */
-const TOPICS: [RegExp, (d: AskData, q: string) => Turn[]][] = [
-  [/\bfix\b/i, fix],
-  [/\b(design|sketch|mock ?up|screens?|layout|ui|wireframe|look)\b/i, design],
-  [/\b(build|engineer|implement|code|develop|make|add)\b/i, build],
-  [/\b(test|check|qa|verify)\b/i, check],
-  [/\b(merged?|shipped?|released?|done|finished|live)\b/i, merged],
-  [/\b(stuck|blocked|fail(ed|ing)?|broken|errors?)\b/i, stuck],
-  [/\b(review|approve|accept)\b/i, review],
-  [/\b(who|team|bots?)\b/i, team],
-  [/\b(happening|what'?s up|status|progress|today|going on|update|overview|summary)\b/i, overview],
-];
+const FIX = /\bfix\b/i;
+const DESIGN = /\b(design|sketch|mock ?up|screens?|layout|ui|wireframe|look)\b/i;
+const BUILD = /\b(build|engineer|implement|code|develop|make|add)\b/i;
+const CHECK = /\b(test|check|qa|verify)\b/i;
+const MERGED = /\b(merged?|shipped?|released?|done|finished|live)\b/i;
+const STUCK = /\b(stuck|blocked|fail(ed|ing)?|broken|errors?|retry)\b/i;
+const REVIEW = /\b(review|approve|accept)\b/i;
+const TEAMQ = /\b(who|team|bots?)\b/i;
+const OVERVIEW = /\b(happening|what'?s up|status|progress|today|going on|update|overview|summary)\b/i;
+
+/** The bot a question is for: "@Builder …", "What is Designer doing?", "Ask Builder to fix it". */
+function addressee(q: string): BotId | null {
+  const m = q.match(/@?\b(pm|builder|designer|checker|fixer)\b/i);
+  return m ? (m[1].toLowerCase() as BotId) : null;
+}
 
 export function answer(question: string, d: AskData): Turn[] {
   const q = question.trim();
-  for (const [re, fn] of TOPICS) if (re.test(q)) return fn(d, q);
-  // A bot named on its own ("What is Builder doing?", "@Checker"): what it's on.
-  const named = q.match(/@?\b(pm|builder|designer|checker|fixer)\b/i)?.[1].toLowerCase() as BotId | undefined;
-  if (named) return botStatus(named);
+  const to = addressee(q);
+
+  // Spoken to a bot by name: it answers itself.
+  if (to && to !== "pm") {
+    if (to === "builder" && FIX.test(q)) return fix(d, true);
+    if (to === "builder" && BUILD.test(q.replace(/builder/gi, ""))) return build(d, q, true);
+    if (to === "designer" && DESIGN.test(q.replace(/designer/gi, ""))) return design(d, q, true);
+    if (to === "checker" && (CHECK.test(q.replace(/checker/gi, "")) || REVIEW.test(q))) return CHECK.test(q.replace(/checker/gi, "")) ? check(d) : review(d);
+    if (to === "fixer" && (STUCK.test(q) || FIX.test(q.replace(/fixer/gi, "")))) return stuck(d);
+    return status(to);
+  }
+
+  // Questions in a bot's own area go to that bot; new work goes through the PM.
+  if (FIX.test(q)) return fix(d, false);
+  if (DESIGN.test(q)) return design(d, q, false);
+  if (BUILD.test(q)) return build(d, q, false);
+  if (CHECK.test(q)) return check(d);
+  if (MERGED.test(q)) return merged(d);
+  if (STUCK.test(q)) return stuck(d);
+  if (REVIEW.test(q)) return review(d);
+  if (TEAMQ.test(q)) return team();
+  if (OVERVIEW.test(q) || to === "pm") return to === "pm" && !OVERVIEW.test(q) ? status("pm") : overview(d);
   return [
-    pm([
-      {
-        kind: "text",
-        text: `I can tell you anything about ${d.project}’s stories, or get new work started. Try one of these:`,
-      },
+    say("pm", [
+      { kind: "text", text: `I can tell you anything about ${d.project}’s stories, or get new work started. You can also talk to a bot directly with @.` },
       { kind: "suggest", items: SUGGESTIONS.slice(0, 4) },
     ]),
   ];
 }
 
+// ---------- The PM: the overview and the team ----------
+
 function overview(d: AskData): Turn[] {
   const urgent = [...d.stuck, ...d.needsYou.filter((s) => s.status === "needs_input")].slice(0, 3);
   return [
-    pm([
+    say("pm", [
       {
         kind: "text",
         text:
@@ -73,197 +95,211 @@ function overview(d: AskData): Turn[] {
   ];
 }
 
-function merged(d: AskData): Turn[] {
-  return [
-    pm([
-      { kind: "text", text: `${plural(d.merged.length, "change")} merged this week. Each one passed the Checker and your review.` },
-      { kind: "stories", items: d.merged },
-      { kind: "suggest", items: ["What’s happening right now?", "What’s ready to review?"] },
-    ]),
-  ];
-}
-
-function stuck(d: AskData): Turn[] {
-  const [first] = d.stuck;
-  return [
-    pm([
-      {
-        kind: "text",
-        text: `${plural(d.stuck.length, "story is", "stories are")} stuck, both on something that failed rather than on a person. I’ve asked Fixer to take the first one.`,
-      },
-      { kind: "stories", items: d.stuck },
-      { kind: "handoff", to: "fixer", task: `Retry the preview for hq-${first.id}` },
-    ]),
-    {
-      from: "fixer",
-      delay: 1800,
-      status: { now: `Restarting hq-${first.id}`, working: true },
-      blocks: [
-        {
-          kind: "text",
-          text: `Restarted the preview for hq-${first.id}. It failed because the build ran out of memory, so I gave it more and it’s starting now. I’ll tell you if it fails again.`,
-        },
-        { kind: "stories", items: [{ ...first, status: "building", detail: "Preview restarting" }] },
-      ],
-    },
-  ];
-}
-
-function review(d: AskData): Turn[] {
-  return [
-    pm([
-      { kind: "text", text: `${plural(d.review.length, "story is", "stories are")} ready for you to review. The Checker has passed each one; open it, try it, then accept or ask for changes.` },
-      { kind: "stories", items: d.review },
-    ]),
-  ];
-}
-
 function team(): Turn[] {
   return [
-    pm([
-      { kind: "text", text: "Here’s the team. You talk to me; I bring in whoever the work needs." },
+    say("pm", [
+      { kind: "text", text: "Here’s the team. Talk to me, or to any of them with @; I bring in whoever new work needs." },
       { kind: "team" },
     ]),
   ];
 }
 
-function design(d: AskData, q: string): Turn[] {
-  const what = topicOf(q, ["design", "sketch", "mock up"]) || "settings page";
+// ---------- Each bot in its own area ----------
+
+/** The Builder on what merged: its own changes that made it through. */
+function merged(d: AskData): Turn[] {
   return [
-    pm([
-      { kind: "text", text: `Good idea. I’ve asked Designer to sketch a few directions for the ${what}, using ${d.project}’s existing screens.` },
-      { kind: "handoff", to: "designer", task: `Sketch the ${what}` },
-    ]),
-    {
-      from: "designer",
-      delay: 2600,
-      status: { now: "Sent three directions", working: false },
-      blocks: [
-        { kind: "text", text: `Three directions for the ${what}. A keeps everything in one list, B groups it into cards, C splits sections from details.` },
-        {
-          kind: "designs",
-          options: [
-            { id: "A", label: "One list", layout: "list" },
-            { id: "B", label: "Cards", layout: "cards" },
-            { id: "C", label: "Split view", layout: "split" },
-          ],
-        },
+    say(
+      "builder",
+      [
+        { kind: "text", text: `${plural(d.merged.length, "of my changes", "of my changes")} merged this week. Each one passed the Checker and your review first.` },
+        { kind: "stories", items: d.merged },
+        { kind: "suggest", items: ["What’s happening right now?", "What’s ready to review?"] },
       ],
-    },
+      700,
+    ),
   ];
 }
 
-/** After a design is picked: the PM turns it into a story for the Builder. */
-export function pickDesign(option: string, label: string, d: AskData): Turn[] {
-  const id = d.nextStoryId;
+/** The Checker on what's ready for you. */
+function review(d: AskData): Turn[] {
   return [
-    pm([
-      { kind: "text", text: `${option} it is. I’ve written it up as a story, with ${label.toLowerCase()} as the design. Approve the plan and the Builder starts.` },
-      { kind: "stories", items: [{ id, title: "Settings page", status: "needs_input", detail: `Design ${option} · plan ready` }] },
-      { kind: "suggest", items: ["Build it now", "What’s happening right now?"] },
+    say("checker", [
+      { kind: "text", text: `${plural(d.review.length, "story has", "stories have")} passed my checks and ${d.review.length === 1 ? "is" : "are"} ready for you. Open one, try it, then accept it or ask for changes.` },
+      { kind: "stories", items: d.review },
     ]),
   ];
 }
 
-function build(d: AskData, q: string): Turn[] {
-  // "Build it now" after picking a design means the settings page that was just written up.
-  const what = topicOf(q, ["build", "add", "make", "implement", "code"]) || (/\b(it|this|that)\b/i.test(q) ? "settings page" : "check-in reminders");
-  const story = { id: d.nextStoryId, title: capitalise(what) };
+/** The Fixer on what's stuck: it lists them, then gets straight to the first. */
+function stuck(d: AskData): Turn[] {
+  const [first] = d.stuck;
   return [
-    pm([
-      { kind: "text", text: `On it. I’ve written “${story.title}” up as hq-${story.id} and handed it to the Builder. The Checker tests it before it reaches you.` },
-      { kind: "handoff", to: "builder", task: `Build hq-${story.id}` },
-    ]),
-    {
-      from: "builder",
-      delay: 2200,
-      status: { now: `Building hq-${story.id}`, working: true },
-      blocks: [
-        { kind: "text", text: "Started. Here’s where it is; I’ll post the preview when the Checker has passed it." },
-        { kind: "steps", story, steps: ["Read the story and the screens", "Write the change", "Run the tests", "Open the pull request"] },
+    say(
+      "fixer",
+      [
+        { kind: "text", text: `${plural(d.stuck.length, "story is", "stories are")} stuck, both on something that failed rather than on a person. I’m taking hq-${first.id} first.` },
+        { kind: "stories", items: d.stuck },
       ],
-    },
+      700,
+      { now: `Retrying hq-${first.id}`, working: true },
+    ),
+    say(
+      "fixer",
+      [
+        { kind: "text", text: `Restarted the preview for hq-${first.id}. It failed because the build ran out of memory, so I gave it more and it’s starting now. I’ll tell you if it fails again.` },
+        { kind: "stories", items: [{ ...first, status: "building", detail: "Preview restarting" }] },
+      ],
+      1600,
+      { now: `Restarting hq-${first.id}`, working: true },
+    ),
   ];
 }
 
+/** The Checker re-running a story: it says it's on it, then posts the results. */
 function check(d: AskData): Turn[] {
   const story = d.review[0] ?? { id: 43, title: "Creation flow revision", status: "in_review" as const };
   return [
-    pm([
-      { kind: "text", text: `I’ve asked the Checker to run hq-${story.id} again on web and Android.` },
-      { kind: "handoff", to: "checker", task: `Check hq-${story.id}` },
-    ]),
-    {
-      from: "checker",
-      delay: 2400,
-      status: { now: `Checked hq-${story.id} · 1 to fix`, working: false },
-      blocks: [
-        { kind: "text", text: `Done. Nearly everything passes; one thing needs a fix before you review it.` },
+    say("checker", [{ kind: "text", text: `Running hq-${story.id} again on web and Android, against what the story asked for.` }], 700, {
+      now: `Checking hq-${story.id}`,
+      working: true,
+    }),
+    say(
+      "checker",
+      [
+        { kind: "text", text: "Done. Nearly everything passes; one thing needs a fix before you review it." },
         { kind: "checks", story, passed: 23, failed: 1, note: "On Android the event date shows as 11/20 instead of 20 Nov." },
         { kind: "suggest", items: ["Ask Builder to fix it", "What’s ready to review?"] },
       ],
-    },
+      2200,
+      { now: `Checked hq-${story.id} · 1 to fix`, working: false },
+    ),
   ];
 }
 
-function fix(d: AskData): Turn[] {
-  const story = d.review[0] ?? { id: 43, title: "Creation flow revision", status: "in_review" as const };
+// ---------- New work: straight to the bot you named, or routed by the PM ----------
+
+function design(d: AskData, q: string, direct: boolean): Turn[] {
+  const what = topicOf(q, ["design", "sketch", "mock up"]) || "settings page";
+  const directions = say(
+    "designer",
+    [
+      { kind: "text", text: `Three directions for the ${what}. A keeps everything in one list, B groups it into cards, C splits sections from details.` },
+      {
+        kind: "designs",
+        options: [
+          { id: "A", label: "One list", layout: "list" },
+          { id: "B", label: "Cards", layout: "cards" },
+          { id: "C", label: "Split view", layout: "split" },
+        ],
+      },
+    ],
+    2400,
+    { now: "Sent three directions", working: false },
+  );
+  const opener = direct
+    ? say("designer", [{ kind: "text", text: `On it. Sketching a few directions for the ${what}, using ${d.project}’s existing screens.` }], 700, {
+        now: `Sketching the ${what}`,
+        working: true,
+      })
+    : say("pm", [
+        { kind: "text", text: `Good idea. I’ve asked Designer to sketch a few directions for the ${what}, using ${d.project}’s existing screens.` },
+        { kind: "handoff", to: "designer", task: `Sketch the ${what}` },
+      ]);
+  return [opener, directions];
+}
+
+/** After a design is picked: the Designer hands it on, written up as a story for the Builder. */
+export function pickDesign(option: string, label: string, d: AskData): Turn[] {
+  const id = d.nextStoryId;
   return [
-    pm([
-      { kind: "text", text: `I’ve sent the Android date fix on hq-${story.id} back to the Builder. The Checker runs it again once it’s in.` },
+    say("designer", [
+      { kind: "text", text: `${option} it is. I’ve written it up as a story with ${label.toLowerCase()} as the design. Approve the plan and the Builder starts.` },
+      { kind: "stories", items: [{ id, title: "Settings page", status: "needs_input", detail: `Design ${option} · plan ready` }] },
+      { kind: "suggest", items: ["@Builder build it now", "What’s happening right now?"] },
+    ]),
+  ];
+}
+
+function build(d: AskData, q: string, direct: boolean): Turn[] {
+  // "Build it now" after picking a design means the settings page that was just written up.
+  const what = topicOf(q, ["build", "add", "make", "implement", "code"]) || (/\b(it|this|that)\b/i.test(q) ? "settings page" : "check-in reminders");
+  const story = { id: d.nextStoryId, title: capitalise(what) };
+  const steps: Block = { kind: "steps", story, steps: ["Read the story and the screens", "Write the change", "Run the tests", "Open the pull request"] };
+  const working = { now: `Building hq-${story.id}`, working: true };
+  if (direct) {
+    return [
+      say(
+        "builder",
+        [{ kind: "text", text: `On it. I’ve written “${story.title}” up as hq-${story.id} and started. The Checker tests it before it reaches you.` }, steps],
+        800,
+        working,
+      ),
+    ];
+  }
+  return [
+    say("pm", [
+      { kind: "text", text: `On it. I’ve written “${story.title}” up as hq-${story.id} and handed it to the Builder. The Checker tests it before it reaches you.` },
+      { kind: "handoff", to: "builder", task: `Build hq-${story.id}` },
+    ]),
+    say("builder", [{ kind: "text", text: "Started. Here’s where it is; I’ll post the preview when the Checker has passed it." }, steps], 2000, working),
+  ];
+}
+
+function fix(d: AskData, direct: boolean): Turn[] {
+  const story: StoryRef = d.review[0] ?? { id: 43, title: "Creation flow revision", status: "in_review" };
+  const builder = say(
+    "builder",
+    [
+      { kind: "text", text: "Found it: the date used the phone’s short format. Switching it to “20 Nov” everywhere, then the Checker runs it again." },
+      { kind: "steps", story, steps: ["Find where the date is formatted", "Use the app’s date format", "Run the tests", "Hand it to the Checker"] },
+    ],
+    direct ? 800 : 2000,
+    { now: `Fixing hq-${story.id}`, working: true },
+  );
+  if (direct) return [builder];
+  return [
+    say("pm", [
+      { kind: "text", text: `I’ve sent the Android date fix on hq-${story.id} back to the Builder.` },
       { kind: "handoff", to: "builder", task: `Fix the date format on hq-${story.id}` },
     ]),
-    {
-      from: "builder",
-      delay: 2000,
-      status: { now: `Fixing hq-${story.id}`, working: true },
-      blocks: [
-        { kind: "text", text: "Found it: the date used the phone’s short format. Switching it to “20 Nov” everywhere." },
-        { kind: "steps", story, steps: ["Find where the date is formatted", "Use the app’s date format", "Run the tests", "Hand it to the Checker"] },
-      ],
-    },
+    builder,
   ];
+}
+
+// ---------- A bot on what it's doing, in its own words ----------
+
+function status(id: BotId): Turn[] {
+  const lines: Record<BotId, Block[]> = {
+    pm: [{ kind: "text", text: "That’s me. I’m here with you, keeping an eye on every story so you don’t have to." }],
+    builder: [
+      { kind: "text", text: "I’m building hq-54, your calendar of upcoming plans. I started about four minutes ago; the Checker gets it when I’m done." },
+      { kind: "stories", items: [{ id: 54, title: "Your calendar: see your upcoming plans", status: "building", detail: "Started 4m ago" }] },
+    ],
+    checker: [
+      { kind: "text", text: "I’m testing hq-43 on web and Android against what the story asked for. Results in a minute or two." },
+      { kind: "stories", items: [{ id: 43, title: "Creation flow revision", status: "checking", detail: "Started 1m ago" }] },
+    ],
+    fixer: [
+      { kind: "text", text: "I’m retrying the preview for hq-21. It failed to start this morning because the build ran out of memory, so I’m giving it more." },
+      { kind: "stories", items: [{ id: 21, title: "Test story", status: "failed", detail: "Retrying the preview" }] },
+    ],
+    designer: [
+      { kind: "text", text: "I’m sketching hq-23, the onboarding value slider and language switch. Two of the three screens are drawn; you’ll get directions to pick from in a few minutes." },
+      { kind: "stories", items: [{ id: 23, title: "Onboarding value slider and language switch", status: "draft", detail: "Sketching · 2 of 3 screens" }] },
+      { kind: "suggest", items: ["@Designer sketch a profile page", "What’s happening right now?"] },
+    ],
+  };
+  return [say(id, lines[id])];
 }
 
 /** The thing asked for, after the first verb that appears: "Design a settings page" → "settings page". */
 function topicOf(q: string, verbs: string[]) {
+  const text = q.replace(/@?\b(pm|builder|designer|checker|fixer)\b[,:]?\s*/gi, "");
   for (const verb of verbs) {
-    const m = q.match(new RegExp(`\\b${verb}\\s+(?:me\\s+)?(?:a|an|the|some)?\\s*(.+?)[.?!]*$`, "i"));
+    const m = text.match(new RegExp(`\\b${verb}\\s+(?:me\\s+)?(?:a|an|the|some)?\\s*(.+?)[.?!]*$`, "i"));
     const t = m?.[1]?.trim();
     if (t) return t.length <= 60 && !/^(it|this|that)\b/i.test(t) ? t : "";
   }
   return "";
 }
-
-/** "What is Builder doing?": what each bot is on, from the team's own lines. */
-function botStatus(id: BotId): Turn[] {
-  const bot = TEAM[id];
-  const lines: Record<BotId, Block[]> = {
-    pm: [{ kind: "text", text: "That’s me. I’m here with you, and I keep an eye on every story so you don’t have to." }],
-    builder: [
-      { kind: "text", text: "Builder is building hq-54, your calendar of upcoming plans. It started a few minutes ago; the Checker gets it next." },
-      { kind: "stories", items: [{ id: 54, title: "Your calendar: see your upcoming plans", status: "building", detail: "Started 4m ago" }] },
-    ],
-    checker: [
-      { kind: "text", text: "Checker is testing hq-43 on web and Android against what the story asked for." },
-      { kind: "stories", items: [{ id: 43, title: "Creation flow revision", status: "checking", detail: "Started 1m ago" }] },
-    ],
-    fixer: [
-      { kind: "text", text: "Fixer is retrying the preview for hq-21. It failed to start this morning, so it’s trying again with more memory." },
-      { kind: "stories", items: [{ id: 21, title: "Test story", status: "failed", detail: "Retrying the preview" }] },
-    ],
-    designer: [
-      {
-        kind: "text",
-        text: "Designer is sketching hq-23, the onboarding value slider and language switch. Two of the three screens are drawn; you’ll get directions to pick from in a few minutes.",
-      },
-      {
-        kind: "stories",
-        items: [{ id: 23, title: "Onboarding value slider and language switch", status: "draft", detail: "Designer sketching · 2 of 3 screens" }],
-      },
-      { kind: "suggest", items: ["Design a settings page", "What’s happening right now?"] },
-    ],
-  };
-  return [pm(lines[id] ?? [{ kind: "text", text: `${bot.name} is ${bot.now.toLowerCase()}.` }])];
-}
-const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

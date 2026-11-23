@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import { ArrowUp, AtSign, Mic, Paperclip, Sparkles, SquarePen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
@@ -6,7 +6,8 @@ import type { Activity, AskData, Block, BotId, ChatMessage, Turn } from "@/types
 import { answer, pickDesign } from "./brain";
 import { BlockView, type BlockActions } from "./Blocks";
 import { BotAvatar } from "./BotAvatar";
-import { BotsSidebar } from "./BotsSidebar";
+import { AskPanel, type ListedChat } from "./AskPanel";
+import { newChatId, newMessageId, saveChat, seedChats, titleOf, useSavedChats } from "./history";
 import { TEAM } from "./team";
 import styles from "./ask.module.css";
 
@@ -166,8 +167,6 @@ function Welcome({ data, onAsk }: { data: AskData; onAsk: (q: string) => void })
   );
 }
 
-let seq = 0;
-const nextId = () => `m${++seq}`;
 
 const PILL =
   "inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] " +
@@ -181,6 +180,10 @@ const PILL =
 export function AskPM({ data }: { data: AskData }) {
   const reduced = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // The open chat's id (made when its first message is sent), and the messages that arrived live, which stream in.
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [liveIds, setLiveIds] = useState<Set<string>>(new Set());
+  const loaded = useRef<ChatMessage[] | null>(null);
   const [thinking, setThinking] = useState<BotId | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -216,7 +219,9 @@ export function AskPM({ data }: { data: AskData }) {
           window.setTimeout(() => {
             const t = Date.now();
             setThinking(null);
-            setMessages((m) => [...m, { id: nextId(), from: turn.from, blocks: turn.blocks }]);
+            const id = newMessageId();
+            setMessages((m) => [...m, { id, from: turn.from, blocks: turn.blocks }]);
+            setLiveIds((l) => new Set(l).add(id));
             setHandedOff((h) => new Set(h).add(turn.from));
             setAnnounce(`${TEAM[turn.from].name}: ${plainText(turn.blocks)}`);
             // The sidebar follows: whoever was handed work starts on it; whoever replied says where it stands.
@@ -244,12 +249,13 @@ export function AskPM({ data }: { data: AskData }) {
       const text = q.trim();
       if (!text || busy) return;
       pinned.current = true;
-      setMessages((m) => [...m, { id: nextId(), from: "me", blocks: [{ kind: "text", text }] }]);
+      if (!chatId) setChatId(newChatId());
+      setMessages((m) => [...m, { id: newMessageId(), from: "me", blocks: [{ kind: "text", text }] }]);
       setInput("");
       play(answer(text, data));
       field.current?.focus();
     },
-    [busy, data, play],
+    [busy, chatId, data, play],
   );
 
   // Arriving from a bot in the sidebar (/ask?about=builder): ask what it's doing, once, and tidy the URL.
@@ -269,21 +275,49 @@ export function AskPM({ data }: { data: AskData }) {
   const actions: BlockActions = {
     onAsk: ask,
     onPickDesign: (id, label) => {
-      setMessages((m) => [...m, { id: nextId(), from: "me", blocks: [{ kind: "text", text: `Let’s go with ${id}.` }] }]);
+      setMessages((m) => [...m, { id: newMessageId(), from: "me", blocks: [{ kind: "text", text: `Let’s go with ${id}.` }] }]);
       play(pickDesign(id, label, data));
     },
     handedOff,
     data,
   };
 
-  const reset = () => {
+  // Every change to the open chat is saved, so New chat never loses it. Just reopening one doesn't count as a change.
+  useEffect(() => {
+    if (!chatId || messages.length === 0 || messages === loaded.current) return;
+    saveChat({ id: chatId, title: titleOf(messages), updatedAt: Date.now(), messages });
+  }, [chatId, messages]);
+
+  const saved = useSavedChats();
+  const seeds = useMemo(() => seedChats(data), [data]);
+  const chats: ListedChat[] = [...saved, ...seeds.filter((s) => !saved.some((c) => c.id === s.id))];
+
+  const stop = () => {
     timers.current.forEach((t) => window.clearTimeout(t));
     timers.current = [];
-    setMessages([]);
     setThinking(null);
     setBusy(false);
+  };
+
+  const reset = () => {
+    stop();
+    loaded.current = null;
+    setMessages([]);
+    setChatId(null);
+    setLiveIds(new Set());
     setHandedOff(new Set());
     field.current?.focus();
+  };
+
+  // Reopen a past chat as it was (no streaming), ready to carry on.
+  const openChat = (chat: ListedChat) => {
+    stop();
+    loaded.current = chat.messages;
+    pinned.current = true;
+    setMessages(chat.messages);
+    setChatId(chat.id);
+    setLiveIds(new Set());
+    setHandedOff(new Set(chat.messages.flatMap((m) => (m.from === "me" ? [] : [m.from]))));
   };
 
   // Adds "@Builder " and puts the cursor after it, once the menu has closed and handed focus back.
@@ -355,7 +389,7 @@ export function AskPM({ data }: { data: AskData }) {
                         </p>
                       </div>
                     ) : (
-                      <BotMessage key={m.id} message={m} stream={!reduced && m.id === lastBot} actions={actions} onTick={follow} />
+                      <BotMessage key={m.id} message={m} stream={!reduced && m.id === lastBot && liveIds.has(m.id)} actions={actions} onTick={follow} />
                     ),
                   )}
                   {thinking && <Thinking from={thinking} />}
@@ -443,7 +477,14 @@ export function AskPM({ data }: { data: AskData }) {
           </div>
         </section>
 
-        <BotsSidebar activity={activity} onAskAbout={(id) => ask(`What is ${TEAM[id].name} doing?`)} onNewChat={reset} />
+        <AskPanel
+          chats={chats}
+          currentId={chatId}
+          onOpenChat={openChat}
+          activity={activity}
+          onAskAbout={(id) => ask(`What is ${TEAM[id].name} doing?`)}
+          onNewChat={reset}
+        />
       </div>
 
       <p className="sr-only" aria-live="polite">
