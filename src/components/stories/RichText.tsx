@@ -55,6 +55,10 @@ export function RichText({
   );
 }
 
+
+/** "Skye Rao", "Skye Rao and Esha Nair", "Skye Rao, Esha Nair and Pranav Iyer". */
+export const names = (list: string[]) => (list.length < 2 ? (list[0] ?? "") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
+
 /** Turns typed text into segments: "@Skye" or "@agent" becomes a chip, and so does "#hq-33" (or "#33"). */
 export function parseText(text: string, people: Person[], stories: { id: number; title: string }[]): Segment[] {
   const out: Segment[] = [];

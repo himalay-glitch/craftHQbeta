@@ -1,12 +1,12 @@
-import { useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowUp, Plus, RefreshCw } from "lucide-react";
+import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
+import { ArrowUp, AtSign, Plus, RefreshCw } from "lucide-react";
 import type { Person } from "@/types/dashboard";
 import type { FileRef, Segment } from "@/types/stories";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
 import { storyRef } from "@/components/dashboard/format";
-import { AgentAvatar } from "./AgentAvatar";
 import { AttachedFiles, type Attachment } from "./AttachedFiles";
-import { parseText } from "./RichText";
+import { names, parseText } from "./RichText";
+import { SuggestionList, useSuggestions, type Suggestion } from "./Suggestions";
 
 export const COMPOSER_INPUT_ID = "story-composer-input";
 
@@ -23,10 +23,12 @@ interface StoryComposerProps {
   /** The line above the box: what a note does in the story's status (statuses guide: a note is a conversation,
    *  a status is an instruction). */
   hint?: string;
+  /** The writer, left out of the "@" list. */
+  viewerName?: string;
   onSend: (message: { text: Segment[]; files: FileRef[]; rebuild: boolean }) => void;
+  /** Moves a draft meant for a teammate to the story's Team conversation, where people talk. */
+  onWriteToTeam: (draft: string) => void;
 }
-
-type Suggestion = { key: string; insert: string; label: string; meta?: string; icon: ReactNode };
 
 const draftKey = (id: number) => `crafthq:story-draft:${id}`;
 function readDraft(id: number) {
@@ -48,66 +50,57 @@ function writeDraft(id: number, text: string) {
 const kindOf = (f: File): FileRef["kind"] => (f.type.startsWith("image/") ? "image" : f.type.startsWith("video/") ? "video" : "file");
 
 /**
- * The message box: a rounded field with + to attach (or paste, or drop anything on it) and a send button
- * that wakes up as you type. "@" brings in a teammate or the agent, "#" links another story. Above it, one
- * line says what a note does right now. In review, "Rebuild after sending" turns a note into a change request
- * (a note, then Approved). The draft is kept per story.
+ * The message box of the story's chat, which is the robots': a rounded field with + to attach (or paste, or drop
+ * anything on it) and a send button that wakes up as you type. Everything sent here goes to the agent; people talk
+ * in Team. So "@" lists teammates only to move the draft to Team, and a teammate tagged here anyway gets a line
+ * saying they won't see it, with the same way out. "#" links another story. In review, "Rebuild after sending"
+ * turns a note into a change request (a note, then Approved). The draft is kept per story.
  */
-export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, onRebuildChange, suggestions = [], hint, onSend }: StoryComposerProps) {
+export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, onRebuildChange, suggestions = [], hint, viewerName, onSend, onWriteToTeam }: StoryComposerProps) {
   // The story page renders only in the browser (client:only), so local storage can be read straight away.
   const [text, setText] = useState(() => readDraft(storyId));
   const [files, setFiles] = useState<Attachment[]>([]);
   const [caret, setCaret] = useState(0);
-  const [active, setActive] = useState(0);
-  const [dismissed, setDismissed] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
   const nextFileId = useRef(0);
-  const pendingCaret = useRef<number | null>(null);
-
-  // After a suggestion is chosen, put the caret after it in the same frame as the new text, so letters
-  // typed straight away land in the right place.
-  useLayoutEffect(() => {
-    const at = pendingCaret.current;
-    if (at === null || !inputRef.current) return;
-    pendingCaret.current = null;
-    inputRef.current.focus();
-    inputRef.current.setSelectionRange(at, at);
-  });
-
-  // "@sk" or "#hq-3" just before the caret opens suggestions.
-  const token = text.slice(0, caret).match(/(?:^|\s)([@#])([\w-]*)$/);
-  const tokenKey = token ? `${caret}:${token[0]}` : null;
-  const q = token?.[2].toLowerCase() ?? "";
-  const mentions: Suggestion[] = !token
-    ? []
-    : token[1] === "@"
-      ? [
-          { key: "agent", insert: "@agent", label: "Agent", meta: "Ask or tell the agent", icon: <AgentAvatar size={20} /> },
-          ...people.map((p) => ({ key: p.id, insert: `@${p.name.split(" ")[0]}`, label: p.name, icon: <PersonAvatar initials={p.initials} /> })),
-        ].filter((s) => s.label.toLowerCase().includes(q) || s.insert.toLowerCase().includes(`@${q}`))
-      : stories
-          .filter((s) => s.id !== storyId && (storyRef(s.id).includes(q) || String(s.id).startsWith(q.replace(/^hq-/, "")) || s.title.toLowerCase().includes(q)))
-          .map((s) => ({ key: String(s.id), insert: `#${storyRef(s.id)}`, label: s.title, meta: storyRef(s.id), icon: null }));
-  const shown = tokenKey !== dismissed ? mentions.slice(0, 6) : [];
-  const canSend = Boolean(text.trim() || files.length);
 
   const update = (value: string, at: number) => {
     setText(value);
     setCaret(at);
-    setActive(0);
     writeDraft(storyId, value);
   };
 
-  const choose = (s: Suggestion) => {
-    if (!token) return;
-    const start = caret - token[2].length - 1;
-    const value = `${text.slice(0, start)}${s.insert} ${text.slice(caret)}`;
-    const at = start + s.insert.length + 1;
-    pendingCaret.current = at;
-    update(value, at);
+  // The draft goes to Team as it is, tag included (and a space, to go on typing), and this box empties.
+  const toTeam = (draft: string) => {
+    onWriteToTeam(`${draft.trim()} `);
+    update("", 0);
   };
+
+  const teammates = people.filter((p) => p.name !== viewerName);
+  const list = useSuggestions({
+    text,
+    caret,
+    inputRef,
+    apply: update,
+    find: (sigil, q): Suggestion[] =>
+      sigil === "@"
+        ? teammates
+            .filter((p) => p.name.toLowerCase().includes(q))
+            .map((p) => ({ key: p.id, insert: `@${p.name.split(" ")[0]}`, label: p.name, meta: "Write in Team", icon: <PersonAvatar initials={p.initials} />, pick: toTeam }))
+        : stories
+            .filter((s) => s.id !== storyId && (storyRef(s.id).includes(q) || String(s.id).startsWith(q.replace(/^hq-/, "")) || s.title.toLowerCase().includes(q)))
+            .map((s) => ({ key: String(s.id), insert: `#${storyRef(s.id)}`, label: s.title, meta: storyRef(s.id), icon: null })),
+  });
+
+  const canSend = Boolean(text.trim() || files.length);
+  // A teammate tagged here (typed out, not picked from the list) won't be told: say so before it's sent.
+  const tagged = [
+    ...new Set(
+      (text.trim() ? parseText(text, people, stories) : []).flatMap((seg) => (typeof seg !== "string" && seg.type === "person" && seg.name !== viewerName ? [seg.name.split(" ")[0]] : [])),
+    ),
+  ];
 
   const addFiles = (list: FileList | File[] | null) => {
     if (!list || !list.length) return;
@@ -130,23 +123,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (shown.length) {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        setActive((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + shown.length) % shown.length);
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        e.preventDefault();
-        choose(shown[active]);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setDismissed(tokenKey);
-        return;
-      }
-    }
+    if (list.onKeyDown(e)) return;
     // Enter sends, Shift+Enter is a new line (as in any chat app). ⌘/Ctrl+Enter also sends.
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -155,6 +132,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
   };
 
   const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
+  const described = tagged.length > 0 || Boolean(hint);
 
   return (
     <div className="relative">
@@ -165,7 +143,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
               key={s}
               type="button"
               onClick={() => {
-                pendingCaret.current = s.length;
+                list.placeCaret(s.length);
                 update(s, s.length);
               }}
               className="h-8 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.03)] transition-colors duration-[120ms] hover:border-[var(--card-line-h)] hover:bg-[var(--row-h)]"
@@ -176,10 +154,22 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
         </div>
       )}
 
-      {hint && (
-        <p id={`${COMPOSER_INPUT_ID}-hint`} className="m-0 mb-2 px-3 text-[12px] leading-4 text-[var(--tx2)]">
-          {hint}
+      {tagged.length > 0 ? (
+        <p id={`${COMPOSER_INPUT_ID}-hint`} key="people" className="m-0 mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-3 text-[12px] leading-4 text-[var(--tx)]">
+          <AtSign aria-hidden="true" size={12} strokeWidth={2} className="flex-none text-[var(--tx2)]" />
+          <span>
+            {names(tagged)} won’t see this. Messages here go to the agent.
+          </span>
+          <button type="button" onClick={() => toTeam(text)} className="font-medium underline decoration-black/20 underline-offset-2 hover:decoration-current">
+            Write to {names(tagged)} in Team
+          </button>
         </p>
+      ) : (
+        hint && (
+          <p id={`${COMPOSER_INPUT_ID}-hint`} key="agent" className="m-0 mb-2 px-3 text-[12px] leading-4 text-[var(--tx2)]">
+            {hint}
+          </p>
+        )
       )}
 
       <div
@@ -201,31 +191,14 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
           dragging ? "border-[var(--cta)]" : "border-black/10 focus-within:border-black/20"
         }`}
       >
-        {shown.length > 0 && (
-          <ul
-            role="listbox"
-            aria-label={token?.[1] === "@" ? "People and the agent" : "Stories"}
-            className="absolute bottom-full left-3 z-20 m-0 mb-2 w-80 list-none rounded-[12px] bg-white p-1 shadow-[var(--shadow-menu)]"
-          >
-            {shown.map((s, i) => (
-              <li
-                key={s.key}
-                role="option"
-                aria-selected={i === active}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  choose(s);
-                }}
-                onMouseEnter={() => setActive(i)}
-                className={`flex h-9 cursor-pointer items-center gap-2 rounded-[8px] px-2.5 text-[14px] leading-5 ${i === active ? "bg-[var(--menu-h)]" : ""}`}
-              >
-                {s.icon}
-                {s.meta && !s.icon && <span className="w-11 flex-none text-[12px] text-[var(--tx2)] tabular-nums">{s.meta}</span>}
-                <span className="min-w-0 flex-1 truncate">{s.label}</span>
-                {s.meta && s.icon && <span className="truncate text-[12px] text-[var(--tx2)]">{s.meta}</span>}
-              </li>
-            ))}
-          </ul>
+        {list.shown.length > 0 && (
+          <SuggestionList
+            items={list.shown}
+            active={list.active}
+            label={list.sigil === "@" ? "Teammates: choose one to write to them in Team" : "Stories"}
+            onHover={list.setActive}
+            onChoose={list.choose}
+          />
         )}
 
         {files.length > 0 && (
@@ -267,8 +240,8 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
                 addFiles(e.clipboardData.files);
               }
             }}
-            placeholder="Message the agent, or @ a teammate"
-            aria-describedby={hint ? `${COMPOSER_INPUT_ID}-hint` : undefined}
+            placeholder="Message the agent"
+            aria-describedby={described ? `${COMPOSER_INPUT_ID}-hint` : undefined}
             className="field-sizing-content block max-h-40 min-h-9 w-full flex-1 resize-none bg-transparent py-2 text-[14px] leading-5 tracking-[-0.15px] text-[var(--tx)] placeholder:text-[var(--tx2)] focus:outline-none"
           />
           <button
@@ -299,7 +272,9 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
               Rebuild after sending
             </button>
             <span className="text-[12px] leading-4 text-[var(--tx2)]">
-              {rebuild ? "Sets the story to Approved: the agent rebuilds with your note, it's checked again, then you review." : "Off: you get a reply. A note in review never changes the code."}
+              {rebuild
+                ? "Sets the story to Approved: Builder rebuilds with your note, Checker checks it again, then you review."
+                : "Off: you get a reply. A note in review never changes the code."}
             </span>
           </div>
         )}

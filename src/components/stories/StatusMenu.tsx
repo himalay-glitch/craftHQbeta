@@ -1,89 +1,115 @@
-import { Fragment } from "react";
+import { useState } from "react";
 import { DropdownMenu } from "radix-ui";
-import { ChevronDown, CircleCheck, CircleSlash, Lock, PencilLine, Play, type LucideIcon } from "lucide-react";
+import { CircleCheck, CircleSlash, Ellipsis, Eye, PencilLine, Play, RotateCcw, RotateCw, type LucideIcon } from "lucide-react";
 import type { StoryStatus } from "@/types/dashboard";
-import { MENU_CONTENT, MENU_SEPARATOR } from "@/components/dashboard/classes";
+import { ICON_BTN } from "@/components/dashboard/classes";
+import { Tip } from "@/components/dashboard/Tip";
 import chat from "./chat.module.css";
-import { MOVE_GROUP, STATUS_LABEL, type MoveOption, type StatusMove } from "./stage";
+import { STATUS_LABEL, type MoveOption, type StatusMove } from "./stage";
+
+/**
+ * The status at the top of the chat, as words: "● In progress · Builder is making the change". Read-only: the
+ * status is changed from the page's ⋯ menu, and the everyday next step (approve, accept) is the chat's decision.
+ */
+export function StatusLine({ status, detail, dot }: { status: StoryStatus; detail?: string; dot: string }) {
+  const name = STATUS_LABEL[status];
+  const shown = detail ? `${name} · ${detail}` : name;
+  return (
+    <p className="m-0 flex min-w-0 items-center gap-2">
+      <span aria-hidden="true" className={`size-2 flex-none rounded-full ${dot}`} />
+      <span key={shown} title={shown} className={`truncate text-[14px] leading-5 ${chat.labelIn}`}>
+        <span className="sr-only">Status: </span>
+        <span className="font-medium text-[var(--tx)]">{name}</span>
+        {detail && <span className="text-[var(--tx2)]"> · {detail}</span>}
+      </span>
+    </p>
+  );
+}
+
+const ICON: Record<MoveOption["icon"], LucideIcon> = {
+  plan: PencilLine,
+  build: Play,
+  rebuild: RotateCw,
+  reopen: RotateCcw,
+  done: CircleCheck,
+  cancel: CircleSlash,
+};
+
+// DESIGN.md §7.6: a card with a hairline ring and a soft shadow, 4 px inside; one-line 32 px items with a muted
+// 16 px icon; groups split by a hairline with 4 px of space; the destructive item last, in danger ink. It's portalled
+// out of the page, so it uses DESIGN.md's global tokens (foreground, muted), not the page's scoped ones.
+const CONTENT = `${chat.menu} z-50 max-h-[60vh] min-w-[180px] max-w-[320px] overflow-y-auto rounded-xl bg-card p-1 shadow-popover outline-none`;
+const ITEM =
+  "flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm whitespace-nowrap outline-none select-none " +
+  "data-highlighted:bg-hover data-disabled:cursor-default data-disabled:opacity-40";
+const SEPARATOR = "-mx-1 my-1 h-px bg-border";
+const NOTE = "max-w-[280px] px-2 pt-1.5 pb-1 text-xs";
 
 interface StatusMenuProps {
-  status: StoryStatus;
-  /** What's under way, after the status: "Waiting to start", "Building", "Verifying", "Stopped". */
-  detail?: string;
-  /** The dot's colour class. */
-  dot: string;
-  /** The agent is at work: the dot blinks. */
-  working: boolean;
-  /** Set while the agent holds a job: the menu still opens, says why, and offers nothing. */
-  locked?: string;
   moves: MoveOption[];
-  onMove: (move: StatusMove) => void;
+  /** While a robot holds a build: one quiet line says why, and the moves stay in view but can't be chosen.
+   *  Cancel story still can (it asks first), so a build can always be stopped. */
+  locked?: string;
+  /** Returns why a move was refused (a teammate changed the story first), or nothing when it was applied. */
+  onMove: (move: StatusMove) => string | void;
+  /** Catches the page up with the teammate's change, from a refusal. */
+  onCatchUp?: () => void;
   /** "hq-21", for the button's accessible name. */
   storyLabel: string;
 }
 
-const ICON: Record<StatusMove, LucideIcon> = { planning: PencilLine, approved: Play, done: CircleCheck, cancelled: CircleSlash };
-
-const ITEM =
-  "mx-1 flex cursor-pointer items-start gap-2.5 rounded-[6px] px-3 py-2 outline-none select-none data-highlighted:bg-[var(--menu-h)]";
+/** The ⋯ button's id: focus comes back to it when a confirm opened from the menu closes. */
+export const MORE_BUTTON_ID = "story-more-button";
 
 /**
- * The story's status, and the way to change it (statuses guide §7). The button shows the status and what's
- * under way ("Approved · Waiting to start"), so an instruction that's waiting reads differently from work
- * that's running. The menu offers only the moves that make sense from here, grouped by what they do, and
- * says what each one does. While the agent holds a build, it opens, says why, and offers nothing.
+ * The story's ⋯ (More) menu in the page's top row (DESIGN.md §4.5, §7.6): the status moves that make sense from
+ * here, each a verb and its object. Choosing one does it at once with Undo in a toast, or asks first when it
+ * would throw away a running build (§6.11).
  */
-export function StatusMenu({ status, detail, dot, working, locked, moves, onMove, storyLabel }: StatusMenuProps) {
-  const name = STATUS_LABEL[status];
-  const shown = detail ? `${name} · ${detail}` : name;
-  // Cancelled goes last, after its own divider; the rest group by what they do.
+export function StatusMenu({ moves, locked, onMove, onCatchUp, storyLabel }: StatusMenuProps) {
+  // A move that was refused stays in the open menu with its reason, instead of the moves (they'd act on old state).
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const choose = (move: StatusMove) => (e: Event) => {
+    const why = onMove(move);
+    if (why) {
+      e.preventDefault();
+      setRefusal(why);
+    }
+  };
   const kept = moves.filter((m) => m.move !== "cancelled");
   const cancel = moves.find((m) => m.move === "cancelled");
-  const groups = [...new Set(kept.map((m) => MOVE_GROUP[m.move]))];
 
   return (
-    <DropdownMenu.Root modal={false}>
-      <DropdownMenu.Trigger
-        aria-label={`Status of ${storyLabel}: ${shown}${working ? ", working" : ""}. Change status`}
-        className="-mx-1 inline-flex min-w-0 items-center gap-1.5 rounded-[6px] px-1 py-0.5 transition-colors duration-[120ms] hover:bg-[var(--ctl-bg-h)] data-[state=open]:bg-[var(--ctl-bg-h)]"
-      >
-        <span aria-hidden="true" className={`size-2 flex-none rounded-full ${dot} ${working ? chat.blink : ""}`} />
-        <span key={shown} className={`truncate text-[14px] leading-5 ${chat.labelIn}`}>
-          <span className="font-medium text-[var(--tx)]">{name}</span>
-          {detail && <span className="text-[var(--tx2)]"> · {detail}</span>}
-        </span>
-        <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} className="flex-none text-[var(--tx2)]" />
-      </DropdownMenu.Trigger>
+    <DropdownMenu.Root modal={false} onOpenChange={(open) => !open && setRefusal(null)}>
+      <Tip label="More">
+        <DropdownMenu.Trigger id={MORE_BUTTON_ID} aria-label={`More actions for ${storyLabel}`} className={`${ICON_BTN} data-[state=open]:bg-black/5 data-[state=open]:text-foreground`}>
+          <Ellipsis aria-hidden="true" size={16} strokeWidth={1.75} />
+        </DropdownMenu.Trigger>
+      </Tip>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="start" sideOffset={6} collisionPadding={8} className={`${MENU_CONTENT} w-[320px]`}>
-          <DropdownMenu.Label className="px-4 pt-1.5 pb-1 text-[12px] leading-4 text-[var(--tx2)]">
-            Status · <span className="font-medium text-[var(--tx)]">{shown}</span>
-          </DropdownMenu.Label>
-          {locked ? (
-            // Nothing to choose: one disabled line that says why, never chosen.
-            <DropdownMenu.Item disabled className="mx-1 flex items-start gap-2.5 rounded-[6px] px-3 py-2 outline-none">
-              <Lock aria-hidden="true" size={16} strokeWidth={1.75} className="mt-0.5 flex-none text-[var(--tx2)]" />
-              <span className="text-[13px] leading-[18px] text-[var(--tx)]">{locked}</span>
-            </DropdownMenu.Item>
+        <DropdownMenu.Content align="end" sideOffset={4} collisionPadding={8} className={CONTENT}>
+          {refusal ? (
+            <>
+              <p role="alert" className={`${NOTE} text-danger-ink`}>
+                {refusal}
+              </p>
+              {onCatchUp && (
+                <DropdownMenu.Item onSelect={onCatchUp} className={`${ITEM} text-foreground`}>
+                  <Eye aria-hidden="true" size={16} strokeWidth={1.75} className="flex-none text-muted-foreground" />
+                  See the change
+                </DropdownMenu.Item>
+              )}
+            </>
           ) : (
             <>
-              {groups.map((group, i) => (
-                <Fragment key={group}>
-                  {i > 0 && <DropdownMenu.Separator className={MENU_SEPARATOR} />}
-                  <DropdownMenu.Group>
-                    <DropdownMenu.Label className="px-4 pt-1.5 pb-0.5 text-[12px] leading-4 text-[var(--tx2)]">{group}</DropdownMenu.Label>
-                    {kept
-                      .filter((m) => MOVE_GROUP[m.move] === group)
-                      .map((m) => (
-                        <MoveItem key={m.move} option={m} onSelect={() => onMove(m.move)} />
-                      ))}
-                  </DropdownMenu.Group>
-                </Fragment>
+              {locked && <DropdownMenu.Label className={`${NOTE} text-muted-foreground`}>{locked}</DropdownMenu.Label>}
+              {kept.map((m) => (
+                <MoveItem key={m.move} option={m} disabled={Boolean(locked)} onSelect={choose(m.move)} />
               ))}
               {cancel && (
                 <>
-                  <DropdownMenu.Separator className={MENU_SEPARATOR} />
-                  <MoveItem option={cancel} onSelect={() => onMove("cancelled")} danger />
+                  {kept.length > 0 && <DropdownMenu.Separator className={SEPARATOR} />}
+                  <MoveItem option={cancel} onSelect={choose("cancelled")} danger />
                 </>
               )}
             </>
@@ -94,15 +120,12 @@ export function StatusMenu({ status, detail, dot, working, locked, moves, onMove
   );
 }
 
-function MoveItem({ option, onSelect, danger }: { option: MoveOption; onSelect: () => void; danger?: boolean }) {
-  const Icon = ICON[option.move];
+function MoveItem({ option, onSelect, danger, disabled }: { option: MoveOption; onSelect: (e: Event) => void; danger?: boolean; disabled?: boolean }) {
+  const Icon = ICON[option.icon];
   return (
-    <DropdownMenu.Item onSelect={onSelect} className={ITEM}>
-      <Icon aria-hidden="true" size={16} strokeWidth={1.75} className={`mt-0.5 flex-none ${danger ? "text-[var(--red)]" : "text-[var(--tx2)]"}`} />
-      <span className="min-w-0">
-        <span className={`block text-[14px] leading-5 ${danger ? "text-[var(--red)]" : "text-[var(--tx)]"}`}>{option.label}</span>
-        <span className="block text-[12px] leading-4 text-[var(--tx2)]">{option.hint}</span>
-      </span>
+    <DropdownMenu.Item disabled={disabled} onSelect={onSelect} className={`${ITEM} ${danger ? "text-danger-ink" : "text-foreground"}`}>
+      <Icon aria-hidden="true" size={16} strokeWidth={1.75} className={`flex-none ${danger ? "" : "text-muted-foreground"}`} />
+      {option.label}
     </DropdownMenu.Item>
   );
 }

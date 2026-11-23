@@ -6,12 +6,23 @@ import type { StoriesData, StoryItem } from "@/types/stories";
 // reviewed; the dashboard's sample has none.
 // (The leading underscore keeps Astro from treating this file as a route.)
 
-const finished: StoryItem[] = [
-  { id: 1, title: "Sign up with your email", status: "done", owner: "DT", updated: "12d ago", updatedMinutes: 12 * 1440 },
-  { id: 5, title: "Home feed: upcoming events near you", status: "done", owner: "R", updated: "11d ago", updatedMinutes: 11 * 1440 },
-  { id: 8, title: "Event card: date, place and host", status: "done", owner: "DT", updated: "9d ago", updatedMinutes: 9 * 1440 },
+export const finished: StoryItem[] = [
+  { id: 1, title: "Sign up with your email", status: "done", owner: "DT", updated: "12d ago", updatedMinutes: 12 * 1440, outcome: "merged", pr: { state: "merged", number: 103 } },
+  { id: 5, title: "Home feed: upcoming events near you", status: "done", owner: "R", updated: "2h ago", updatedMinutes: 120, outcome: "merged", pr: { state: "merged", number: 115 } },
+  { id: 8, title: "Event card: date, place and host", status: "done", owner: "DT", updated: "9d ago", updatedMinutes: 9 * 1440, outcome: "done" },
   { id: 9, title: "Old onboarding carousel", status: "cancelled", owner: "R", updated: "14d ago", updatedMinutes: 14 * 1440 },
 ];
+
+// Robots at work right now, by story, matching the dashboard's sample: two builds, and three replies on stories
+// in review (its "Agent run started" activity). Laid over the dashboard's stories by ID, so its file is never
+// edited. Minutes, not times: this page is rendered ahead of time, and the browser turns them into times.
+export const working: Record<number, Partial<StoryItem>> = {
+  57: { live: { phase: "implement", minutesAgo: 4 } },
+  54: { live: { phase: "ui-check", minutesAgo: 1 } },
+  34: { live: { phase: "reply", minutesAgo: 0 } },
+  35: { live: { phase: "reply", minutesAgo: 0 } },
+  27: { live: { phase: "reply", minutesAgo: 0 } },
+};
 
 // Teammates behind the owners' initials in the sample stories, so names show on the story page.
 const teammates = [
@@ -25,6 +36,6 @@ export const storiesData: StoriesData = {
   project: dashboardData.project,
   viewer: dashboardData.viewer,
   people: [...dashboardData.people, ...teammates],
-  stories: [...dashboardData.stories, ...finished],
+  stories: [...dashboardData.stories.map((st) => ({ ...st, ...working[st.id] })), ...finished],
   nextStoryId: dashboardData.nextStoryId,
 };

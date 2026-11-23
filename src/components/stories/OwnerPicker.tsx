@@ -15,6 +15,8 @@ interface OwnerPickerProps {
   size?: 20 | 24;
   /** Show the owner's name next to the avatar (the story page's Details). */
   withName?: boolean;
+  /** The menu opened or closed (the board holds the card's lane while it's open). */
+  onOpenChange?: (open: boolean) => void;
 }
 
 const RING = "rounded-full outline-offset-2 transition-shadow duration-[120ms] hover:shadow-[0_0_0_2px_var(--ctl-h)] data-[state=open]:shadow-[0_0_0_2px_var(--cta)]";
@@ -23,14 +25,14 @@ const RING = "rounded-full outline-offset-2 transition-shadow duration-[120ms] h
  * Who owns a story, and the way to change it: the avatar (or the dotted circle when nobody does) is a button
  * that opens the team. You first, then teammates, then "No owner".
  */
-export function OwnerPicker({ owner, people, viewerInitials, onChange, storyLabel, size = 24, withName }: OwnerPickerProps) {
+export function OwnerPicker({ owner, people, viewerInitials, onChange, storyLabel, size = 24, withName, onOpenChange }: OwnerPickerProps) {
   const ordered = [...people].sort((a, b) => Number(b.initials === viewerInitials) - Number(a.initials === viewerInitials));
   const current = people.find((p) => p.initials === owner);
   const name = current ? (current.initials === viewerInitials ? `${current.name} (you)` : current.name) : undefined;
   const dim = size === 20 ? "size-5" : "size-6";
 
   return (
-    <DropdownMenu.Root modal={false}>
+    <DropdownMenu.Root modal={false} onOpenChange={onOpenChange}>
       <DropdownMenu.Trigger
         aria-label={owner ? `Owner of ${storyLabel}: ${name ?? owner}. Change owner` : `Add an owner to ${storyLabel}`}
         className={`group inline-flex max-w-full items-center gap-2 ${withName ? "-mx-1 rounded-[6px] px-1 py-0.5 hover:bg-[var(--ctl-bg-h)] data-[state=open]:bg-[var(--ctl-bg-h)]" : RING}`}

@@ -1,5 +1,6 @@
 import type { NeedKind } from "@/types/dashboard";
-import type { ActivityItem, ActivityKind, Device, FileRef, StoryFacts, StoryItem } from "@/types/stories";
+import type { ActivityItem, ActivityKind, Device, FileRef, PhaseKey, StoryFacts, StoryItem } from "@/types/stories";
+import { PHASE_LABEL } from "./phases";
 import { prNumberFor } from "./thread";
 
 // The activity log's starting point for a story (front end only, until it comes from the CraftHQ API), and
@@ -12,7 +13,11 @@ const item = (s: StoryItem, kind: ActivityKind, rest: Omit<ActivityItem, "id" | 
 });
 
 /** Newest first, from where the story is now. */
-export function buildActivity(s: StoryItem, facts: StoryFacts): ActivityItem[] {
+/** How far a build is, by its phase: the same four steps the story page's own build ticks through. */
+const BUILD_STEP: Partial<Record<PhaseKey, number>> = { plan: 0, resume: 0, implement: 1, "ui-check": 2, review: 3, verify: 4, reply: 4 };
+
+/** `now`: when the page opened (epoch ms), so a run under way counts its time from the same start as the board. */
+export function buildActivity(s: StoryItem, facts: StoryFacts, now?: number): ActivityItem[] {
   const a: ActivityItem[] = [];
   const status = s.status;
   // New is not a plan being written (statuses guide §2): until the agent picks it up, nothing is happening.
@@ -36,12 +41,15 @@ export function buildActivity(s: StoryItem, facts: StoryFacts): ActivityItem[] {
   if (status === "approved" && !stuck) return a.reverse();
 
   const building = status === "in_progress" || stuck;
+  // A run under way (the board's live line) says which phase it's in, here as on the board.
+  const phase = status === "in_progress" && s.live ? s.live.phase : undefined;
   a.push(
     item(s, "build", {
       title: "Build",
       state: building ? (stuck ? "failed" : "working") : "done",
-      detail: building ? (stuck ? "Paused" : "Running the checks") : "Built · 6 steps",
-      progress: building ? { done: 4, total: 6 } : undefined,
+      detail: building ? (stuck ? "Paused" : phase ? PHASE_LABEL[phase] : "Running the checks") : "Built · 6 steps",
+      progress: building ? (phase ? { done: BUILD_STEP[phase] ?? 0, total: 4 } : { done: 4, total: 6 }) : undefined,
+      startedAt: phase && s.live && now ? (s.live.startedAt ?? now - (s.live.minutesAgo ?? 0) * 60_000) : undefined,
       at: "Nov 12",
     }),
   );
@@ -55,7 +63,7 @@ export function buildActivity(s: StoryItem, facts: StoryFacts): ActivityItem[] {
   // A second agent, not the builder, checks the work before it reaches review (statuses guide §4).
   a.push(item(s, "checks", { title: "Independent check", state: "done", detail: "Passed · does what the story asks", at: "Nov 12" }));
   // The pull request opens with the move to review, before the preview, so the preview stays the newest card.
-  a.push(item(s, "pr", { title: `Pull request #${prNumberFor(s.id)}`, state: "done", detail: "Open · waiting for you to merge", at: "Nov 12" }));
+  a.push(item(s, "pr", { title: `Pull request #${prNumberFor(s.id)}`, state: "done", detail: "Ready to merge", at: "Nov 12" }));
   a.push(item(s, "preview", { title: "Preview · Web", state: "done", detail: "Ready to try", device: "web", run: "off", at: "Nov 12" }));
   if (status === "done") {
     a.push(item(s, "pr", { title: `Pull request #${prNumberFor(s.id)}`, state: "done", detail: "Merged into main", at: "Nov 14" }));
@@ -223,6 +231,18 @@ export function readyOf(items: ActivityItem[]) {
     if (it.state === "done" && !it.settling) newest.push({ it, index });
   });
   return newest.sort((a, b) => (a.it.doneAt ?? 0) - (b.it.doneAt ?? 0) || b.index - a.index).map(({ it }) => it);
+}
+
+// ---- Outputs: one short list, in a fixed order ----
+
+/** The thing you'd open first goes first; then the order they finished. */
+const KIND_ORDER: ActivityKind[] = ["spec", "engineering", "preview", "screenshots", "markup", "pr", "build", "checks"];
+
+export function orderOutputs(ready: ActivityItem[]) {
+  return ready
+    .map((it, i) => ({ it, i }))
+    .sort((a, b) => KIND_ORDER.indexOf(a.it.kind) - KIND_ORDER.indexOf(b.it.kind) || a.i - b.i)
+    .map(({ it }) => it);
 }
 
 /** The newest thing working, else the newest thing (the phone summary falls back to it). Items are newest first. */

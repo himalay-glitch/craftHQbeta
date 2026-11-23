@@ -11,6 +11,9 @@ import { DashboardSkeleton } from "./DashboardSkeleton";
 import { FilterPill, type FilterOption } from "./FilterPill";
 import { NewStoryDialog, type NewStoryInput } from "@/components/stories";
 import { addCreated, useCreatedStories } from "@/components/stories/created";
+import { PauseToggle } from "@/components/stories/PauseToggle";
+import type { LiveRow } from "@/components/stories/RowStatus";
+import { finished as sampleFinished, working as sampleWorking } from "@/pages/stories/_sample-data";
 import { QueueList } from "./QueueList";
 import { QueueMessage } from "./QueueMessage";
 import { QueueTable } from "./QueueTable";
@@ -71,9 +74,20 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const isWide = useIsWide();
   const setup = useConnectionSetup();
 
-  const [stories, setStories] = useState(data.stories);
+  // Demo branch: the Stories sample's robot runs laid over these stories, and its merges from the last two days, so
+  // the one list shows what needs you, what's moving and what just shipped (until the API reports them).
+  const [stories, setStories] = useState<LiveRow[]>(() => [
+    ...data.stories.map((s) => ({ ...s, ...sampleWorking[s.id] })),
+    ...sampleFinished.filter((s) => (s.outcome === "merged" || s.pr?.state === "merged") && (s.updatedMinutes ?? Infinity) <= 2 * 1440),
+  ]);
+  // Stories acted on here: their rows stay and show what happens next (waiting to start, building, merged).
+  const [changed, setChanged] = useState<ReadonlySet<number>>(() => new Set());
+  // Where each acted-on row was in the list, so it stays put while it changes (DESIGN.md §8.4: never move a row under
+  // the pointer); a re-sort or filter lets it go back to its group.
+  const [pinned, setPinned] = useState<ReadonlyMap<number, number>>(() => new Map());
+  const pickups = useRef(new Map<number, number>());
   const [show, setShow] = useState<Show>("mine");
-  const [need, setNeed] = useState<"all" | NeedKind>("all");
+  const [need, setNeed] = useState<"all" | NeedKind | "running">("all");
   const [sort, setSort] = useState<SortMode>("group");
   const [localPanel, setLocalPanel] = useState<LocalPanel>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -101,14 +115,41 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const othersWaiting = needing.filter((s) => s.need !== "stuck" && s.waitingOn !== "You").length;
   const reviewCount = needing.filter((s) => s.need === "review").length;
   const stuckCount = needing.filter((s) => s.need === "stuck").length;
-  // The agent's side, as on the live app's "Agent's turn" card: what it's running now, by stage.
+  // Robots at work right now, and what just finished: rows in the same list, after the ones that need a person.
+  // Running counts live runs, not statuses: a story in review isn't "running" unless a robot is on it.
+  const moving = useMemo(() => (override === "empty" ? [] : stories.filter((s) => !s.need && s.live)), [override, stories]);
+  const settled = useMemo(
+    () =>
+      override === "empty"
+        ? []
+        : stories
+            .filter((s) => !s.need && !s.live && (changed.has(s.id) || s.status === "done"))
+            .sort((a, b) => (a.updatedMinutes ?? 0) - (b.updatedMinutes ?? 0)),
+    [override, stories, changed],
+  );
   const running = {
-    inProgress: data.running.filter((r) => r.status === "In progress").length,
-    inReview: data.running.filter((r) => r.status === "In review").length,
+    total: moving.length,
+    planning: moving.filter((s) => s.status === "planning" || s.status === "new").length,
+    inProgress: moving.filter((s) => s.status === "in_progress").length,
+    inReview: moving.filter((s) => s.status === "in_review").length,
   };
   // "Mine" is what's waiting on you, plus stuck stories, because those need a person too.
   const inShow = show === "mine" ? needing.filter((s) => s.waitingOn === "You" || s.need === "stuck") : needing;
-  const visible = sortQueue(need === "all" ? inShow : inShow.filter((s) => s.need === need), sort);
+  const visible = useMemo(() => {
+    // Robot rows sort by when their run started (newest first), so "Updated" puts a fresh run at the top.
+    const timed = moving.map((s) => ({ ...s, updatedMinutes: s.updatedMinutes ?? s.live?.minutesAgo ?? 0 }));
+    if (need === "running") return sortQueue(timed, sort === "group" ? "updated-desc" : sort);
+    if (need !== "all") return sortQueue(inShow.filter((s) => s.need === need), sort);
+    if (sort !== "group") return sortQueue([...inShow, ...timed, ...settled], sort);
+    // The default order, with each acted-on row back where it was.
+    const base = [...sortQueue(inShow, "group"), ...timed, ...settled];
+    const rest = base.filter((s) => !pinned.has(s.id));
+    [...pinned].sort((a, b) => a[1] - b[1]).forEach(([id, at]) => {
+      const row = base.find((s) => s.id === id);
+      if (row) rest.splice(Math.min(at, rest.length), 0, row);
+    });
+    return rest;
+  }, [need, sort, inShow, moving, settled, pinned]);
   const filtersAreDefault = show === "mine" && need === "all";
 
   const openStory = urlStory !== null && urlStory !== closing ? byId.get(urlStory) : undefined;
@@ -201,6 +242,11 @@ export function Dashboard({ data }: { data: DashboardData }) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [panel, visible, urlStory, closePanel]);
 
+  useEffect(() => {
+    const pending = pickups.current;
+    return () => pending.forEach((t) => window.clearTimeout(t));
+  }, []);
+
   // ---- Acting on a story ----
   const act = (story: Story, action: StoryAction) => {
     const ref = storyRef(story.id);
@@ -213,7 +259,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
         break;
       case "approve":
         status = "approved";
-        message = `${ref} approved. The agent starts building within a minute.`;
+        message = `${ref} approved. Builder starts on it in a moment.`;
         break;
       case "defaults":
         status = "approved";
@@ -221,7 +267,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
         break;
       case "restart":
         status = "in_progress";
-        message = `Restarting ${ref}. It’s back with the agent.`;
+        message = `Restarting ${ref}. Builder is back on it.`;
         break;
       case "plan":
         status = "planning";
@@ -234,27 +280,61 @@ export function Dashboard({ data }: { data: DashboardData }) {
       case "note":
         if (action.intent === "changes") {
           status = "approved";
-          message = `Changes sent. ${ref} is back with the agent.`;
+          message = `Changes sent. Builder picks up ${ref}.`;
         } else if (action.intent === "question") {
           status = "planning";
-          message = `Question sent. The agent replies on ${ref}.`;
+          message = `Question sent. Asker replies on ${ref}.`;
         } else if (story.need === "stuck") {
           // A note doesn't unstick anything on its own; the story stays on the list.
           showToast(`Note sent on ${ref}.`);
           return;
         } else {
           status = "planning";
-          message = `Note sent. The agent picks up ${ref}.`;
+          message = `Note sent. Asker picks up ${ref}.`;
         }
         break;
     }
 
     const index = visible.findIndex((s) => s.id === story.id);
     const after = visible[index + 1] ?? visible[index - 1];
-    setStories((ss) => ss.map((s) => (s.id === story.id ? { ...s, status, need: undefined } : s)));
+    // The row stays and says what happens next: a robot back at work, merged, or cancelled.
+    const live = status === "in_progress" ? { phase: "implement" as const, startedAt: Date.now() } : status === "planning" ? { phase: "plan" as const, startedAt: Date.now() } : undefined;
+    setChanged((c) => new Set(c).add(story.id));
+    if (need === "all" && sort === "group" && index >= 0) setPinned((m) => new Map(m).set(story.id, index));
+    setStories((ss) =>
+      ss.map((s) =>
+        s.id === story.id
+          ? {
+              ...s,
+              status,
+              need: undefined,
+              waitingOn: undefined,
+              live,
+              ...(status === "done" ? { outcome: "merged" as const, pr: { state: "merged" as const } } : {}),
+              updated: "just now",
+              updatedMinutes: 0,
+            }
+          : s,
+      ),
+    );
+    // Approved: the Builder picks it up a moment later, in the same row.
+    if (status === "approved") {
+      window.clearTimeout(pickups.current.get(story.id));
+      pickups.current.set(
+        story.id,
+        window.setTimeout(() => {
+          pickups.current.delete(story.id);
+          setStories((ss) => ss.map((s) => (s.id === story.id && s.status === "approved" ? { ...s, status: "in_progress", live: { phase: "implement", startedAt: Date.now() } } : s)));
+        }, 2500),
+      );
+    }
     showToast(message, {
       label: "Undo",
-      run: () => setStories((ss) => ss.map((s) => (s.id === story.id ? story : s))),
+      run: () => {
+        window.clearTimeout(pickups.current.get(story.id));
+        pickups.current.delete(story.id);
+        setStories((ss) => ss.map((s) => (s.id === story.id ? story : s)));
+      },
     });
     closePanel(after?.id);
   };
@@ -291,8 +371,9 @@ export function Dashboard({ data }: { data: DashboardData }) {
     { value: "mine", label: "Mine", count: needing.filter((s) => s.waitingOn === "You" || s.need === "stuck").length },
     { value: "team", label: "Team", count: needing.length },
   ];
-  const needOptions: FilterOption<"all" | NeedKind>[] = [
-    { value: "all", label: "Everything", count: inShow.length },
+  const needOptions: FilterOption<"all" | NeedKind | "running">[] = [
+    { value: "all", label: "Everything", count: inShow.length + moving.length + settled.length },
+    ...(moving.length > 0 || need === "running" ? [{ value: "running" as const, label: "Working now", count: moving.length }] : []),
     ...NEEDS.map((n) => ({ value: n.kind, label: n.label, count: inShow.filter((s) => s.need === n.kind).length })).filter(
       (o) => o.count > 0 || o.value === need,
     ),
@@ -302,7 +383,16 @@ export function Dashboard({ data }: { data: DashboardData }) {
     setNeed("all");
   };
 
-  const activeCard = need === "stuck" ? "stuck" : need === "review" ? "review" : filtersAreDefault ? "mine" : null;
+  const activeCard =
+    need === "stuck"
+      ? "stuck"
+      : need === "review"
+        ? "review"
+        : need === "running"
+          ? "running"
+          : filtersAreDefault && moving.length + settled.length === 0
+            ? "mine"
+            : null;
   const panelOpenWide = panel !== null && isWide;
 
   return (
@@ -349,6 +439,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
               onNeedsYou={resetFilters}
               onReview={() => setNeed((n) => (n === "review" ? "all" : "review"))}
               onAgent={() => openLocal({ kind: "details", tab: "agent" })}
+              onRunning={() => setNeed((n) => (n === "running" ? "all" : "running"))}
               onStuck={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
             />
 
@@ -371,6 +462,10 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   Clear
                 </button>
               )}
+              {/* Stops the rows' working marks turning, for this viewer (shared with the Stories board). */}
+              <span className="ml-auto">
+                <PauseToggle />
+              </span>
             </div>
 
             <div className="mt-4">
@@ -419,7 +514,12 @@ export function Dashboard({ data }: { data: DashboardData }) {
             key="details"
             tab={localPanel.tab}
             onTab={(tab) => setLocalPanel({ kind: "details", tab })}
-            running={data.running}
+            running={moving.map((s) => ({
+              id: s.id,
+              title: s.title,
+              status: s.status === "in_review" ? ("In review" as const) : ("In progress" as const),
+              updated: s.updated ?? "",
+            }))}
             queued={data.queued}
             loopTick={data.loopTick}
             activity={data.activity}

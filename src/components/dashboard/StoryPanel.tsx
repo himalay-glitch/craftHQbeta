@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { LiveLine } from "@/components/stories/LiveLine";
+import type { LiveRun } from "@/types/stories";
 import { CircleExclamationPoint, Link } from "lucide-react";
 import type { NeedKind, Story } from "@/types/dashboard";
 import { BTN_PRIMARY, BTN_SECONDARY, ICON_BTN } from "./classes";
@@ -191,7 +193,14 @@ export function StoryPanel({ story, isWide, onClose, onAct, onCopyLink }: StoryP
 
       <div className="mt-5 border-t border-[var(--line)] pt-5">
         {!need ? (
-          <p className="text-[15px] leading-[22px] text-[var(--tx2)]">Nothing is needed from you on this story right now.</p>
+          <>
+            {"live" in story && story.live && (
+              <p className="mb-2 flex">
+                <LiveLine live={story.live as LiveRun} size={16} />
+              </p>
+            )}
+            <p className="text-[15px] leading-[22px] text-[var(--tx2)]">Nothing is needed from you on this story right now.</p>
+          </>
         ) : need === "stuck" ? (
           <p className="flex gap-2 rounded-[8px] bg-[var(--red-bg)] px-3 py-2.5 text-[14px] leading-5 text-[var(--red)]">
             <CircleExclamationPoint aria-hidden="true" size={16} strokeWidth={1.75} className="mt-0.5 flex-none" />

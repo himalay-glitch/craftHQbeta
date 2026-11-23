@@ -2,6 +2,7 @@ import { useRef, type KeyboardEvent } from "react";
 import { Search } from "lucide-react";
 import type { StoriesView } from "@/types/stories";
 import { FilterPill, type FilterOption } from "@/components/dashboard/FilterPill";
+import { PauseToggle } from "./PauseToggle";
 
 interface StoriesToolbarProps {
   view: StoriesView;
@@ -96,6 +97,9 @@ export function StoriesToolbar({ view, onView, query, onQuery, owner, ownerOptio
             Clear
           </button>
         )}
+
+        {/* Stops the working marks turning (one-off moves still play); remembered for this viewer. */}
+        <PauseToggle />
       </div>
     </div>
   );

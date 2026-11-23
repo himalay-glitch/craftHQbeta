@@ -16,6 +16,15 @@ export function useEmptyOverride() {
   );
 }
 
+/** `/stories?demo=live` shows the board's demo controls (simulated robots), since there's no back end yet. */
+export function useLiveDemo() {
+  return useSyncExternalStore(
+    subscribeNever,
+    () => new URLSearchParams(window.location.search).get("demo") === "live",
+    () => false,
+  );
+}
+
 function subscribeUrl(onChange: () => void) {
   window.addEventListener("popstate", onChange);
   window.addEventListener(URL_EVENT, onChange);

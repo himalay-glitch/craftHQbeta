@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { ArrowRight, Check } from "lucide-react";
-import type { AskCard } from "@/types/stories";
+import type { AskCard, AskRefusal } from "@/types/stories";
 import { BTN_PRIMARY, BTN_SECONDARY } from "@/components/dashboard/classes";
 import chat from "./chat.module.css";
 import { Mascot } from "./Mascot";
+import { Refusal } from "./TeammateBanner";
 
 /**
  * A stage's decision, in front of the conversation. When the agent finishes a stage and needs a person to move
@@ -11,7 +12,7 @@ import { Mascot } from "./Mascot";
  * takes the message box's place: what's being decided, where it moves the story, and the buttons.
  * "Read the chat first" (or Esc, or a click on the chat) puts it back as the last card in the conversation.
  */
-export function StoryDecision({ ask, onDismiss }: { ask: AskCard | null; onDismiss: () => void }) {
+export function StoryDecision({ ask, refusal, onDismiss }: { ask: AskCard | null; refusal?: AskRefusal; onDismiss: () => void }) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
@@ -38,7 +39,7 @@ export function StoryDecision({ ask, onDismiss }: { ask: AskCard | null; onDismi
         Read the chat first
       </button>
       <div className="flex items-start gap-3.5">
-        <Mascot size={40} state="idle" className="flex-none" />
+        <Mascot size={40} className="flex-none" />
         <div className="min-w-0 flex-1">
           <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4 text-[var(--tx2)] md:pr-32">
             <span className="inline-flex items-center gap-1.5">
@@ -61,7 +62,9 @@ export function StoryDecision({ ask, onDismiss }: { ask: AskCard | null; onDismi
             {ask.title}
           </h2>
           {ask.meta && <p className="m-0 mt-0.5 text-[14px] leading-5 text-[var(--tx2)]">{ask.meta}</p>}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* Refused because the story moved: the reason replaces the buttons, which would act on the old state. */}
+          {refusal && <Refusal text={refusal.text} fix={refusal.fix} />}
+          <div className={`mt-4 flex flex-wrap items-center gap-2 ${refusal ? "hidden" : ""}`}>
             {ask.primary && (
               <button type="button" onClick={ask.primary.onClick} className={`${BTN_PRIMARY} h-9 px-4`}>
                 {ask.primary.label}

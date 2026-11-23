@@ -1,12 +1,15 @@
 import { Fragment, useState, type ReactNode } from "react";
-import { Check, ChevronDown, Circle, File as FileIcon, FileImage, FilePlay, LoaderCircle } from "lucide-react";
-import type { AskCard, Author, FileRef, LiveState, ThreadEntry } from "@/types/stories";
+import { Check, ChevronRight, File as FileIcon, FileImage, FilePlay } from "lucide-react";
+import type { AskCard, AskRefusal, Author, FileRef, LiveState, RunPhase, ThreadEntry } from "@/types/stories";
 import { BTN_PRIMARY, BTN_SECONDARY } from "@/components/dashboard/classes";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
 import { AgentAvatar } from "./AgentAvatar";
 import chat from "./chat.module.css";
+import { elapsed, useNow } from "./clock";
 import { Mascot } from "./Mascot";
+import { PHASE_LABEL, PHASE_NOTE, runLine, runTime } from "./phases";
 import { RichText } from "./RichText";
+import { Refusal } from "./TeammateBanner";
 
 interface StoryThreadProps {
   entries: ThreadEntry[];
@@ -19,6 +22,10 @@ interface StoryThreadProps {
   onAnswer: (entryId: string, option: number) => void;
   /** "Let the defaults stand", offered beside an open question's Send answer. */
   onSkipQuestion?: () => void;
+  /** A stage line to tint for a moment: the teammate's change, from "See what changed". */
+  highlight?: string;
+  /** Why the ask's button did nothing (a teammate changed the story first), in place of its buttons. */
+  refusal?: AskRefusal;
 }
 
 // Bubbles: the agent's are soft grey, teammates' white with a hairline, the viewer's dark on the right.
@@ -30,7 +37,8 @@ const CARD = "w-full max-w-[460px] rounded-[16px] border border-[var(--card-line
 
 type AuthorKey = string;
 const keyOf = (a: Author): AuthorKey => (a.kind === "agent" ? "agent" : a.initials);
-const dayOf = (at: string) => (at === "Just now" ? "Today" : at);
+// "Just now" and a time of day ("10:42 AM", on teammates' messages) are today.
+const dayOf = (at: string) => (at === "Just now" || /^\d{1,2}:\d{2}\s?[AP]M$/.test(at) ? "Today" : at);
 
 /** Where the day dividers go, and which messages start a new group (show the avatar and name). */
 function layout(entries: ThreadEntry[]) {
@@ -91,55 +99,68 @@ function Checklist({ items, fresh }: { items: string[]; fresh?: boolean }) {
   );
 }
 
-/** One of the agent's runs: steps that tick off while it works, folded to a summary once done. */
-function Run({ entry }: { entry: Extract<ThreadEntry, { kind: "run" }> }) {
+/** A finished run as one quiet line with a tick, that opens on click into what it did, one row per item. */
+function Fold({ line, time, rows }: { line: string; time?: string; rows: { label: string; note?: string; time?: string }[] }) {
   const [open, setOpen] = useState(false);
-  const done = entry.done ?? (entry.running ? 0 : entry.steps.length);
-  const showAll = entry.running || open || entry.steps.length <= 4;
-  const steps = showAll ? entry.steps : entry.steps.slice(-3);
-  const offset = entry.steps.length - steps.length;
   return (
-    <div className={`${AGENT_BUBBLE} min-w-[260px]`}>
-      <p className="m-0 flex items-center gap-2 font-medium">
-        {entry.running ? (
-          <LoaderCircle aria-hidden="true" size={14} strokeWidth={2} className="animate-spin text-[var(--tx2)] motion-reduce:animate-none" />
-        ) : (
-          <Check aria-hidden="true" size={14} strokeWidth={2.25} className="text-[var(--green)]" />
-        )}
-        {entry.summary}
-      </p>
-      <ol className="m-0 mt-1.5 flex list-none flex-col gap-1 p-0">
-        {steps.map((step, j) => {
-          const i = j + offset;
-          const isDone = i < done;
-          const isNow = entry.running && i === done;
-          return (
-            <li key={step} className="flex items-center gap-2 text-[13px] leading-[18px]">
-              <span className="flex size-3.5 flex-none items-center justify-center">
-                {isDone ? (
-                  <Check aria-hidden="true" size={13} strokeWidth={2.25} className={`text-[var(--green)] ${entry.fresh || entry.running ? chat.check : ""}`} />
-                ) : isNow ? (
-                  <LoaderCircle aria-hidden="true" size={12} strokeWidth={2.25} className="animate-spin text-[var(--tx2)] motion-reduce:animate-none" />
-                ) : (
-                  <Circle aria-hidden="true" size={10} strokeWidth={2} className="text-[var(--ctl-h)]" />
-                )}
+    <div className="px-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex max-w-full items-center gap-1.5 rounded-[4px] py-0.5 text-left text-[12px] leading-4 text-[var(--tx2)] transition-colors duration-[120ms] hover:text-[var(--tx)]"
+      >
+        <Check aria-hidden="true" size={13} strokeWidth={2.25} className="flex-none text-[var(--green)]" />
+        <span className="min-w-0 truncate">{line}</span>
+        {time && <span className="flex-none tabular-nums">— {time}</span>}
+        <ChevronRight aria-hidden="true" size={12} strokeWidth={2} className={`flex-none transition-transform duration-[120ms] ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <ol className={`m-0 mt-1 mb-1 flex list-none flex-col gap-1.5 border-l border-[var(--line)] p-0 pl-3 ${chat.enter}`}>
+          {rows.map((r, i) => (
+            <li key={`${r.label}-${i}`} className="text-[12px] leading-4">
+              <span className="flex items-baseline gap-2">
+                <span className="text-[var(--tx)]">{r.label}</span>
+                {r.time && <span className="text-[var(--tx2)] tabular-nums">{r.time}</span>}
               </span>
-              <span className={isDone ? "text-[var(--tx)]" : isNow ? `text-[var(--tx)] ${chat.shimmer}` : "text-[var(--tx2)]"}>{step}</span>
+              {r.note && <span className="block text-[var(--tx2)]">{r.note}</span>}
             </li>
-          );
-        })}
-      </ol>
-      {!showAll && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="mt-1.5 inline-flex items-center gap-1 rounded-[4px] text-[12px] leading-4 text-[var(--tx2)] hover:text-[var(--tx)]"
-        >
-          <ChevronDown aria-hidden="true" size={12} />
-          Show all {entry.steps.length} steps
-        </button>
+          ))}
+        </ol>
       )}
     </div>
+  );
+}
+
+/** The phases behind a reply, folded: "Planned · changed · screens checked · reviewed · verified — 14s". */
+function RunFold({ phases }: { phases: RunPhase[] }) {
+  return (
+    <Fold
+      line={runLine(phases)}
+      time={runTime(phases)}
+      rows={phases.map((p) => ({ label: PHASE_LABEL[p.key], note: PHASE_NOTE[p.key], time: elapsed(p.ms) }))}
+    />
+  );
+}
+
+/**
+ * An older run, listed by its steps. While it runs it shows nothing here: the live line at the foot of the
+ * chat names the one thing under way. Once done, it folds to its summary and opens into its steps.
+ */
+function Run({ entry }: { entry: Extract<ThreadEntry, { kind: "run" }> }) {
+  if (entry.running) return null;
+  return <Fold line={entry.summary} rows={entry.steps.map((label) => ({ label }))} />;
+}
+
+/** "2 of 6 · 9s" beside the live phase: hidden from screen readers, so the polite region isn't read every second. */
+function LiveMeta({ step, of, since }: { step?: number; of?: number; since?: number }) {
+  const now = useNow(since !== undefined);
+  const parts = [step && of && of > 1 ? `${step} of ${of}` : null, since && now ? elapsed(now - since) : null].filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <span aria-hidden="true" className="flex-none text-[12px] leading-4 font-normal text-[var(--tx2)] tabular-nums">
+      {parts.join(" · ")}
+    </span>
   );
 }
 
@@ -255,11 +276,11 @@ function TheirRow({ author, head, at, children }: { author: Author; head: boolea
 }
 
 /**
- * The story's whole life as a chat, oldest first: who created it and what they asked, the agent's replies,
- * its work as checklists, its questions, people's notes, and a centred line for each stage change. Messages
+ * The story's whole life as a chat, oldest first: who created it and what they asked, the agent's replies
+ * (each with its run folded under it), its questions, people's notes, and a centred line for each stage change. Messages
  * from the same person in a row are grouped; days are marked once. New messages land with a little motion.
  */
-export function StoryThread({ entries, stories, viewerInitials, live, ask, onAnswer, onSkipQuestion }: StoryThreadProps) {
+export function StoryThread({ entries, stories, viewerInitials, live, ask, onAnswer, onSkipQuestion, highlight, refusal }: StoryThreadProps) {
   const { rows, lastKey } = layout(entries);
 
   return (
@@ -270,7 +291,12 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
         let body: ReactNode = null;
         if (entry.kind === "created" || entry.kind === "stage") {
           body = (
-            <p className={`m-0 py-1 text-center text-[12px] leading-4 text-[var(--tx2)] ${anim}`}>
+            // data-entry: "See what changed" on a teammate's banner scrolls here; `highlight` tints it for a moment.
+            <p
+              data-entry={entry.id}
+              key={entry.id === highlight ? `${entry.id}-lit` : entry.id}
+              className={`m-0 rounded-md py-1 text-center text-[12px] leading-4 text-[var(--tx2)] ${anim} ${entry.id === highlight ? chat.flash : ""}`}
+            >
               {entry.kind === "created" ? (
                 <>
                   <span className="font-medium text-[var(--tx)]">{entry.by.kind === "agent" ? "Agent" : entry.by.name}</span> created this story
@@ -280,6 +306,8 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
               )}
             </p>
           );
+        } else if (entry.kind === "run" && entry.running) {
+          body = null; // the live line shows it
         } else if (entry.kind === "run" || entry.kind === "question") {
           body = (
             <TheirRow author={{ kind: "agent" }} head={head} at={entry.at}>
@@ -320,6 +348,11 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
                   <Files files={entry.files} mine={mine} />
                 </div>
               )}
+              {entry.run && entry.run.length > 0 && (
+                <div className={land}>
+                  <RunFold phases={entry.run} />
+                </div>
+              )}
             </>
           );
           body = mine ? (
@@ -355,7 +388,8 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
             </p>
             <p className="m-0 mt-1.5 text-[14px] leading-5 font-semibold">{ask.title}</p>
             {ask.meta && <p className="m-0 mt-0.5 text-[13px] leading-[18px] text-[var(--tx2)]">{ask.meta}</p>}
-            {(ask.primary || ask.secondary) && (
+            {refusal && <Refusal text={refusal.text} fix={refusal.fix} />}
+            {!refusal && (ask.primary || ask.secondary) && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {ask.primary && (
                   <button type="button" onClick={ask.primary.onClick} className={BTN_PRIMARY}>
@@ -373,26 +407,25 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
         </TheirRow>
       )}
 
-      {/* The agent, live: thinking, working (its loop plays), or waiting on someone. */}
+      {/* The robot, live: reading your message, working, or waiting on someone. The robot holds still (its poster)
+          and nothing here loops: the words and the elapsed time say it's busy (DESIGN.md §8.5), and the Builder's
+          ring in the activity column is the page's one loop (§3.7). */}
       <div aria-live="polite" className="min-h-10">
         {live?.kind === "thinking" && (
           <div className={`flex items-center gap-2.5 ${chat.enter}`}>
-            <Mascot size={32} state="idle" />
-            <span className="flex items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
-              <span aria-hidden="true" className="flex gap-1 text-[#EB6834]">
-                <span className={chat.dot} />
-                <span className={chat.dot} />
-                <span className={chat.dot} />
-              </span>
-              <span className={chat.labelIn}>Thinking</span>
-            </span>
+            <Mascot size={36} />
+            <span className={`text-[13px] leading-[18px] text-[var(--tx2)] ${chat.labelIn}`}>Builder is reading your message</span>
           </div>
         )}
+        {/* Working: only the current phase, by the robot's name, sliding in as it changes, with its step and the run's time. */}
         {live?.kind === "working" && (
           <div className={`flex items-center gap-2.5 ${chat.enter}`}>
-            <Mascot size={36} state="work" />
-            <span key={live.label} className={`text-[13px] leading-[18px] font-medium ${chat.labelIn} ${chat.shimmer}`}>
-              {live.label}
+            <Mascot size={36} />
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span key={live.label} className={`truncate text-[13px] leading-[18px] font-medium text-[var(--tx)] ${chat.labelIn}`}>
+                {live.label}
+              </span>
+              <LiveMeta step={live.step} of={live.of} since={live.since} />
             </span>
           </div>
         )}

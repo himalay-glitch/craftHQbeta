@@ -13,22 +13,26 @@ export type StageTone = "you" | "question" | "stuck" | "waiting" | "agent" | "qu
 export interface Stage {
   text: string;
   tone: StageTone;
+  /** Finished stories: which mark goes with the words (GitMerge, a tick, or a slash for cancelled). */
+  outcome?: "merged" | "done" | "cancelled";
+  /** When it finished, after the words: "Merged · 9d ago". */
+  when?: string;
 }
 
 const FOR_YOU: Record<Exclude<NeedKind, "stuck" | "decision">, string> = {
   review: "Ready for you to review",
   planning: "Approve the plan",
   triage: "Decide whether to plan it",
-  next: "Tell the agent what to do next",
+  next: "Tell Builder what to do next",
 };
 
 // What each status means when nobody has to act (the statuses guide, §2–6). New is not a plan being written,
 // and In review is work that has already passed its check: neither says the agent is busy.
 const WITH_AGENT: Record<StoryStatus, string> = {
   new: "Not planned yet",
-  planning: "Agent is planning",
+  planning: "Asker is planning the work",
   approved: "Waiting to start",
-  in_progress: "Agent is building",
+  in_progress: "Builder is making the change",
   in_review: "Checked · ready for review",
   done: "Done",
   cancelled: "Cancelled",
@@ -53,15 +57,23 @@ function questionsForYou(meta?: string) {
   return n ? `${plural(n, "question", "questions")} for you` : "A question for you";
 }
 
-export function storyStage(s: StoryItem): Stage {
+/** What `storyStage` reads: a whole story, or a stories-list row. */
+export type StageInput = Pick<StoryItem, "need" | "waitingOn" | "meta" | "status" | "outcome" | "pr" | "updated">;
+
+export function storyStage(s: StageInput): Stage {
   if (s.need === "stuck") return { text: "Stuck: not being picked up", tone: "stuck" };
   if (s.need && s.waitingOn && s.waitingOn !== "You") return { text: `Waiting on ${s.waitingOn}`, tone: "waiting" };
   if (s.need === "decision") return { text: questionsForYou(s.meta), tone: "question" };
   if (s.need) return { text: FOR_YOU[s.need], tone: "you" };
-  const finished = s.status === "done" || s.status === "cancelled";
-  // Only planning and building have the agent at work; the rest wait (an empty dot).
+  // Finished: merged (its pull request went in), done without one, or cancelled; with when (DESIGN.md §7.12).
+  if (s.status === "cancelled") return { text: "Cancelled", tone: "done", outcome: "cancelled", when: s.updated };
+  if (s.status === "done") {
+    const merged = s.outcome === "merged" || s.pr?.state === "merged";
+    return { text: merged ? "Merged" : "Done", tone: "done", outcome: merged ? "merged" : "done", when: s.updated };
+  }
+  // Only planning and building have a robot at work; the rest wait (an empty dot).
   const idle = s.status === "new" || s.status === "approved" || s.status === "in_review";
-  return { text: WITH_AGENT[s.status], tone: finished ? "done" : idle ? "queued" : "agent" };
+  return { text: WITH_AGENT[s.status], tone: idle ? "queued" : "agent" };
 }
 
 // ---- Columns: the statuses guide's five groups, left to right, in plain words ----
@@ -79,14 +91,22 @@ export interface Column {
 export const COLUMNS: Column[] = [
   { key: "planning", label: "Planning", hint: "A plan first; nothing is built", statuses: ["new", "planning"] },
   { key: "ready", label: "Ready to build", hint: "Approved, waiting to start", statuses: ["approved"] },
-  { key: "building", label: "Building", hint: "The agent builds; another checks", statuses: ["in_progress"] },
-  { key: "review", label: "In review", hint: "Checked, waiting for you", statuses: ["in_review"] },
-  { key: "done", label: "Done", hint: "Finished, or not going to happen", statuses: ["done", "cancelled"] },
+  { key: "building", label: "Building", hint: "Builder builds, Checker checks", statuses: ["in_progress"] },
+  { key: "review", label: "In review", hint: "Checked; waiting for a review", statuses: ["in_review"] },
+  { key: "done", label: "Done", hint: "Merged, or closed by a person", statuses: ["done", "cancelled"] },
 ];
 
 /** The board column a status sits in, by name; "Cancelled" for cancelled stories. */
 export const columnLabel = (status: StoryStatus) =>
   status === "cancelled" ? "Cancelled" : (COLUMNS.find((c) => c.statuses.includes(status))?.label ?? "Planning");
+
+/** A move that waits while someone's pointer, focus or open menu is in a lane it touches (DESIGN.md §8.4): the
+ *  lane it's shown in, how it will land, and the story as it was, so it keeps its place until it moves. */
+export interface Hold {
+  lane: ColumnKey;
+  kind: "move" | "merge";
+  was: StoryItem;
+}
 
 export interface StoryColumn extends Column {
   stories: StoryItem[];
@@ -102,18 +122,26 @@ function needRank(s: StoryItem) {
 }
 
 /** Every column, in order, even when empty. Within one: just created here first, then what needs a person,
- *  then the most recently updated. */
-export function storyColumns(stories: StoryItem[], justAdded: number[]): StoryColumn[] {
+ *  then the most recently updated (a story that just moved here is "just now", so it lands on top of its group).
+ *  `held`: stories kept in the lane they're leaving while someone's pointer or focus is there (DESIGN.md §8.4).
+ *  `recent`: stories moved on this visit, newest first: each lands on top of its group. */
+export function storyColumns(stories: StoryItem[], justAdded: number[], held?: Map<number, Hold>, recent: number[] = []): StoryColumn[] {
+  // Moved on this visit, newest first: a story that just arrived goes on top of its group (it's on screen).
+  const moved = new Map(recent.map((id, i) => [id, i]));
   const fresh = new Map(justAdded.map((id, i) => [id, i]));
   // Just created (on this visit, or anywhere a moment ago and not picked up yet) goes to the top.
   const freshRank = (s: StoryItem) => fresh.get(s.id) ?? (s.status === "new" && s.updatedMinutes === 0 ? FAR - 1 : FAR);
   return COLUMNS.map((col) => {
-    const indexed = stories.filter((s) => col.statuses.includes(s.status)).map((s, i) => ({ s, i }));
+    const inLane = (s: StoryItem) => (held?.has(s.id) ? held.get(s.id)?.lane === col.key : col.statuses.includes(s.status));
+    // A held story sorts as it was, so nothing shifts under the pointer while it waits.
+    const key = (s: StoryItem) => held?.get(s.id)?.was ?? s;
+    const indexed = stories.filter(inLane).map((s, i) => ({ s, k: key(s), i }));
     indexed.sort(
       (a, b) =>
-        freshRank(a.s) - freshRank(b.s) ||
-        needRank(a.s) - needRank(b.s) ||
-        (a.s.updatedMinutes ?? FAR) - (b.s.updatedMinutes ?? FAR) ||
+        freshRank(a.k) - freshRank(b.k) ||
+        needRank(a.k) - needRank(b.k) ||
+        (held?.has(a.s.id) ? FAR : (moved.get(a.s.id) ?? FAR)) - (held?.has(b.s.id) ? FAR : (moved.get(b.s.id) ?? FAR)) ||
+        (a.k.updatedMinutes ?? FAR) - (b.k.updatedMinutes ?? FAR) ||
         a.i - b.i,
     );
     return { ...col, stories: indexed.map((x) => x.s) };
@@ -126,42 +154,32 @@ export function fileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// ---- The status menu: the moves a person can make from where the story is (statuses guide §7) ----
+// ---- The story's ⋯ menu: the status moves a person can make from where the story is (statuses guide §7) ----
 
-/** What a person can set. New, In progress and In review are the agent's moves, never offered. */
+/** What a person can set. New, In progress and In review are the robots' moves, never offered. */
 export type StatusMove = "planning" | "approved" | "done" | "cancelled";
 
+/** A menu item: a verb and its object (DESIGN.md §9.2). What it does is said after you choose it (the toast,
+ *  or the confirm), not on the item. `icon` tells a fresh build apart from picking up again. */
 export interface MoveOption {
   move: StatusMove;
   label: string;
-  /** What choosing it does, in one line. */
-  hint: string;
+  icon: "plan" | "build" | "rebuild" | "reopen" | "done" | "cancel";
 }
-
-/** The menu's groups, named for what a choice does (statuses guide §7). */
-export const MOVE_GROUP: Record<StatusMove, string> = {
-  planning: "Replies & planning · nothing is built",
-  approved: "Changes the code",
-  done: "Closes",
-  cancelled: "Closes",
-};
 
 /** The moves that make sense from a status, in the menu's order. `stopped`: a build stopped and needs a person. */
 export function statusMoves(status: StoryStatus, stopped = false): MoveOption[] {
-  const planning: MoveOption =
-    status === "new"
-      ? { move: "planning", label: "Planning", hint: "The agent writes a plan from your description." }
-      : { move: "planning", label: "Back to Planning", hint: "Rework the plan first. Then say in a note what should change." };
+  const planning: MoveOption = { move: "planning", label: status === "new" ? "Move to Planning" : "Move back to Planning", icon: "plan" };
   const approved: MoveOption =
     status === "new" || status === "planning"
-      ? { move: "approved", label: "Approved", hint: "Build it. The agent starts on its own branch." }
+      ? { move: "approved", label: "Approve and build", icon: "build" }
       : status === "in_review"
-        ? { move: "approved", label: "Approved · rebuild", hint: "Rebuilds with your notes since the last build, then checks again." }
+        ? { move: "approved", label: "Rebuild with my notes", icon: "rebuild" }
         : status === "done" || status === "cancelled"
-          ? { move: "approved", label: "Approved · reopen", hint: "Reopens it and builds again from the story as it is now." }
-          : { move: "approved", label: "Approved · try again", hint: "A new build from the story as it is now." };
-  const done: MoveOption = { move: "done", label: "Done", hint: "Merge the pull request first. The agent never merges." };
-  const cancelled: MoveOption = { move: "cancelled", label: "Cancelled", hint: "The work won’t happen. Nothing picks it up." };
+          ? { move: "approved", label: "Reopen story", icon: "reopen" }
+          : { move: "approved", label: "Start a new build", icon: "rebuild" };
+  const done: MoveOption = { move: "done", label: "Mark as Done", icon: "done" };
+  const cancelled: MoveOption = { move: "cancelled", label: "Cancel story", icon: "cancel" };
 
   switch (status) {
     case "new":

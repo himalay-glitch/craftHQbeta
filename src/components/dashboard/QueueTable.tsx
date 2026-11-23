@@ -1,13 +1,14 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
-import type { Story } from "@/types/dashboard";
+import { RowStatus, rowStateKey, rowWaitingOn, type LiveRow } from "@/components/stories/RowStatus";
 import { rowAction, storyRef, type SortMode } from "./format";
 import { NeedChip } from "./NeedChip";
 import { PersonAvatar } from "./PersonAvatar";
 import { Tip } from "./Tip";
 
 interface QueueTableProps {
-  stories: Story[];
+  /** Stories that need a person first, then the ones robots are working on, then what just finished. */
+  stories: LiveRow[];
   selectedId: number | null;
   sort: SortMode;
   onSort: () => void;
@@ -120,10 +121,26 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
                     </span>
                   </td>
                   <td className={TD}>
-                    <NeedChip need={s.need!} />
+                    {/* Needs a person: the need chip. Otherwise what's happening: a robot at work (it turns), merged,
+                        waiting to start. It changes in place, with a short fade. */}
+                    <AnimatePresence initial={false} mode="wait">
+                      <motion.span
+                        key={rowStateKey(s)}
+                        className="-mx-1.5 flex min-w-0 rounded-[6px] px-1.5"
+                        initial={{ opacity: 0, backgroundColor: s.status === "done" ? "var(--success-tint)" : "var(--hover)" }}
+                        animate={{
+                          opacity: 1,
+                          backgroundColor: "rgba(255, 255, 255, 0)",
+                          transition: { opacity: { duration: 0.15 }, backgroundColor: { duration: 0.6, delay: 0.15 } },
+                        }}
+                        exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                      >
+                        {s.need ? <NeedChip need={s.need} /> : <RowStatus story={s} />}
+                      </motion.span>
+                    </AnimatePresence>
                   </td>
-                  <td className={`${TD} truncate text-[var(--tx2)] @max-[859px]:hidden`} title={action}>
-                    {action}
+                  <td className={`${TD} truncate text-[var(--tx2)] @max-[859px]:hidden`} title={s.need ? action : undefined}>
+                    {s.need ? action : ""}
                   </td>
                   <td className={TD}>
                     {s.owner && (
@@ -133,7 +150,7 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
                       </>
                     )}
                   </td>
-                  <td className={`${TD} truncate`}>{s.waitingOn}</td>
+                  <td className={`${TD} truncate`}>{s.need ? s.waitingOn : rowWaitingOn(s)}</td>
                   <td className={`${TD} pr-4 text-right text-[var(--tx2)] tabular-nums`}>{s.updated}</td>
                 </motion.tr>
               );

@@ -2,7 +2,7 @@ import { useId, type ReactNode } from "react";
 import { ChevronRight, File as FileIcon, FileImage, FilePlay } from "lucide-react";
 import type { NeedKind } from "@/types/dashboard";
 import type { ActivityItem, FileRef, PreviewActions, StoryFacts } from "@/types/stories";
-import { NowArea, ReadyTray } from "./StoryActivity";
+import { NowArea, Outputs } from "./StoryActivity";
 
 interface StoryRailProps {
   /** Desktop: headed "Activity". On phones it sits in a disclosure that already says so. */
@@ -25,27 +25,30 @@ interface StoryRailProps {
 }
 
 /**
- * Beside the conversation: on top, what's happening now, as a notification; at the bottom, what's ready, as buttons.
- * When something finishes it goes down from one to the other. The story's details fold away at the very end.
+ * Beside the conversation, kept calm. On desktop it sits on the grey canvas with no box, so the white chat sheet
+ * is the only bright surface. On top, one small card with what's running now; under it, the outputs to check, in
+ * groups. When something finishes it goes down from one to the other. The story's details fold away at the foot.
  */
 export function StoryRail({ withHeader, activity, yours, restartInChat, epoch, preview, facts, owner, updated, files, onSoon }: StoryRailProps) {
   const headingId = useId();
   const activityProps = { items: activity, yours, restartInChat, epoch, preview, onSoon };
 
   return (
-    <section aria-labelledby={withHeader ? headingId : undefined} aria-label={withHeader ? undefined : "Activity"} className="flex min-h-full flex-col pt-1 pb-3 md:pb-0">
+    <section aria-labelledby={withHeader ? headingId : undefined} aria-label={withHeader ? undefined : "Activity"} className="flex min-h-full flex-col pt-1 pb-3 md:pt-0 md:pb-0">
+      {/* Desktop: as tall as the chat sheet's header row beside it, so the two tops line up. */}
       {withHeader && (
-        <h2 id={headingId} className="m-0 pb-3 text-[12px] leading-4 font-medium text-[var(--tx2)]">
+        <h2 id={headingId} className="m-0 flex h-14 flex-none items-center text-sm font-medium text-[var(--tx)]">
           Activity
         </h2>
       )}
+      {/* One group under the other, like a sidebar: what's running now, then the outputs it finished into. */}
       <NowArea {...activityProps} />
-      {/* Desktop: the Ready list sits at the bottom of the column, so finished things visibly go down to it. */}
-      <div className="mt-6 md:mt-auto md:pt-8">
-        <ReadyTray {...activityProps} />
+      <div className="mt-6">
+        <Outputs {...activityProps} />
       </div>
 
-      <div className="pt-6">
+      {/* The story's details sit at the foot of the column, under a hairline. */}
+      <div className="mt-auto pt-6">
       <details className="group border-t border-[var(--line)] pt-3">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12px] leading-4 font-medium text-[var(--tx2)] hover:text-[var(--tx)] [&::-webkit-details-marker]:hidden">
           <ChevronRight aria-hidden="true" size={14} strokeWidth={1.75} className="transition-transform duration-[120ms] group-open:rotate-90" />

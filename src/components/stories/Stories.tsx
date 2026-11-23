@@ -9,16 +9,31 @@ import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
 import { Toast, type ToastMessage } from "@/components/dashboard/Toast";
 import { addCreated, useCreatedStories } from "./created";
 import { setDraft } from "./draft";
-import { setView, useEmptyOverride, useView } from "./hooks";
+import { BoardDemo, type DemoKind } from "./BoardDemo";
+import { setView, useEmptyOverride, useLiveDemo, useView } from "./hooks";
+import { clearPatches, patchStory, useStoryPatches, withPatch, type StoryPatch } from "./live";
 import { ownerOf, setStoryOwner, useStoryOwners } from "./owners";
 import { NewStoryDialog } from "./NewStoryDialog";
-import { storyColumns } from "./stage";
-import { StoriesBoard } from "./StoriesBoard";
+import { COLUMNS, storyColumns, type ColumnKey, type Hold } from "./stage";
+import { StoriesBoard, type Landed, type Landing } from "./StoriesBoard";
 import { StoriesEmpty } from "./StoriesEmpty";
 import { StoriesToolbar } from "./StoriesToolbar";
 import { StoryList } from "./StoryList";
 
 const rowLink = (id: number) => document.querySelector<HTMLElement>(`[data-story-row="${id}"]`);
+const laneOf = (s: Pick<StoryItem, "status">): ColumnKey => COLUMNS.find((c) => c.statuses.includes(s.status))?.key ?? "planning";
+
+/** Where a move can be held: a board lane, or the whole list view. */
+export type Zone = ColumnKey | "list";
+
+/** What the board and the list report, so a move waits while someone is in a zone it touches. */
+export interface ZoneEvents {
+  pointer: (zone: Zone, inside: boolean) => void;
+  focus: (zone: Zone, inside: boolean) => void;
+  menu: (zone: Zone, open: boolean) => void;
+  /** The board or list is going away (a view switch, or a filter that empties it): it can't report leaving. */
+  gone: () => void;
+}
 const isTyping = (el: HTMLElement) => Boolean(el.closest("input, textarea, select, [contenteditable='true']"));
 
 /**
@@ -30,8 +45,21 @@ export function Stories({ data }: { data: StoriesData }) {
   const view = useView();
   const created = useCreatedStories();
   const owners = useStoryOwners();
+  const patches = useStoryPatches();
+  const liveDemo = useLiveDemo();
 
   const [justAdded, setJustAdded] = useState<number[]>([]);
+  // Live moves (DESIGN.md §8.4): stories kept in the lane they're leaving while someone is there, and cards that just
+  // landed or changed (for their moment of highlight). Where the pointer, focus and an open menu are is kept in refs:
+  // the handlers and timers read it when they run, never a value from an earlier render.
+  const [held, setHeld] = useState<Map<number, Hold>>(() => new Map());
+  const pointerZone = useRef<Zone | null>(null);
+  const focusZone = useRef<Zone | null>(null);
+  const menuZones = useRef(new Set<Zone>());
+  const releaseTimer = useRef<number | undefined>(undefined);
+  const [landed, setLanded] = useState<Landed>(() => new Map());
+  const [landing, setLanding] = useState<Landing>("clear");
+  const [recent, setRecent] = useState<number[]>([]);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const [owner, setOwner] = useState("anyone");
@@ -41,9 +69,10 @@ export function Stories({ data }: { data: StoriesData }) {
 
   // Stories created in this browser come first; `?state=empty` hides the sample ones, so creating can be tried.
   // An owner changed from a card's avatar replaces the one the story came with.
-  const all = (emptyOverride ? created : [...created, ...data.stories]).map((s) =>
-    s.id in owners ? { ...s, owner: ownerOf(s, owners) } : s,
-  );
+  // The board demo's changes (robots at work, moves, merges) apply on top, until the API sends real ones.
+  const all = (emptyOverride ? created : [...created, ...data.stories])
+    .map((s) => withPatch(s, patches[s.id]))
+    .map((s) => (s.id in owners ? { ...s, owner: ownerOf(s, owners) } : s));
   const nextId = Math.max(data.nextStoryId, ...created.map((s) => s.id + 1));
   const q = query.trim().toLowerCase();
   const shown = all.filter(
@@ -51,7 +80,115 @@ export function Stories({ data }: { data: StoriesData }) {
       (owner === "anyone" || s.owner === owner) &&
       (!q || s.title.toLowerCase().includes(q) || s.why?.toLowerCase().includes(q) || storyRef(s.id).includes(q)),
   );
-  const columns = storyColumns(shown, justAdded);
+  const columns = storyColumns(shown, justAdded, held, recent);
+
+  // The latest render's stories, holds and view, for handlers and timers that outlive a render (Play the pipeline).
+  const latest = useRef({ all, held, view });
+  useEffect(() => {
+    latest.current = { all, held, view };
+  });
+  useEffect(() => () => window.clearTimeout(releaseTimer.current), []);
+
+  const zoneHot = (z: Zone) => pointerZone.current === z || focusZone.current === z || menuZones.current.has(z);
+  /** Board: the lane it leaves or the lane it lands in is in use. List: anyone is in the list. */
+  const holdsMove = (from: ColumnKey, to: ColumnKey) => (latest.current.view === "list" ? zoneHot("list") : zoneHot(from) || zoneHot(to));
+
+  /** A moment of highlight on a card or row (DESIGN.md §8.4): it moved here, merged, or changed in place. */
+  const mark = (id: number, kind: "move" | "merge" | "update") => {
+    setLanded((m) => new Map(m).set(id, kind));
+    window.setTimeout(
+      () =>
+        setLanded((m) => {
+          const next = new Map(m);
+          next.delete(id);
+          return next;
+        }),
+      1200,
+    );
+  };
+
+  const land = (id: number, kind: "move" | "merge") => {
+    setRecent((r) => [id, ...r.filter((x) => x !== id)]);
+    mark(id, kind);
+  };
+
+  /** Release the held moves whose zones are free, after a beat: a pointer travelling from the lane a card leaves
+   *  into the lane it lands in keeps it held. */
+  const release = () => {
+    window.clearTimeout(releaseTimer.current);
+    releaseTimer.current = window.setTimeout(() => {
+      const { held: holds, all: stories } = latest.current;
+      const free = [...holds].filter(([id, hold]) => {
+        const story = stories.find((s) => s.id === id);
+        return !story || !holdsMove(hold.lane, laneOf(story));
+      });
+      if (!free.length) return;
+      setHeld((m) => {
+        const next = new Map(m);
+        free.forEach(([id]) => next.delete(id));
+        return next;
+      });
+      free.forEach(([id, hold]) => land(id, hold.kind));
+    }, 150);
+  };
+
+  const zones: ZoneEvents = {
+    pointer: (zone, inside) => {
+      if (inside) pointerZone.current = zone;
+      else if (pointerZone.current === zone) pointerZone.current = null;
+      if (!inside) release();
+    },
+    focus: (zone, inside) => {
+      if (inside) focusZone.current = zone;
+      else if (focusZone.current === zone) focusZone.current = null;
+      if (!inside) release();
+    },
+    menu: (zone, open) => {
+      if (open) menuZones.current.add(zone);
+      else {
+        menuZones.current.delete(zone);
+        release();
+      }
+    },
+    gone: () => {
+      pointerZone.current = null;
+      focusZone.current = null;
+      menuZones.current.clear();
+      release();
+    },
+  };
+  const changeView = (next: typeof view) => {
+    zones.gone();
+    setView(next);
+  };
+
+  /** A change from a robot (the demo, later the API). A move waits while someone is in a zone it touches: the card
+   *  stays where it is, already showing its new words with a moment of highlight, and moves when they leave. */
+  const applyEvent = (id: number, patch: StoryPatch, kind: DemoKind) => {
+    const { all: stories, held: holds } = latest.current;
+    const before = stories.find((s) => s.id === id);
+    patchStory(id, patch);
+    if (!before) return;
+    const holding = holds.get(id);
+    const from = holding?.lane ?? laneOf(before);
+    const to = patch.status ? laneOf({ status: patch.status }) : laneOf(before);
+    if (kind === "update" || from === to) {
+      // It changed in place (or came back to the lane it's shown in): no move left to make.
+      if (holding) {
+        setHeld((m) => {
+          const next = new Map(m);
+          next.delete(id);
+          return next;
+        });
+      }
+      mark(id, "update");
+      return;
+    }
+    if (holdsMove(from, to)) {
+      setHeld((m) => new Map(m).set(id, { lane: from, kind, was: holding?.was ?? before }));
+      mark(id, "update");
+    } else land(id, kind);
+  };
 
   // Owner: you first, then everyone who owns a story here, named when they're a teammate.
   const viewerInitials = data.viewer.initials;
@@ -170,7 +307,7 @@ export function Stories({ data }: { data: StoriesData }) {
           <>
             <StoriesToolbar
               view={view}
-              onView={setView}
+              onView={changeView}
               query={query}
               onQuery={setQuery}
               owner={owner}
@@ -201,9 +338,12 @@ export function Stories({ data }: { data: StoriesData }) {
                   people={data.people}
                   viewerInitials={viewerInitials}
                   onOwner={changeOwner}
+                  landed={landed}
+                  landing={landing}
+                  zones={zones}
                 />
               ) : (
-                <StoryList columns={columns} justAdded={justAdded} />
+                <StoryList columns={columns} justAdded={justAdded} landed={landed} zones={zones} />
               )}
             </div>
           </>
@@ -218,6 +358,20 @@ export function Stories({ data }: { data: StoriesData }) {
         onCreate={create}
         onDiscard={(undo) => showToast("Draft discarded.", { label: "Undo", run: undo })}
       />
+
+      {liveDemo && (
+        <BoardDemo
+          stories={all}
+          onEvent={applyEvent}
+          landing={landing}
+          onLanding={setLanding}
+          onStop={() => {
+            clearPatches();
+            setHeld(new Map());
+            setRecent([]);
+          }}
+        />
+      )}
 
       <Toast toast={toast} onDismiss={dismissToast} offsetRight="0px" />
     </Tooltip.Provider>

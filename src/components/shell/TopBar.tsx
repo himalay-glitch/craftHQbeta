@@ -2,6 +2,7 @@ import { DropdownMenu, Tooltip } from "radix-ui";
 import { Menu } from "lucide-react";
 import type { SearchItem, Viewer } from "@/types/dashboard";
 import { ICON_BTN, MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
+import { Messages } from "@/components/messages";
 import { AvatarMenu } from "./AvatarMenu";
 import { SearchBox } from "./SearchBox";
 
@@ -75,6 +76,7 @@ export function TopBar({ viewer, search, current }: TopBarProps) {
 
           <div className="ml-auto flex items-center gap-2">
             <SearchBox items={search} />
+            <Messages viewer={viewer} />
             <AvatarMenu viewer={viewer} />
           </div>
         </div>

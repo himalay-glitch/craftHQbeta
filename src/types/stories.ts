@@ -9,6 +9,20 @@ export interface StoryItem extends Story {
   detail?: string;
   /** Names of the attached files. Nothing is uploaded yet; only the names are kept. */
   files?: string[];
+  /** A robot run under way on this story (cards and rows show it live, with a turning mark). */
+  live?: LiveRun;
+  /** Done stories: whether a pull request was merged, so the card says "Merged" rather than "Done". */
+  outcome?: "merged" | "done";
+  /** The story's pull request, once there is one. */
+  pr?: { state: "open" | "merged"; number?: number };
+}
+
+/** A robot run under way. The sample (rendered on the server) gives `minutesAgo`; the browser turns it into a
+ *  time once, so the elapsed time ticks. Runs started in the browser carry `startedAt` (epoch ms) instead. */
+export interface LiveRun {
+  phase: PhaseKey;
+  minutesAgo?: number;
+  startedAt?: number;
 }
 
 export interface StoriesData {
@@ -63,15 +77,20 @@ export interface AgentReport {
   details?: string[];
 }
 
-/** Every entry may be `fresh`: it arrived while the page was open, so it animates in. */
-export type ThreadEntry = ThreadEntryBody & { fresh?: boolean };
+/** Every entry may be `fresh`: it arrived while the page was open, so it animates in. `ts` (epoch ms) is set on
+ *  entries added on this visit and on teammates' messages, so the two can be put in the order they happened. */
+export type ThreadEntry = ThreadEntryBody & { fresh?: boolean; ts?: number };
 
 type ThreadEntryBody =
   | { kind: "created"; id: string; at: string; by: Author }
-  | { kind: "message"; id: string; at: string; author: Author; text?: Segment[]; report?: AgentReport; files?: FileRef[] }
+  /** `run`: the phases behind this reply, folded into one line under it. `to`: who a person's message tagged, by
+   *  name ("the agent" first when it was tagged too); with only teammates, the agent doesn't reply. `seen`: on your
+   *  own message to teammates, whether they've read it ("Seen", "Not seen yet"). */
+  | { kind: "message"; id: string; at: string; author: Author; text?: Segment[]; report?: AgentReport; files?: FileRef[]; run?: RunPhase[] }
   /** A slim marker: "Plan approved by Skye", "Moved to In review". */
   | { kind: "stage"; id: string; at: string; text: string }
   /** One of the agent's runs, folded into a line that opens into its steps. */
+  /** An older run, listed by steps: folded to its summary once done; while running, the live line shows it. */
   | { kind: "run"; id: string; at: string; summary: string; steps: string[]; running?: boolean; done?: number }
   /** A question the agent asked, answered in the conversation. */
   | {
@@ -84,9 +103,19 @@ type ThreadEntryBody =
     };
 
 /** What the agent is doing right now, shown at the foot of the conversation. */
+/** The phases of one of the agent's runs, in the order they happen. Shown one at a time while it works. */
+export type PhaseKey = "plan" | "implement" | "ui-check" | "review" | "verify" | "resume" | "reply";
+
+/** A finished phase and how long it took, for the summary folded under the agent's reply. */
+export interface RunPhase {
+  key: PhaseKey;
+  ms: number;
+}
+
 export type LiveState =
   | { kind: "thinking" }
-  | { kind: "working"; label: string }
+  /** `phase`: the run's current phase, one at a time; `step` of `of` and the elapsed time since `since` go beside it. */
+  | { kind: "working"; label: string; phase?: PhaseKey; step?: number; of?: number; since?: number }
   | { kind: "waiting"; text: string }
   | { kind: "quiet"; text: string };
 
@@ -99,6 +128,13 @@ export interface AskCard {
   move?: { from: string; to: string };
   primary?: { label: string; onClick: () => void };
   secondary?: { label: string; onClick: () => void };
+}
+
+/** A decision's button was pressed on a story a teammate had just changed: nothing was applied. Shown in place of
+ *  the buttons, with `fix` to catch the page up ("See the change"). */
+export interface AskRefusal {
+  text: string;
+  fix?: { label: string; onClick: () => void };
 }
 
 /** The facts in the right-hand column. */
@@ -122,7 +158,12 @@ export interface StoryPageData {
   people: Person[];
   /** For # links and ‹ › between stories. */
   stories: { id: number; title: string }[];
+  /** The builder's left column: every story, with what `storyStage` needs to group and mark it. */
+  queue: StoryNavItem[];
 }
+
+/** One row of the stories list beside the builder. */
+export type StoryNavItem = Pick<StoryItem, "id" | "title" | "status" | "need" | "waitingOn" | "meta" | "outcome" | "pr" | "updated">;
 
 export interface StoryThreadData {
   entries: ThreadEntry[];

@@ -22,8 +22,8 @@ const DEVICES: { value: Device; label: string }[] = [
   { value: "mobile", label: "Mobile" },
 ];
 
-/** Web or Mobile, picked before the preview starts. Arrow keys move between the two. */
-export function DeviceSwitch({ device, onChange }: { device: Device; onChange: (d: Device) => void }) {
+/** Web or Mobile, picked before the preview starts. Arrow keys move between the two. `compact`: 24 px, for a row. */
+export function DeviceSwitch({ device, onChange, compact }: { device: Device; onChange: (d: Device) => void; compact?: boolean }) {
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
     e.preventDefault();
@@ -32,7 +32,7 @@ export function DeviceSwitch({ device, onChange }: { device: Device; onChange: (
     requestAnimationFrame(() => group.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus());
   };
   return (
-    <div role="radiogroup" aria-label="Preview on" onKeyDown={onKeyDown} className="ml-auto flex h-7 rounded-full bg-[var(--ctl-bg-on)] p-0.5 pointer-coarse:h-11">
+    <div role="radiogroup" aria-label="Preview on" onKeyDown={onKeyDown} className={`ml-auto flex rounded-full bg-field p-0.5 pointer-coarse:h-11 ${compact ? "h-6" : "h-7"}`}>
       {DEVICES.map(({ value, label }) => (
         <button
           key={value}
@@ -41,7 +41,7 @@ export function DeviceSwitch({ device, onChange }: { device: Device; onChange: (
           aria-checked={device === value}
           tabIndex={device === value ? 0 : -1}
           onClick={() => onChange(value)}
-          className={`flex items-center rounded-full px-2.5 text-[12px] leading-4 transition-[background-color,color,box-shadow] duration-[120ms] ${device === value ? "bg-white font-medium text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-[var(--tx2)] hover:text-[var(--tx)]"}`}
+          className={`flex items-center rounded-full text-[12px] leading-4 ${compact ? "px-2" : "px-2.5"} transition-[background-color,color,box-shadow] duration-[120ms] ${device === value ? "bg-white font-medium text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-[var(--tx2)] hover:text-[var(--tx)]"}`}
         >
           {label}
         </button>
@@ -129,5 +129,49 @@ export function PreviewRow({ item, preview, onSoon, compact }: { item: ActivityI
         Stop
       </button>
     </div>
+  );
+}
+
+/**
+ * The preview's controls on one line, for its row in the outputs: Web or Mobile and a play button; Cancel while it
+ * starts; Open and Stop while it runs (Stop always shows: the machine costs server time).
+ */
+export function PreviewInline({ item, preview, onSoon }: { item: ActivityItem; preview: PreviewActions; onSoon: (message: string) => void }) {
+  const where = item.device ?? "web";
+  if (item.run === "on") {
+    return (
+      <span className="relative flex flex-none items-center gap-1.5">
+        <Tip label="Open preview">
+          <button type="button" aria-label={`Open preview on ${where}, opens in a new tab`} onClick={() => onSoon(OPEN_SOON)} className={ICON_SMALL_BTN}>
+            <ArrowUpRight aria-hidden="true" size={14} strokeWidth={2} />
+          </button>
+        </Tip>
+        <Tip label="Stop preview · it stops by itself after 30 minutes unused">
+          <button type="button" aria-label={`Stop preview on ${where}`} onClick={() => preview.stop(item.id)} className={ICON_SMALL_BTN}>
+            <Square aria-hidden="true" size={11} strokeWidth={2.25} />
+          </button>
+        </Tip>
+      </span>
+    );
+  }
+  if (item.run === "starting") {
+    return (
+      <span className="relative flex flex-none items-center gap-1.5">
+        <LoaderCircle aria-hidden="true" size={14} strokeWidth={1.75} className="animate-spin text-[var(--tx2)] [animation-duration:0.8s] motion-reduce:animate-none" />
+        <button type="button" onClick={() => preview.stop(item.id)} className="h-7 rounded-full px-2 text-[12px] leading-4 text-[var(--tx2)] hover:bg-black/[0.05] hover:text-[var(--tx)]">
+          Cancel
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span className="relative flex flex-none items-center gap-1.5">
+      <DeviceSwitch compact device={where} onChange={(d) => preview.device(item.id, d)} />
+      <Tip label={`Start preview on ${where}`}>
+        <button type="button" aria-label={`Start preview on ${where}`} onClick={() => preview.start(item.id)} className={ICON_SMALL_BTN}>
+          <Play aria-hidden="true" size={12} strokeWidth={2.25} className="translate-x-px" />
+        </button>
+      </Tip>
+    </span>
   );
 }

@@ -1,12 +1,12 @@
 /*
  * Motion for a story's conversation. Timings follow a calm, chat-app feel: new things rise 8 px and fade in
  * over 360 ms; a message lands from its own corner (yours from the bottom right, everyone else's from the
- * bottom left); nothing overshoots (DESIGN.md §3.7). Only the mascot moves on its own (§2.8).
- * Everything stops under prefers-reduced-motion.
+ * bottom left); nothing overshoots (DESIGN.md §3.7). One thing loops: the Builder's working ring in the activity
+ * column (§3.7, §8.5); the words and the elapsed time say the rest. Everything stops under prefers-reduced-motion.
  */
 
 .enter {
-  animation: enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: enter 360ms var(--ease-out) both;
 }
 @keyframes enter {
   from {
@@ -17,7 +17,7 @@
 
 .landMine {
   transform-origin: 100% 100%;
-  animation: land-mine 360ms cubic-bezier(0.2, 0, 0, 1) both;
+  animation: land-mine 360ms var(--ease-out) both;
 }
 @keyframes land-mine {
   from {
@@ -28,7 +28,7 @@
 
 .landTheirs {
   transform-origin: 0 100%;
-  animation: land-theirs 360ms cubic-bezier(0.2, 0, 0, 1) both;
+  animation: land-theirs 360ms var(--ease-out) both;
 }
 @keyframes land-theirs {
   from {
@@ -37,34 +37,9 @@
   }
 }
 
-/* "Thinking": three dots breathing in turn. */
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-  animation: dot 1.3s ease-in-out infinite;
-}
-.dot:nth-child(2) {
-  animation-delay: 0.18s;
-}
-.dot:nth-child(3) {
-  animation-delay: 0.36s;
-}
-@keyframes dot {
-  0%,
-  55%,
-  100% {
-    opacity: 0.25;
-  }
-  25% {
-    opacity: 0.85;
-  }
-}
-
 /* A status label that changes ("Reading the plan" → "Running the checks") slides up into place. */
 .labelIn {
-  animation: label-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: label-in 260ms var(--ease-out) both;
 }
 @keyframes label-in {
   from {
@@ -75,30 +50,12 @@
 
 /* A finished step's tick pops in. */
 .check {
-  animation: check 300ms cubic-bezier(0.2, 0, 0, 1) both;
+  animation: check 300ms var(--ease-out) both;
 }
 @keyframes check {
   from {
     opacity: 0;
     transform: scale(0.4);
-  }
-}
-
-/* Work in progress: a light passes along the words. */
-.shimmer {
-  background: linear-gradient(90deg, var(--tx2) 0%, var(--tx2) 38%, var(--tx) 50%, var(--tx2) 62%, var(--tx2) 100%);
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: shimmer 2.4s linear infinite;
-}
-@keyframes shimmer {
-  from {
-    background-position: 150% 0;
-  }
-  to {
-    background-position: -150% 0;
   }
 }
 
@@ -119,24 +76,10 @@
   background: linear-gradient(to bottom, #fff 0%, rgb(255 255 255 / 0) 100%);
 }
 
-/* The agent is working: its status dot blinks, slowly (DESIGN.md §3.1: active is ink plus motion). */
-.blink {
-  animation: blink 1.4s ease-in-out infinite;
-}
-@keyframes blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.2;
-  }
-}
-
 /* A decision in front: the conversation behind it softens and blurs, a beat after the agent's last message
    lands, so that message is seen first. */
 .recede {
-  animation: recede 420ms 450ms cubic-bezier(0.2, 0, 0, 1) both;
+  animation: recede 420ms 450ms var(--ease-out) both;
 }
 @keyframes recede {
   to {
@@ -147,7 +90,7 @@
 
 /* The decision rises into the message box's place, on the same beat. */
 .rise {
-  animation: rise 420ms 450ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise 420ms 450ms var(--ease-out) both;
 }
 @keyframes rise {
   from {
@@ -168,7 +111,7 @@
 
 /* A new or changed activity card is tinted, fading over 600 ms (DESIGN.md §8.4 live updates). */
 .flash {
-  animation: flash 600ms cubic-bezier(0.2, 0, 0, 1) both;
+  animation: flash 600ms var(--ease-out) both;
 }
 @keyframes flash {
   from {
@@ -179,21 +122,66 @@
   }
 }
 
+/* A pull request merged: its line gets the positive tint, fading over 600 ms, and nothing stays green (DESIGN.md §8.6). */
+.flashGood {
+  animation: flash-good 600ms var(--ease-out) both;
+}
+@keyframes flash-good {
+  from {
+    background-color: var(--success-tint);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+/* The story's ⋯ menu (DESIGN.md §3.7): in, a fade, a 4 px slide from the trigger and scale 0.98 → 1 over 200 ms;
+   out, a fade over 150 ms (Radix waits for it). */
+.menu {
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+}
+.menu[data-state="open"] {
+  animation: menu-in 200ms var(--ease-out);
+}
+.menu[data-state="open"][data-side="top"] {
+  animation-name: menu-in-up;
+}
+.menu[data-state="closed"] {
+  animation: menu-out 150ms var(--ease-in) forwards;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+@keyframes menu-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+  }
+}
+
 /* The Ready list fades back while something is being worked on, so the card on top is the one thing in focus.
    Hover or keyboard focus brings it back at once. */
 .dim {
   opacity: 0.45;
-  transition: opacity 200ms cubic-bezier(0.4, 0, 1, 1) 200ms;
+  transition: opacity 200ms var(--ease-in) 200ms;
 }
 @media (hover: hover) {
   .tray:hover .dim {
     opacity: 1;
-    transition: opacity 150ms cubic-bezier(0.2, 0, 0, 1) 60ms;
+    transition: opacity 150ms var(--ease-out) 60ms;
   }
 }
 .tray:focus-within .dim {
   opacity: 1;
-  transition: opacity 150ms cubic-bezier(0.2, 0, 0, 1);
+  transition: opacity 150ms var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -202,9 +190,13 @@
   .landTheirs,
   .labelIn,
   .check,
-  .rise,
-  .blink {
+  .rise {
     animation: none;
+  }
+  /* The menu just fades. */
+  .menu[data-state="open"],
+  .menu[data-state="open"][data-side="top"] {
+    animation: menu-out 150ms linear reverse;
   }
   .recede {
     animation: none;
@@ -220,14 +212,5 @@
   .tray:hover .dim,
   .tray:focus-within .dim {
     transition: opacity 150ms linear;
-  }
-  .dot {
-    animation: none;
-    opacity: 0.5;
-  }
-  .shimmer {
-    animation: none;
-    background: none;
-    color: var(--tx2);
   }
 }

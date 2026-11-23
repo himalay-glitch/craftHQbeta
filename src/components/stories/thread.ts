@@ -136,28 +136,15 @@ export function buildThread(s: StoryItem, people: Person[], viewer: Viewer): Sto
     return { entries: e, facts: buildFacts(s, ownerName) };
   }
 
+  // While it builds, the live line at the foot of the chat names the one phase under way (no checklist here).
   if (s.status === "in_progress") {
-    e.push({
-      kind: "run",
-      id: id("build"),
-      at: "Nov 12",
-      summary: "Building · 4 of 6 steps",
-      steps: ["Read the plan", "Change the screens", "Add sample data", "Write the checks", "Run the checks", "Build the preview"],
-      running: true,
-      done: 4,
-    });
+    e.push({ kind: "stage", id: id("started"), at: "Nov 12", text: "Builder started building" });
     return { entries: e, facts: buildFacts(s, ownerName) };
   }
 
   if (reached(s, "in_review")) {
-    e.push({
-      kind: "run",
-      id: id("build"),
-      at: "Nov 12",
-      summary: "Built in 38m · 6 steps",
-      steps: ["Read the plan", "Changed the screens", "Added sample data", "Wrote the checks", "Ran 214 checks: all passed", "Built the preview"],
-    });
-    e.push({ kind: "stage", id: id("verified"), at: "Nov 12", text: "Checked by a second agent · it does what the story asks" });
+    e.push({ kind: "stage", id: id("started"), at: "Nov 12", text: "Builder started building" });
+    e.push({ kind: "stage", id: id("verified"), at: "Nov 12", text: "Verified by Checker · it does what the story asks" });
     e.push({ kind: "stage", id: id("pr"), at: "Nov 12", text: `Pull request #${prNumberFor(s.id)} opened` });
     e.push({ kind: "stage", id: id("review"), at: "Nov 12", text: "Moved to In review" });
     e.push({
@@ -166,11 +153,20 @@ export function buildThread(s: StoryItem, people: Person[], viewer: Viewer): Sto
       at: "Nov 12",
       author: AGENT,
       report: {
-        outcome: "Ready for your review. All 214 automated checks passed, and a second agent checked it against the story.",
+        outcome: "Ready for your review. All 214 automated checks passed, and Checker verified it against the story.",
         means: `“${s.title}” works as the story asks, in the preview.`,
         next: `${first}: try the preview and read pull request #${prNumberFor(s.id)}. To accept, merge it and mark the story Done; to change it, write a note and rebuild.`,
         details: ["Checked on web and Android sizes", "Used the sample events for empty states", "No other screens were changed"],
       },
+      // The build's phases, folded under the reply: 38 minutes in all.
+      run: [
+        { key: "plan", ms: 130_000 },
+        { key: "implement", ms: 1_280_000 },
+        { key: "ui-check", ms: 240_000 },
+        { key: "review", ms: 330_000 },
+        { key: "verify", ms: 260_000 },
+        { key: "reply", ms: 40_000 },
+      ],
     });
   }
 

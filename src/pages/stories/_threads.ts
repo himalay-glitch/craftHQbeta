@@ -58,7 +58,7 @@ export const threads: Record<number, StoryThreadData> = {
           " ask before resolving anything that conflicts.",
         ],
       },
-      { kind: "stage", id: "53-verified", at: "Nov 19", text: "Checked by a second agent · it does what the story asks" },
+      { kind: "stage", id: "53-verified", at: "Nov 19", text: "Verified by Checker · it does what the story asks" },
       { kind: "stage", id: "53-pr", at: "Nov 19", text: "Pull request #259 updated" },
       { kind: "stage", id: "53-review", at: "Nov 19", text: "Moved to In review" },
       {

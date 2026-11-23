@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, LoaderCircle } from "lucide-react";
 import styles from "./tokens.module.css";
 
 // Card anatomy measured from the reference: 12 px radius, 1 px #E3E3E3, a faint shadow, 12 × 16 px padding;
@@ -35,7 +35,9 @@ function StatCard({
     >
       <span className="flex items-center justify-between gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
         <span className="flex min-w-0 items-center gap-1.5 truncate">
-          {dot && <span aria-hidden="true" className="size-1.5 flex-none rounded-full bg-[var(--green)]" />}
+          {/* Robots at work: a still ink mark (DESIGN.md §3.1: active is ink; green means merged). It doesn't turn:
+              the turning marks are on the rows it filters to. */}
+          {dot && <LoaderCircle aria-hidden="true" size={12} strokeWidth={2} className="flex-none text-[var(--tx)]" />}
           {label}
         </span>
         <ChevronRight
@@ -56,16 +58,18 @@ interface SummaryCardsProps {
   othersWaiting: number;
   readyToReview: number;
   stuck: number;
-  /** Stories the agent is working on, split by stage for the Running card's line. */
-  running: { inProgress: number; inReview: number };
+  /** Live robot runs: how many, and by stage for the Running card's line. */
+  running: { total: number; planning: number; inProgress: number; inReview: number };
   queued: number;
   loopTick: string;
   /** Which filter-card is on, if any. */
-  active: "mine" | "review" | "stuck" | null;
+  active: "mine" | "review" | "stuck" | "running" | null;
   onNeedsYou: () => void;
   onReview: () => void;
   onStuck: () => void;
   onAgent: () => void;
+  /** Running filters the list to the stories robots are working on now, like the cards before it. */
+  onRunning: () => void;
 }
 
 /**
@@ -74,7 +78,14 @@ interface SummaryCardsProps {
  * gone; it lives in the Details panel's Recent activity.
  */
 export function SummaryCards(p: SummaryCardsProps) {
-  const runningTotal = p.running.inProgress + p.running.inReview;
+  const runningTotal = p.running.total;
+  const runningLine = [
+    p.running.planning && `${p.running.planning} planning`,
+    p.running.inProgress && `${p.running.inProgress} in progress`,
+    p.running.inReview && `${p.running.inReview} in review`,
+  ]
+    .filter(Boolean)
+    .join(", ");
   return (
     <section aria-label="Summary" className={`${styles.cards} mt-4`}>
       <StatCard
@@ -95,8 +106,9 @@ export function SummaryCards(p: SummaryCardsProps) {
       <StatCard
         label="Running"
         value={runningTotal}
-        sub={runningTotal === 0 ? "The agent is idle" : `${p.running.inProgress} in progress, ${p.running.inReview} in review`}
-        onClick={p.onAgent}
+        sub={runningTotal === 0 ? "Nothing running" : runningLine}
+        onClick={p.onRunning}
+        pressed={p.active === "running"}
         dot={runningTotal > 0}
       />
       <StatCard
