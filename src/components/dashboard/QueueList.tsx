@@ -1,10 +1,10 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Story } from "@/types/dashboard";
-import { storyRef } from "./format";
-import { NeedChip } from "./NeedChip";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { NEED_STATUS, storyRef } from "./format";
 import { PersonAvatar } from "./PersonAvatar";
 
-/** The stories below 768 px: two-line rows (title, then chip, ID and update time). */
+/** The stories below 768 px: two-line rows (title, then status, ID and update time). */
 export function QueueList({ stories, onOpen }: { stories: Story[]; onOpen: (id: number) => void }) {
   const reduced = useReducedMotion();
   return (
@@ -27,7 +27,7 @@ export function QueueList({ stories, onOpen }: { stories: Story[]; onOpen: (id: 
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] leading-[22px] text-[var(--tx)]">{s.title}</span>
                 <span className="mt-1 flex items-center gap-2">
-                  <NeedChip need={s.need!} />
+                  <StatusPill status={NEED_STATUS[s.need!]} />
                   <span className="truncate text-[13px] leading-[18px] text-[var(--tx2)] tabular-nums">
                     {[storyRef(s.id), s.waitingOn, s.updated].filter(Boolean).join(" · ")}
                   </span>

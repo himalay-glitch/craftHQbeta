@@ -1,8 +1,8 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
 import type { Story } from "@/types/dashboard";
-import { rowAction, storyRef, type SortMode } from "./format";
-import { NeedChip } from "./NeedChip";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { NEED_STATUS, rowAction, storyRef, type SortMode } from "./format";
 import { PersonAvatar } from "./PersonAvatar";
 import { Tip } from "./Tip";
 
@@ -41,7 +41,7 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
               Story
             </th>
             <th scope="col" className={`${TH} w-[176px]`}>
-              Next
+              Status
             </th>
             <th scope="col" className={`${TH} @max-[999px]:hidden`}>
               Action
@@ -121,7 +121,7 @@ export function QueueTable({ stories, selectedId, sort, onSort, onOpen }: QueueT
                     </span>
                   </td>
                   <td className={TD}>
-                    <NeedChip need={s.need!} />
+                    <StatusPill status={NEED_STATUS[s.need!]} />
                   </td>
                   <td className={`${TD} truncate text-[var(--tx2)] @max-[999px]:hidden`} title={action}>
                     {action}
