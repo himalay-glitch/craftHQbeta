@@ -108,8 +108,8 @@ export function Sidebar({ current }: { current: string }) {
       aria-label="Main"
       className="sticky top-[var(--bar-h)] z-20 hidden h-[calc(100dvh-var(--bar-h))] w-[var(--sidebar-w)] flex-none flex-col justify-between self-start bg-[var(--bar)] px-2 py-3 transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none lg:flex"
     >
-      <ul className="flex flex-col gap-0.5">{list(false)}</ul>
-      <ul className="flex flex-col gap-0.5">
+      <ul className="flex list-none flex-col gap-0.5">{list(false)}</ul>
+      <ul className="flex list-none flex-col gap-0.5">
         {list(true)}
         <li className="relative">
           <button
