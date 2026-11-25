@@ -61,7 +61,7 @@ Five cards: the agent's two first, then the three that filter the table. Each la
 | Ready to review | `GitPullRequest`, amber (as In review) | Review stories | "Test, then accept or ask for changes" | toggles Filter: Review |
 | Stuck | `CircleX`, red (as Failed), with the Stuck alert | Stuck stories | "Not being picked up" | toggles Filter: Stuck |
 
-Each indicator is the icon (14 px) in a 24 px circle of its tone's tint, matching the table's status pills (`DESIGN.md` §7.12): robots at work are CraftHQ blue and turn (green means merged, so it isn't used here; with reduced motion the icon is still), waiting is grey, a person's turn amber, stuck red. At 0 a card's indicator goes grey and still, so colour shows only where there's something to look at. A card whose filter is on has a blue edge. Values are never coloured.
+Each indicator is a white icon (14 px) in a solid 24 px circle, in the tones of the table's status pills (`DESIGN.md` §7.12): robots at work are CraftHQ blue `#2F6FED` and the icon turns (green means merged, so it isn't used here; with reduced motion the icon is still), waiting is grey `#8E8F94`, a person's turn amber `#D97706`, stuck red `#DC2626`. Every fill keeps the white icon above 3:1. At 0 a card's indicator goes grey and still, so colour shows only where there's something to look at. A card whose filter is on has a blue edge. Values are never coloured.
 
 ### Filters (`FilterPill`, Radix menus)
 - **Show:** Mine (default: waiting on you, plus Stuck) or Team. Counts beside each option.
