@@ -22,8 +22,15 @@ const team: RebusBotItem[] = [
   <LoginIntro />
   <div class="flex min-h-dvh flex-col bg-background">
     <header class="flex h-16 flex-none items-center justify-between px-5 sm:px-8" data-intro-fade="3">
-      {/* The black-glass wordmark (design/blender/crafthq_logo_glass_v001.blend), the same file and 24 px height as the dashboard's top bar. */}
-      <img src="/dashboard/crafthq-logo-glass.webp" width={84} height={24} alt="CraftHQ" class="block h-6 w-auto" />
+      {/* The black-glass wordmark with the red glass slash (design/blender/crafthq_logo_glass_v002.blend), the same files and 22 px height as the dashboard's top bar. */}
+      <img
+        src="/dashboard/crafthq-logo-44.webp"
+        srcset="/dashboard/crafthq-logo-22.webp 1x, /dashboard/crafthq-logo-44.webp 2x, /dashboard/crafthq-logo-66.webp 3x"
+        width={128}
+        height={22}
+        alt="CraftHQ"
+        class="block h-[22px] w-auto"
+      />
       <span class="text-[13px] text-muted-foreground">by BetaCraft</span>
     </header>
 
