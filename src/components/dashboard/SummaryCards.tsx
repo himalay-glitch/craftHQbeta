@@ -11,13 +11,13 @@ const CARD =
   "hover:shadow-[var(--shadow-card-h)] motion-reduce:hover:translate-y-0";
 
 // Each card's status indicator: its white icon in a 24 px solid circle, in the same tones and icons as the status pills
-// in the table (DESIGN.md §7.12). Robots at work are CraftHQ blue and turn (green means merged); waiting is grey;
+// in the table (DESIGN.md §7.12). Robots at work are green and turn (by choice: green reads as running); waiting is grey;
 // a person's turn is amber; stuck is red, with a soft ring pulsing out. At 0 the indicator goes grey and still,
 // so colour only shows where there's something to look at.
 // Solid circles with a white icon, so each status reads at a glance; every fill keeps the icon above 3:1
 // (WCAG's bar for graphics). Grey covers Queued and any card at 0.
 const TONE = {
-  active: "bg-[#2F6FED] text-white",
+  active: "bg-[#16A34A] text-white",
   neutral: "bg-[#8E8F94] text-white",
   attention: "bg-[#D97706] text-white",
   negative: "bg-[#DC2626] text-white",

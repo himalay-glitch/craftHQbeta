@@ -55,13 +55,13 @@ Five cards: the agent's two first, then the three that filter the table. Each la
 
 | Card | Indicator | Value | Line | Click |
 |---|---|---|---|---|
-| Running | `LoaderCircle`, turning, CraftHQ blue | stories the agent is working on | "2 in progress, 7 in review", or "The agent is idle" | Details, With the agent tab |
+| Running | `LoaderCircle`, turning, green | stories the agent is working on | "2 in progress, 7 in review", or "The agent is idle" | Details, With the agent tab |
 | Queued | `Clock`, grey | stories waiting for the agent to start | "Agent checked just now" (the loop tick) | Details, With the agent tab |
 | Needs you | `CircleExclamationPoint`, amber (as Needs input) | stories waiting on you | "3 more waiting on others" | Show: Mine, Filter: Everything |
 | Ready to review | `GitPullRequest`, amber (as In review) | Review stories | "Test, then accept or ask for changes" | toggles Filter: Review |
 | Stuck | `CircleX`, red (as Failed), with the Stuck alert | Stuck stories | "Not being picked up" | toggles Filter: Stuck |
 
-Each indicator is a white icon (14 px) in a solid 24 px circle, in the tones of the table's status pills (`DESIGN.md` §7.12): robots at work are CraftHQ blue `#2F6FED` and the icon turns (green means merged, so it isn't used here; with reduced motion the icon is still), waiting is grey `#8E8F94`, a person's turn amber `#D97706`, stuck red `#DC2626`. Every fill keeps the white icon above 3:1. At 0 a card's indicator goes grey and still, so colour shows only where there's something to look at. A card whose filter is on has a blue edge. Values are never coloured.
+Each indicator is a white icon (14 px) in a solid 24 px circle, in the tones of the table's status pills (`DESIGN.md` §7.12): robots at work are green `#16A34A` and the icon turns (with reduced motion it's still; green here means running, by choice, though `DESIGN.md` keeps green for merged), waiting is grey `#8E8F94`, a person's turn amber `#D97706`, stuck red `#DC2626`. Every fill keeps the white icon above 3:1. At 0 a card's indicator goes grey and still, so colour shows only where there's something to look at. A card whose filter is on has a blue edge. Values are never coloured.
 
 ### Filters (`FilterPill`, Radix menus)
 - **Show:** Mine (default: waiting on you, plus Stuck) or Team. Counts beside each option.
