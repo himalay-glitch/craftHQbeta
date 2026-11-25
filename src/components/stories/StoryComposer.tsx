@@ -1,5 +1,5 @@
 import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
-import { ArrowUp, AtSign, Plus, RefreshCw } from "lucide-react";
+import { ArrowUp, AtSign, Paperclip, RefreshCw, Sparkles } from "lucide-react";
 import type { Person } from "@/types/dashboard";
 import type { FileRef, Segment } from "@/types/stories";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
@@ -49,9 +49,15 @@ function writeDraft(id: number, text: string) {
 
 const kindOf = (f: File): FileRef["kind"] => (f.type.startsWith("image/") ? "image" : f.type.startsWith("video/") ? "video" : "file");
 
+// Ask PM's message box, so the two chats feel like one (Shubham, 25 Nov): a two-row card, the field with a sparkle
+// on top, Attach and the send button under it, and a short centred note below the box.
+const PILL =
+  "inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] " +
+  "text-[var(--tx)] transition-colors duration-[120ms] hover:bg-[#F6F6F7]";
+
 /**
- * The message box of the story's chat, which is the robots': a rounded field with + to attach (or paste, or drop
- * anything on it) and a send button that wakes up as you type. Everything sent here goes to the agent; people talk
+ * The message box of the story's chat, which is the robots': a two-row card with Attach (or paste, or drop anything
+ * on it) and a send button that wakes up as you type. Everything sent here goes to the agent; people talk
  * in Team. So "@" lists teammates only to move the draft to Team, and a teammate tagged here anyway gets a line
  * saying they won't see it, with the same way out. "#" links another story. In review, "Rebuild after sending"
  * turns a note into a change request (a note, then Approved). The draft is kept per story.
@@ -146,7 +152,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
                 list.placeCaret(s.length);
                 update(s, s.length);
               }}
-              className="h-8 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.03)] transition-colors duration-[120ms] hover:border-[var(--card-line-h)] hover:bg-[var(--row-h)]"
+              className="h-8 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl)] hover:bg-[var(--ctl-bg-h)]"
             >
               {s}
             </button>
@@ -154,8 +160,8 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
         </div>
       )}
 
-      {tagged.length > 0 ? (
-        <p id={`${COMPOSER_INPUT_ID}-hint`} key="people" className="m-0 mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-3 text-[12px] leading-4 text-[var(--tx)]">
+      {tagged.length > 0 && (
+        <p id={`${COMPOSER_INPUT_ID}-hint`} className="m-0 mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-3 text-[12px] leading-4 text-[var(--tx)]">
           <AtSign aria-hidden="true" size={12} strokeWidth={2} className="flex-none text-[var(--tx2)]" />
           <span>
             {names(tagged)} won’t see this. Messages here go to the agent.
@@ -164,12 +170,6 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
             Write to {names(tagged)} in Team
           </button>
         </p>
-      ) : (
-        hint && (
-          <p id={`${COMPOSER_INPUT_ID}-hint`} key="agent" className="m-0 mb-2 px-3 text-[12px] leading-4 text-[var(--tx2)]">
-            {hint}
-          </p>
-        )
       )}
 
       <div
@@ -187,8 +187,8 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
           setDragging(false);
           addFiles(e.dataTransfer.files);
         }}
-        className={`relative rounded-[24px] border bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_10px_30px_-14px_rgb(0_0_0/0.18)] transition-[border-color,box-shadow] duration-[160ms] ${
-          dragging ? "border-[var(--cta)]" : "border-black/10 focus-within:border-black/20"
+        className={`relative rounded-[20px] border bg-white p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_rgb(0_0_0/0.05)] transition-[border-color,box-shadow] duration-[160ms] focus-within:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.08)] ${
+          dragging ? "border-[var(--cta)]" : "border-[var(--card-line)] focus-within:border-[var(--ctl)]"
         }`}
       >
         {list.shown.length > 0 && (
@@ -202,7 +202,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
         )}
 
         {files.length > 0 && (
-          <div className="px-3 pt-3">
+          <div className="mb-2.5 px-1">
             <AttachedFiles
               files={files}
               onRemove={(id) => {
@@ -213,16 +213,8 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
           </div>
         )}
 
-        <div className="flex items-end gap-1.5 p-1.5">
-          <button
-            type="button"
-            aria-label="Attach files"
-            title="Attach files, screenshots or recordings"
-            onClick={() => pickerRef.current?.click()}
-            className="inline-flex size-9 flex-none items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)]"
-          >
-            <Plus aria-hidden="true" size={18} strokeWidth={1.75} />
-          </button>
+        <div className="flex items-start gap-2 px-1">
+          <Sparkles aria-hidden="true" size={16} strokeWidth={1.75} className="mt-[5px] flex-none text-[var(--tx2)]" />
           <label htmlFor={COMPOSER_INPUT_ID} className="sr-only">
             Tell PM about {storyRef(storyId)}
           </label>
@@ -241,53 +233,62 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
               }
             }}
             placeholder={`Tell PM about ${storyRef(storyId)}`}
-            aria-describedby={described ? `${COMPOSER_INPUT_ID}-hint` : undefined}
-            className="field-sizing-content block max-h-40 min-h-9 w-full flex-1 resize-none bg-transparent py-2 text-[14px] leading-5 tracking-[-0.15px] text-[var(--tx)] placeholder:text-[var(--tx2)] focus:outline-none"
+            aria-describedby={described || canRebuild ? [tagged.length > 0 && `${COMPOSER_INPUT_ID}-hint`, (hint || canRebuild) && `${COMPOSER_INPUT_ID}-note`].filter(Boolean).join(" ") : undefined}
+            className="field-sizing-content block max-h-40 min-h-6 w-full min-w-0 flex-1 resize-none bg-transparent text-[15px] leading-6 text-[var(--tx)] placeholder:text-[var(--tx2)] focus:outline-none"
           />
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <button type="button" onClick={() => pickerRef.current?.click()} title="Attach files, screenshots or recordings" className={PILL}>
+            <Paperclip aria-hidden="true" size={14} strokeWidth={1.75} className="text-[var(--tx2)]" />
+            Attach
+          </button>
+          {canRebuild && (
+            <button
+              type="button"
+              aria-pressed={rebuild}
+              onClick={() => onRebuildChange(!rebuild)}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] leading-[18px] transition-colors duration-[120ms] ${
+                rebuild ? "border-[#C9DAFB] bg-[#E9F0FE] text-[#1F57C3]" : "border-[var(--card-line)] bg-white text-[var(--tx)] hover:bg-[#F6F6F7]"
+              }`}
+            >
+              <RefreshCw aria-hidden="true" size={14} strokeWidth={1.75} className={rebuild ? undefined : "text-[var(--tx2)]"} />
+              Rebuild after sending
+            </button>
+          )}
+          <span className="flex-1" />
           <button
             type="button"
             onClick={send}
             disabled={!canSend}
             aria-label={canRebuild && rebuild ? "Send and rebuild" : "Send"}
             title={canRebuild && rebuild ? "Send and rebuild" : "Send (Enter)"}
-            className={`inline-flex size-9 flex-none items-center justify-center rounded-full transition-[background-color,color,transform] duration-[160ms] ${
-              canSend ? "scale-100 bg-[var(--ink)] text-white hover:bg-black active:scale-95" : "scale-95 bg-black/[0.06] text-black/30"
-            }`}
+            className="inline-flex size-9 flex-none items-center justify-center rounded-full bg-[var(--cta)] text-white transition-[background-color,transform] duration-[120ms] hover:bg-[var(--cta-h)] active:scale-95 disabled:bg-[#E4E4E7]"
           >
-            {canRebuild && rebuild ? <RefreshCw aria-hidden="true" size={16} strokeWidth={2} /> : <ArrowUp aria-hidden="true" size={18} strokeWidth={2} />}
+            {canRebuild && rebuild ? <RefreshCw aria-hidden="true" size={16} strokeWidth={2.25} /> : <ArrowUp aria-hidden="true" size={17} strokeWidth={2.25} />}
           </button>
         </div>
-
-        {canRebuild && (
-          <div className="flex items-center gap-2 px-3 pb-2.5">
-            <button
-              type="button"
-              aria-pressed={rebuild}
-              onClick={() => onRebuildChange(!rebuild)}
-              className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] leading-4 font-medium transition-colors duration-[120ms] ${
-                rebuild ? "border-[#C9DAFB] bg-[#E9F0FE] text-[#1F57C3]" : "border-[var(--card-line)] text-[var(--tx2)] hover:text-[var(--tx)]"
-              }`}
-            >
-              <RefreshCw aria-hidden="true" size={12} strokeWidth={2} />
-              Rebuild after sending
-            </button>
-            <span className="text-[12px] leading-4 text-[var(--tx2)]">
-              {rebuild
-                ? "Sets the story to Approved: Builder rebuilds with your note, Checker checks it again, then you review."
-                : "Off: you get a reply. A note in review never changes the code."}
-            </span>
-          </div>
-        )}
 
         {dragging && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[24px] bg-white/90 text-[14px] font-medium text-[var(--cta)]"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[20px] bg-white/90 text-[14px] font-medium text-[var(--cta)]"
           >
             Drop files to attach them
           </div>
         )}
       </div>
+
+      {/* What a note does here, under the box like Ask PM's line; in review, what Rebuild after sending changes. */}
+      {(hint || canRebuild) && (
+        <p id={`${COMPOSER_INPUT_ID}-note`} className="m-0 mt-2 text-center text-[12px] leading-4 text-pretty text-[var(--tx2)]">
+          {canRebuild
+            ? rebuild
+              ? "Sets the story to Approved: Builder rebuilds with your note, Checker checks it again, then you review."
+              : "A note gets a reply. It never changes the code unless you turn on Rebuild after sending."
+            : hint}
+        </p>
+      )}
 
       <input
         ref={pickerRef}

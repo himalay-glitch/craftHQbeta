@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Activity as ActivityIcon } from "lucide-react";
 import type { NeedKind } from "@/types/dashboard";
@@ -20,7 +20,7 @@ type Signal = { kind: "working" | "running" | "waiting" | "failed" | "finished" 
 
 /** What the icon shows: the robot's working ring while something is under way (DESIGN.md §8.5), otherwise a dot in
  *  the state's tone (§3.1), or nothing at all. The words go to its name and tooltip, in the column's own wording. */
-function signalOf(items: ActivityItem[], yours?: NeedKind): Signal {
+export function signalOf(items: ActivityItem[], yours?: NeedKind): Signal {
   const top = nowOf(items)[0];
   if (top) {
     const reason = reasonOf(top, top.settling ? undefined : yours);
@@ -43,16 +43,36 @@ const DOT: Partial<Record<Signal["kind"], string>> = {
   failed: "bg-[var(--red)]",
 };
 
+/** Activity's state as a dot for the Activity tab while Team is showing: the robot's colour while one works. */
+export function activityDot(items: ActivityItem[], yours?: NeedKind) {
+  const signal = signalOf(items, yours);
+  const dot = signal.kind === "working" ? "bg-[var(--bot-builder)]" : DOT[signal.kind];
+  return dot ? { dot, words: signal.words } : undefined;
+}
+
+interface ActivityCornerProps {
+  items: ActivityItem[];
+  yours?: NeedKind;
+  /** Open is the page's to say, so the faces in the header can open it straight on Team. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** The open card's top row, left of the icon: "Activity", or the Activity · Team tabs. */
+  title?: ReactNode;
+  children: ReactNode;
+}
+
 /**
  * The top-right corner of the builder: the story's activity, as one quiet icon, so the chat with the agent has the
  * page (Shubham, 23 Nov). The icon says when something is happening: its outline turns into the working ring while a
  * robot is at work, and a dot shows a preview running, something waiting on you, a failure or a fresh finish; with
  * nothing going on it holds still. Clicking it grows the icon into the activity card, from its own corner, over the
- * chat (nothing moves aside); Esc or a click anywhere else folds it back. From 768 px; phones keep Activity folded
- * over the chat. Open: 300 ms out, 200 ms back (DESIGN.md §3.7), no motion with reduced motion.
+ * chat (nothing moves aside); Esc or a click anywhere else folds it back. Only at 768–1023 px: from 1024 the
+ * activity and Team are always in view as a card beside the chat, and phones keep Activity folded over the chat. The
+ * open card carries the same Activity · Team tabs. Open: 300 ms out, 200 ms back (DESIGN.md §3.7), no motion with
+ * reduced motion.
  */
-export function ActivityCorner({ items, yours, children }: { items: ActivityItem[]; yours?: NeedKind; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+export function ActivityCorner({ items, yours, open, onOpenChange, title, children }: ActivityCornerProps) {
+  const setOpen = onOpenChange;
   const reduce = useReducedMotion();
   const surface = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -76,7 +96,7 @@ export function ActivityCorner({ items, yours, children }: { items: ActivityItem
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onDown);
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   const size = reduce ? { duration: 0 } : open ? { duration: 0.3, ease: "easeOut" as const } : { duration: 0.2, ease: "easeIn" as const };
 
@@ -89,16 +109,21 @@ export function ActivityCorner({ items, yours, children }: { items: ActivityItem
         initial={false}
         animate={{ width: open ? OPEN_W : 32, height: open ? "auto" : 32, boxShadow: open ? SHADOW_OPEN : SHADOW_SHUT }}
         transition={size}
-        className={`absolute top-0 right-0 z-30 flex max-h-[calc(100dvh-var(--bar-h)-24px)] flex-col items-end overflow-hidden rounded-2xl border bg-white ${
+        className={`absolute top-0 right-0 z-30 flex max-h-[calc(100dvh-var(--bar-h)-64px)] flex-col items-end overflow-hidden rounded-2xl border bg-white ${
           open ? "border-[var(--card-line)]" : "border-[var(--ctl)]"
         }`}
       >
         <div className="flex h-[30px] w-[318px] flex-none items-center justify-end">
-          {open && (
-            <h2 id={titleId} className="m-0 mr-auto pl-3.5 text-sm font-medium text-[var(--tx)]">
-              Activity
-            </h2>
-          )}
+          {open &&
+            (title ? (
+              <div id={titleId} className="mr-2 min-w-0 flex-1 pl-0.5">
+                {title}
+              </div>
+            ) : (
+              <h2 id={titleId} className="m-0 mr-auto pl-3.5 text-sm font-medium text-[var(--tx)]">
+                Activity
+              </h2>
+            ))}
           <Tip label={open ? "Close activity" : `Activity: ${signal.words}`}>
             <button
               ref={button}
@@ -125,7 +150,7 @@ export function ActivityCorner({ items, yours, children }: { items: ActivityItem
             <motion.div
               key="activity"
               id={PANEL_ID}
-              aria-labelledby={titleId}
+              aria-label="Activity and Team"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { delay: reduce ? 0 : 0.12, duration: reduce ? 0 : 0.15 } }}
               exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.1 } }}

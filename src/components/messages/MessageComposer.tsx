@@ -147,7 +147,7 @@ export function MessageComposer({ conversationKey, label, people, recipients, ca
             aria-label={asking ? `Send and wait for ${names(taggedFirst)}` : "Send"}
             title="Send (Enter)"
             className={`inline-flex size-8 flex-none items-center justify-center rounded-full transition-[background-color,color,transform] duration-[160ms] ${
-              canSend ? "scale-100 bg-[var(--ink)] text-white hover:bg-black active:scale-95" : "scale-95 bg-black/[0.06] text-black/30"
+              canSend ? "scale-100 bg-[var(--cta)] text-white hover:bg-[var(--cta-h)] active:scale-95" : "scale-95 bg-[#E4E4E7] text-white"
             }`}
           >
             <ArrowUp aria-hidden="true" size={16} strokeWidth={2} />

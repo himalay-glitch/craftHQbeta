@@ -8,8 +8,8 @@ import { isGroupOpen, setGroupOpen, setStoriesOpen, usePanels } from "./panels";
 import { COLUMNS, storyStage, type Stage } from "./stage";
 
 // The builder's left column: every story, so you can move from ticket to ticket without leaving the builder (the
-// list stays where it is, DESIGN.md §2.5). It sits on the grey canvas like a sidebar; the builder beside it is the
-// one white surface. Grouped like the board: what needs you first, then the board's five groups in order. Groups
+// list stays where it is, DESIGN.md §2.5). A white card on the page's wash, beside the chat's card, as Ask PM's
+// panels are. Grouped like the board: what needs you first, then the board's five groups in order. Groups
 // fold (DESIGN.md §5.1). The column is put away until you open it from the builder's header, so the chat gets the
 // room; it slides in from the left edge like a panel (DESIGN.md §3.7: 300 ms in, 200 ms out, none with reduced motion).
 
@@ -91,12 +91,13 @@ export function StoryNav({ stories, current }: StoryNavProps) {
       aria-label="Stories"
       inert={hidden}
       // Duration and easing only with motion on too: a duration alone would animate every property, slide included.
-      className={`hidden overflow-hidden xl:flex xl:flex-none xl:bg-[var(--bar)] motion-safe:transition-[width] ${
-        hidden ? "xl:w-0 motion-safe:duration-200 motion-safe:ease-in" : "xl:w-[264px] motion-safe:duration-300 motion-safe:ease-out"
+      className={`hidden overflow-hidden xl:flex xl:flex-none motion-safe:transition-[width] ${
+        hidden ? "xl:w-0 motion-safe:duration-200 motion-safe:ease-in" : "xl:w-[276px] motion-safe:duration-300 motion-safe:ease-out"
       }`}
     >
-      {/* Full width inside while the column slides, so the list is uncovered or covered, never squeezed. */}
-      <div className="flex w-[264px] flex-none flex-col border-r border-[var(--line)]">
+      {/* A card on the wash, like Ask PM's side panel, 16 px off the chat. Full width inside while the column slides, so
+          the list is uncovered or covered, never squeezed. A border, not a shadow: the sliding edge would clip one. */}
+      <div className="mr-4 flex w-[260px] flex-none flex-col rounded-[24px] border border-black/[0.06] bg-white">
         {/* As tall as the builder's header row, so the three tops line up. */}
         <div className="flex h-14 flex-none items-center gap-1.5 px-4">
           <h2 className="m-0 text-sm font-medium text-[var(--tx)]">Stories</h2>
@@ -142,7 +143,7 @@ export function StoryNav({ stories, current }: StoryNavProps) {
                               here ? "bg-pressed font-medium" : "hover:bg-hover"
                             }`}
                           >
-                            <span aria-hidden="true" className={`size-2 flex-none rounded-full ${dotFor(stage)}`} />
+                            <span aria-hidden="true" className={`size-[7px] flex-none rounded-full ${dotFor(stage)}`} />
                             <span className="min-w-0 flex-1 truncate">{s.title}</span>
                             <span className="sr-only">, {stage.text}</span>
                             <span className="flex-none text-xs font-normal text-[var(--tx2)] tabular-nums">{storyRef(s.id)}</span>

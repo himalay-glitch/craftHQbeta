@@ -265,7 +265,9 @@ export function NowArea({ items, yours, restartInChat, epoch, preview, onSoon }:
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, transition: { duration: 0.15 } }}
           exit={{ opacity: 0, transition: { duration: 0.15, delay: 0.1 } }}
-          className="rounded-xl border border-[var(--card-line)] bg-white p-1 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_6px_16px_-10px_rgb(0_0_0/0.12)]"
+          // No box (Shubham, 25 Nov): what's under way sits on the panel like everything else; the robot's ring, the
+          // words and the bar say it's working.
+          className="-mx-1"
         >
           <ul className="m-0 flex list-none flex-col p-0">
             <AnimatePresence initial={false} mode="popLayout">
@@ -412,37 +414,57 @@ function ChecksRow({ items, proof }: { items: ActivityItem[]; proof: boolean }) 
  * screens, the pull request, then the build and its checks folded into one line). While something is being worked
  * on, the lines fade back so the card on top is the one thing in focus; hover or keyboard focus brings them back.
  */
+/** The outputs in parts (Shubham, 25 Nov), each under its own small heading, in the order you'd open them. */
+const SECTIONS: { label: string; kinds: ActivityKind[] }[] = [
+  { label: "Pages", kinds: ["spec", "engineering"] },
+  { label: "Preview", kinds: ["preview", "screenshots", "markup"] },
+  { label: "Code", kinds: ["pr", "build", "checks"] },
+];
+
 export function Outputs({ items, yours, preview, onSoon }: ActivityProps) {
-  const headingId = useId();
   const ready = orderOutputs(readyOf(items));
   const dim = anyWorking(items);
   const checks = ready.filter((it) => it.kind === "build" || it.kind === "checks");
   const folded = checks.length > 1;
   const lines = folded ? ready.filter((it) => !checks.includes(it)) : ready;
 
+  if (ready.length === 0) {
+    return (
+      <section aria-label="Outputs" className={chat.tray}>
+        <p className="m-0 text-xs text-[var(--tx2)]">Finished pages, previews and code land here.</p>
+      </section>
+    );
+  }
+
   return (
-    <section aria-labelledby={headingId} className={chat.tray}>
-      <h3 id={headingId} className="m-0 flex h-6 items-center gap-1.5 text-xs font-medium text-[var(--tx2)]">
-        Outputs
-        {ready.length > 0 && <span className="tabular-nums">· {ready.length}</span>}
-      </h3>
-      {ready.length === 0 ? (
-        <p className="m-0 mt-1 text-xs text-[var(--tx2)]">Finished pages, previews and code land here.</p>
-      ) : (
-        // A size container: the Preview line lays out by the width it's given (the card, or the phone's Activity).
-        <div className="@container -mx-2 mt-0.5 flex flex-col">
-          {lines.map((it) => (
-            <div key={it.id} className={dim && !(it.kind === "preview" && it.run === "on") ? chat.dim : undefined}>
-              <OutputRow item={it} proof={isProof(it, yours)} preview={preview} onSoon={onSoon} />
+    // A size container: the Preview line lays out by the width it's given (the card, or the phone's Activity).
+    <section aria-label="Outputs" className={`${chat.tray} @container flex flex-col gap-4`}>
+      {SECTIONS.map(({ label, kinds }) => {
+        const rows = lines.filter((it) => kinds.includes(it.kind));
+        const fold = folded && kinds.includes("checks");
+        const count = rows.length + (fold ? 1 : 0);
+        if (count === 0) return null;
+        return (
+          <div key={label} role="group" aria-label={label}>
+            <h3 className="m-0 flex h-6 items-center gap-1.5 text-xs font-medium text-[var(--tx2)]">
+              {label}
+              {count > 1 && <span className="tabular-nums">· {count}</span>}
+            </h3>
+            <div className="-mx-2 mt-0.5 flex flex-col">
+              {rows.map((it) => (
+                <div key={it.id} className={dim && !(it.kind === "preview" && it.run === "on") ? chat.dim : undefined}>
+                  <OutputRow item={it} proof={isProof(it, yours)} preview={preview} onSoon={onSoon} />
+                </div>
+              ))}
+              {fold && (
+                <div className={dim ? chat.dim : undefined}>
+                  <ChecksRow items={checks} proof={checks.some((it) => isProof(it, yours))} />
+                </div>
+              )}
             </div>
-          ))}
-          {folded && (
-            <div className={dim ? chat.dim : undefined}>
-              <ChecksRow items={checks} proof={checks.some((it) => isProof(it, yours))} />
-            </div>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })}
     </section>
   );
 }

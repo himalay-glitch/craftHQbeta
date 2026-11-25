@@ -28,9 +28,9 @@ export const MENU_ITEM =
 
 export const MENU_SEPARATOR = "my-1 h-px bg-[var(--line)]";
 
-/** Dark tooltip: 12 px, 6 px radius. */
-export const TOOLTIP =
-  "z-50 max-w-[260px] rounded-[6px] bg-[var(--ink)] px-2 py-1 text-[12px] leading-4 text-white select-none";
+/** Dark tooltip: 12 px, 6 px radius. Radix portals it out of the page, so like the menus it carries `.tokens`:
+ *  without them `--ink` is undefined, the fill comes out empty and the white label disappears on a white page. */
+export const TOOLTIP = `${styles.tokens} z-50 max-w-[260px] rounded-[6px] bg-[var(--ink)] px-2 py-1 text-[12px] leading-4 text-white select-none`;
 
 /** Grey placeholder block for loading states. */
 export const SKELETON = `${styles.pulse} rounded-[6px] bg-[var(--skeleton)]`;

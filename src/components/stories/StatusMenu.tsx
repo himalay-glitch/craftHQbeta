@@ -11,6 +11,24 @@ import { STATUS_LABEL, type MoveOption, type StatusMove } from "./stage";
  * The status at the top of the chat, as words: "● In progress · Builder is making the change". Read-only: the
  * status is changed from the page's ⋯ menu, and the everyday next step (approve, accept) is the chat's decision.
  */
+/**
+ * The status, once, beside the story's title (Shubham, 25 Nov: simpler; it was said in a row of its own, on the
+ * decision and in the chat): "● In review" in a small soft pill. What's under way, or whose turn it is, is its tooltip
+ * and part of its spoken name. Read-only: it changes from the ⋯ menu.
+ */
+export function StatusBadge({ status, detail, dot }: { status: StoryStatus; detail?: string; dot: string }) {
+  const name = STATUS_LABEL[status];
+  const pill = (
+    <span key={name} className={`inline-flex h-6 flex-none items-center gap-1.5 rounded-full bg-[#F4F4F5] px-2.5 text-[12px] leading-4 font-medium text-[var(--tx)] ${chat.labelIn}`}>
+      <span aria-hidden="true" className={`size-1.5 flex-none rounded-full ${dot}`} />
+      <span className="sr-only">Status: </span>
+      {name}
+      {detail && <span className="sr-only">, {detail}</span>}
+    </span>
+  );
+  return detail ? <Tip label={detail}>{pill}</Tip> : pill;
+}
+
 export function StatusLine({ status, detail, dot }: { status: StoryStatus; detail?: string; dot: string }) {
   const name = STATUS_LABEL[status];
   const shown = detail ? `${name} · ${detail}` : name;
@@ -45,7 +63,19 @@ const ITEM =
 const SEPARATOR = "-mx-1 my-1 h-px bg-border";
 const NOTE = "max-w-[280px] px-2 pt-1.5 pb-1 text-xs";
 
+/** A plain action at the top of ⋯: going to the previous or next story, copying the link. */
+export interface MenuLink {
+  label: string;
+  icon: LucideIcon;
+  /** Muted, on the right: the story it goes to ("hq-42"). */
+  hint?: string;
+  disabled?: boolean;
+  onSelect: () => void;
+}
+
 interface StatusMenuProps {
+  /** Previous story, Next story and Copy link, which used to be buttons in the top row (Shubham, 25 Nov: simpler). */
+  links?: MenuLink[];
   moves: MoveOption[];
   /** While a robot holds a build: one quiet line says why, and the moves stay in view but can't be chosen.
    *  Cancel story still can (it asks first), so a build can always be stopped. */
@@ -66,7 +96,7 @@ export const MORE_BUTTON_ID = "story-more-button";
  * here, each a verb and its object. Choosing one does it at once with Undo in a toast, or asks first when it
  * would throw away a running build (§6.11).
  */
-export function StatusMenu({ moves, locked, onMove, onCatchUp, storyLabel }: StatusMenuProps) {
+export function StatusMenu({ links = [], moves, locked, onMove, onCatchUp, storyLabel }: StatusMenuProps) {
   // A move that was refused stays in the open menu with its reason, instead of the moves (they'd act on old state).
   const [refusal, setRefusal] = useState<string | null>(null);
   const choose = (move: StatusMove) => (e: Event) => {
@@ -102,6 +132,14 @@ export function StatusMenu({ moves, locked, onMove, onCatchUp, storyLabel }: Sta
             </>
           ) : (
             <>
+              {links.map(({ label, icon: Icon, hint, disabled, onSelect }) => (
+                <DropdownMenu.Item key={label} disabled={disabled} onSelect={onSelect} className={`${ITEM} text-foreground`}>
+                  <Icon aria-hidden="true" size={16} strokeWidth={1.75} className="flex-none text-muted-foreground" />
+                  {label}
+                  {hint && <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums">{hint}</span>}
+                </DropdownMenu.Item>
+              ))}
+              {links.length > 0 && (moves.length > 0 || locked) && <DropdownMenu.Separator className={SEPARATOR} />}
               {locked && <DropdownMenu.Label className={`${NOTE} text-muted-foreground`}>{locked}</DropdownMenu.Label>}
               {kept.map((m) => (
                 <MoveItem key={m.move} option={m} disabled={Boolean(locked)} onSelect={choose(m.move)} />

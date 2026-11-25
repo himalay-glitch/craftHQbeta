@@ -9,9 +9,11 @@ import { isOpenAsk, withdrawAsk } from "./store";
 import { firstName, nameOf, personById, STORIES } from "./team";
 import { day, stamp } from "./time";
 
-const TEXT = "text-[14px] leading-5 tracking-[-0.15px] whitespace-pre-wrap break-words";
-const THEIRS = `w-fit max-w-[85%] rounded-[16px] border border-[var(--card-line)] bg-white px-3.5 py-2 text-[var(--tx)] ${TEXT}`;
-const MINE = `w-fit max-w-[85%] rounded-[18px] bg-[var(--ink)] px-3.5 py-2 text-white ${TEXT}`;
+// Ask PM's chat language, as in the story chat (Shubham, 25 Nov): their words plain under their name, yours in a light
+// grey bubble on the right. 14/20 here, a size down from the story chat's 15/24, because the pane is narrow.
+const TEXT = "text-[14px] leading-5 whitespace-pre-wrap break-words text-[var(--tx)]";
+const THEIRS = `max-w-full ${TEXT}`;
+const MINE = `w-fit max-w-[85%] rounded-[18px] bg-[#F2F2F4] px-3.5 py-2 ${TEXT}`;
 /** A new group starts when the sender changes, the day changes, or after five quiet minutes. */
 const GAP = 5 * 60_000;
 
@@ -22,16 +24,20 @@ interface ConversationViewProps {
 }
 
 /**
- * One conversation, oldest first, in the story chat's bubbles: yours dark on the right, theirs white on the
- * left with their name. Under your latest message, whether they've seen it. New messages scroll into view.
+ * One conversation, oldest first, in the story chat's style: yours in a grey bubble on the right, theirs as plain
+ * words on the left under their name. Under your latest message, whether they've seen it. New messages scroll into view.
  */
 export function ConversationView({ conversation, viewerId, now }: ConversationViewProps) {
   const end = useRef<HTMLDivElement>(null);
   const { messages } = conversation;
   const lastMine = [...messages].reverse().find((m) => m.from === viewerId);
 
+  // Show the newest: scroll the list's own scroll area to its end, up or down only. Not scrollIntoView, which also
+  // moves every scrolling box around it, sideways too, and would jolt a pane that's still opening.
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" });
+    let box = end.current?.parentElement ?? null;
+    while (box && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
+    if (box) box.scrollTop = box.scrollHeight;
   }, [messages.length]);
 
   if (!messages.length) {
@@ -72,7 +78,7 @@ export function ConversationView({ conversation, viewerId, now }: ConversationVi
                 {head && <p className="m-0 px-1 text-[12px] leading-4 text-[var(--tx2)]">{stamp(m.at, now)}</p>}
                 {m.text.length > 0 && (
                   <div className={MINE}>
-                    <RichText segments={m.text} stories={STORIES} tone="dark" />
+                    <RichText segments={m.text} stories={STORIES} />
                   </div>
                 )}
                 {files}
@@ -84,8 +90,8 @@ export function ConversationView({ conversation, viewerId, now }: ConversationVi
                 <span className="flex w-7 flex-none justify-center">{head && <PersonAvatar initials={personById(m.from)?.initials ?? "?"} size={28} />}</span>
                 <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
                   {head && (
-                    <p className="m-0 flex items-baseline gap-2 px-1 text-[13px] leading-[18px]">
-                      <span className="font-semibold text-[var(--tx)]">{nameOf(m.from)}</span>
+                    <p className="m-0 flex items-baseline gap-2 text-[13px] leading-[18px]">
+                      <span className="font-medium text-[var(--tx)]">{nameOf(m.from)}</span>
                       <span className="text-[12px] text-[var(--tx2)]">{stamp(m.at, now)}</span>
                     </p>
                   )}

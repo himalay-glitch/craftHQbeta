@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { Tooltip } from "radix-ui";
 import { ArrowDown, ArrowLeft, BellRing, ChevronLeft, ChevronRight, Link as LinkIcon } from "lucide-react";
 import type { NeedKind, Person, StoryStatus } from "@/types/dashboard";
@@ -6,9 +7,8 @@ import type { ActivityItem, AskCard, AskRefusal, Author, FileRef, LiveState, Pha
 import { BTN_SECONDARY, ICON_BTN } from "@/components/dashboard/classes";
 import { storyRef } from "@/components/dashboard/format";
 import { Tip } from "@/components/dashboard/Tip";
-import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
 import { Toast } from "@/components/dashboard/Toast";
-import { openMessages } from "@/components/messages/events";
+import { saveDraft } from "@/components/messages/MessageComposer";
 import { isOpenAsk, useStoryMessages } from "@/components/messages/store";
 import { buildActivity, DEVICE_NAME, livePreview, restoreActivity, taskFor, type Task } from "./activity";
 import { ActivitySummary } from "./ActivitySummary";
@@ -20,13 +20,15 @@ import { PHASE_LABEL } from "./phases";
 import { names } from "./RichText";
 import { PreviewRow } from "./PreviewControl";
 import { columnLabel, statusMoves, type StatusMove } from "./stage";
-import { MORE_BUTTON_ID, StatusLine, StatusMenu } from "./StatusMenu";
-import { StoryDecision } from "./StoryDecision";
+import { MORE_BUTTON_ID, StatusBadge, StatusMenu } from "./StatusMenu";
 import { ownerOf, useStoryOwners } from "./owners";
 import { COMPOSER_INPUT_ID, StoryComposer } from "./StoryComposer";
-import { ActivityCorner } from "./ActivityCorner";
+import { ActivityCorner, activityDot } from "./ActivityCorner";
+import { useIsPhone } from "./hooks";
 import { StoryNav, StoryNavToggle } from "./StoryNav";
 import { StoryRail } from "./StoryRail";
+import { SideTabs, type SideTab } from "./SideTabs";
+import { DirectConversation, StoryTeam, TeamConversation } from "./StoryTeam";
 import { StoryThread } from "./StoryThread";
 import { TeamButton, TeamChip } from "./TeamButton";
 import { ago, TeammateBanner, type TeammateChange } from "./TeammateBanner";
@@ -88,12 +90,13 @@ const BUILD_PHASES: RunPhase[] = [
 /** How long something that just finished stays on top of the activity column before it goes down. */
 const SETTLE_MS = 1500;
 
-/** Desktop: the chat's column in the white sheet. The columns beside it keep fixed widths and the chat takes the
- *  rest of the screen (Shubham, 23 Nov): the whole sheet up to 1200 px, then 70% of it, centred, so a big monitor
- *  still gets a bigger chat while the agent's side and yours stay within one glance. Bubbles and cards keep their
- *  own widths, so lines stay readable (DESIGN.md §3.2, about 70 characters). The status row, the thread and the
- *  message box all use it, so they line up. Sheet padding is 16 px below 1024 px and 24 px above (DESIGN.md §3.3). */
-const COLUMN = "md:mx-auto md:w-full md:max-w-[min(100%,max(1200px,70%))] md:px-4 lg:px-6";
+/** Desktop: the chat's reading column, Ask PM's (Shubham, 25 Nov: the story chat and the PM chat are the same thing, so
+ *  they share one design language). The card fills the screen at any width; the conversation stays a readable 720 px
+ *  column in it, its words at 15/24 (DESIGN.md §3.2, about 70 characters a line). The status row and the thread use
+ *  it, so they line up. */
+const COLUMN = "md:mx-auto md:w-full md:max-w-[720px] md:px-6";
+/** The message box and the decision over it: 24 px wider each side than the words, as Ask's box is. */
+const BOX_COLUMN = "md:mx-auto md:w-full md:max-w-[768px] md:px-6";
 
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now()}-${(seq += 1)}`;
@@ -163,9 +166,17 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState<LiveState | null>(null);
   const [rebuild, setRebuild] = useState(false);
+  // The story's Team conversation: the Team tab of the card beside the chat (Shubham, 25 Nov), the same tab in the corner
+  // card at 768–1023 px, or a full screen on phones. `teamEpoch` is bumped when a draft is put into it from outside (a
+  // nudge, or "Write to Esha in Team" from the agent's box), so its reply box reads the draft again.
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [teamEpoch, setTeamEpoch] = useState(0);
+  // The corner card (768–1023 px), open; the faces open it straight on Team.
+  const [cornerOpen, setCornerOpen] = useState(false);
+  // A private word with one person, from their face's card: shown in the Team tab, under "← Team".
+  const [privateWith, setPrivateWith] = useState<Person | null>(null);
+  const isPhone = useIsPhone();
   const [atBottom, setAtBottom] = useState(true);
-  // The decision put back into the chat ("Read the chat first"), by its key; the next stage's decision comes forward again.
-  const [dismissed, setDismissed] = useState<string | null>(null);
   // The story's pull request: the agent opens it once the work passes its check; a person merges it.
   const [pr, setPr] = useState(initial.facts.pullRequest.state);
   const [prNo, setPrNo] = useState(() => prNumberFor(story.id));
@@ -209,11 +220,55 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const asks = storyMessages.filter((m) => isOpenAsk(m, storyMessages));
   const waitingOnThem = peopleOf(asks.filter((m) => m.from === data.viewer.id).flatMap((m) => m.ask?.of ?? []));
   const waitingOnMe = peopleOf(asks.filter((m) => m.ask?.of.includes(data.viewer.id)).map((m) => m.from));
-  const openTeam = (draft?: string) => openMessages(`story:${story.id}`, draft);
+  const openTeam = (draft?: string) => {
+    if (draft) {
+      saveDraft(`story:${story.id}`, draft);
+      setTeamEpoch((n) => n + 1);
+    }
+    setPrivateWith(null);
+    setTeamOpen(true);
+    if (window.matchMedia("(min-width: 768px) and (max-width: 1023.98px)").matches) setCornerOpen(true);
+  };
+  // From a face's card: one to one with them, in the Team tab (Messages has the same conversation).
+  const messagePrivately = (person: Person) => {
+    setPrivateWith(person);
+    setTeamOpen(true);
+    if (window.matchMedia("(min-width: 768px) and (max-width: 1023.98px)").matches) setCornerOpen(true);
+  };
+  // Back to Activity (or the sheet or corner card closes), and focus back on the faces, where you came from.
+  const closeTeam = () => {
+    setTeamOpen(false);
+    setPrivateWith(null);
+    setCornerOpen(false);
+    window.requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-team-button]")?.focus({ preventScroll: true }));
+  };
+  const showTab = (t: SideTab) => (t === "team" ? openTeam() : setTeamOpen(false));
+  // What the Team tab shows: the story's Team conversation, or the private one opened from a face.
+  const teamBody = (compact: boolean, className: string) =>
+    privateWith ? (
+      <DirectConversation key={privateWith.id} person={privateWith} viewerId={data.viewer.id} compact={compact} onBack={() => setPrivateWith(null)} className={className} />
+    ) : (
+      <TeamConversation storyId={story.id} viewerId={data.viewer.id} draftEpoch={teamEpoch} compact={compact} onEscape={closeTeam} className={className} />
+    );
+  const tabs = (small: boolean) => (
+    <SideTabs tab={teamOpen ? "team" : "activity"} onTab={showTab} unread={teamUnread} signal={activityDot(activity, yours)} small={small} />
+  );
   const owners = useStoryOwners();
   const ownerInitials = ownerOf(story, owners);
   const owner = ownerInitials ? personFor(ownerInitials, data.people, data.viewer) : undefined;
   const ownerName = owner?.kind === "person" ? owner.name : undefined;
+  // Who's on this story, as faces in the header (Shubham, 25 Nov: the people, not a "Team" label): its owner, who wrote
+  // it, everyone in its Team conversation, and you. Clicking them opens the Team chat.
+  const byInitials = (initials?: string | null): Person | undefined =>
+    !initials ? undefined : initials === data.viewer.initials ? data.viewer : data.people.find((p) => p.initials === initials);
+  const created = entries.find((e) => e.kind === "created");
+  const members = [
+    ...new Map(
+      [byInitials(ownerInitials), created?.kind === "created" && created.by.kind === "person" ? byInitials(created.by.initials) : undefined, ...teamPeople, data.viewer]
+        .filter((p): p is Person => Boolean(p))
+        .map((p) => [p.id, p] as const),
+    ).values(),
+  ];
   // The teammate in the demo: the story's owner when that isn't you, else the first teammate.
   const teammate = data.people.find((p) => p.initials === ownerInitials && p.id !== data.viewer.id) ?? data.people.find((p) => p.id !== data.viewer.id);
   const mateName = teammate?.name ?? "A teammate";
@@ -561,8 +616,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   };
 
   const ref = storyRef(story.id);
-  // Which decision is up: one per stage.
-  const decisionKey = `${state.status}:${state.need ?? ""}`;
   const actions = {
     // Accepting is the person's: merge the pull request, then mark the story Done (statuses guide §5).
     accept: () => {
@@ -613,15 +666,13 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       add({ kind: "stage", id: nextId("stage"), at: "Just now", text: "Cancelled by you" });
       log({ kind: "stage", title: "Cancelled by you", state: "info", detail: "", move: { from: columnLabel(state.status), to: "Cancelled" } });
     },
-    // These hand over to the message box, so the decision steps back into the chat first.
+    // These hand over to the message box.
     changes: () => {
       setRebuild(true);
-      setDismissed(decisionKey);
       requestAnimationFrame(focusComposer);
     },
     write: () => {
       setRebuild(false);
-      setDismissed(decisionKey);
       requestAnimationFrame(focusComposer);
     },
   };
@@ -689,8 +740,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const guard = (verb: string, fn: () => void) => {
     const why = refuse(verb);
     if (!why) return fn();
-    setRefusal(why);
-    setDismissed(null); // the decision comes forward, so the reason shows where the button was
+    setRefusal(why); // shown on the decision card in the chat, where the button was
   };
   // The decision's buttons, each checked when pressed (closures, so nothing runs while the page renders).
   const act = {
@@ -806,7 +856,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     // A note, then Approved: refused if a teammate moved the story first (the note itself stays).
     if (andRebuild && pending) {
       setRefusal(refuse("rebuild it"));
-      setDismissed(null);
       return;
     }
     add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `PM passed your note to ${holder}` });
@@ -855,15 +904,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       .catch(() => showToast("Couldn’t copy the link. Copy it from the address bar."));
   };
 
-  // A decision with a button comes in front of the chat until it's put back.
-  // Worked out from the state, not from `ask`, whose buttons hold the agent's timers.
-  const gated =
-    !busy &&
-    (state.need === "stuck" ||
-      (isYours(state) && (state.need === "review" || state.need === "planning" || state.need === "triage")));
-  const gateKey = gated ? decisionKey : null;
-  const focused = gateKey !== null && dismissed !== gateKey;
-  const dismissDecision = useCallback(() => setDismissed(gateKey), [gateKey]);
 
   // Waiting on a teammate: one tap opens Team with a nudge written for them, which reaches them in Messages.
   const waitingOn = !busy && state.need && !isYours(state) ? data.people.find((p) => p.name === state.waitingOn && p.id !== data.viewer.id) : undefined;
@@ -877,7 +917,21 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       : working
         ? (SUGGESTIONS.working ?? [])
         : [];
-  const teamChips = waitingOnMe.length > 0 || waitingOnThem.length > 0 || (nudge && waitingOn);
+  // At most one Team chip, beside the faces in the header: a request waiting on you first, then one waiting on them,
+  // then a nudge for whoever the story waits on. Each opens Team.
+  const teamChip =
+    waitingOnMe.length > 0 ? (
+      <TeamChip
+        person={waitingOnMe[0]}
+        text={`${names(waitingOnMe.map(firstName))} ${waitingOnMe.length === 1 ? "is" : "are"} waiting on you`}
+        onYou
+        onClick={() => openTeam()}
+      />
+    ) : waitingOnThem.length > 0 ? (
+      <TeamChip person={waitingOnThem[0]} text={`Waiting on ${names(waitingOnThem.map(firstName))}`} onClick={() => openTeam()} />
+    ) : nudge && waitingOn ? (
+      <TeamChip icon={<BellRing aria-hidden="true" size={14} strokeWidth={1.75} />} text={`Nudge ${firstName(waitingOn)}`} onClick={() => openTeam(nudge)} />
+    ) : null;
 
   // The line above the message box: what a note does from here. A note is a conversation; a status is an instruction.
   const noteHint = (() => {
@@ -928,83 +982,96 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
 
   return (
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
-      {/* Desktop: a builder workspace, full height: the chat with the agent is the page (Shubham, 23 Nov). The stories
-          list can open on the left (1280 px and wider, from the header's first button), split off by a hairline that
-          runs from the top bar to the bottom of the window; the activity opens from the icon in the header's top-right
-          corner, as a card over the chat. The builder is the one white surface. It scrolls on its own, and the message
-          box stays pinned under the conversation. `relative` makes the frame hold everything absolutely positioned
-          inside it (screen-reader text too), so nothing can stretch the page past the window. Phones scroll as one
-          white page, the activity folded under "Activity". */}
-      <main id="main" className="md:relative md:flex md:h-[calc(100dvh-var(--bar-h))] md:overflow-hidden md:border-t md:border-[var(--line)]">
+      {/* Desktop: Ask PM's frame (Shubham, 25 Nov). A soft wash behind floating cards, cool at the top left and warm at
+          the bottom right; the chat with the agent is the main card and fills the rest of the screen (23 Nov). The
+          stories list can open on the left as a card of its own (1280 px and wider, from the header's first button).
+          The activity is always in view from 1024 px, a card on the right like Ask's side panel (Shubham, 25 Nov: "don't
+          hide it"); at 768–1023 px it opens from the icon in the header's corner, over the chat. The chat scrolls on
+          its own, and the message box stays pinned under the conversation. `relative` makes the frame hold everything
+          absolutely positioned inside it (screen-reader text too), so nothing can stretch the page past the window.
+          Phones scroll as one white page, the activity folded under "Activity". */}
+      <main
+        id="main"
+        className="md:relative md:flex md:h-[calc(100dvh-var(--bar-h))] md:overflow-hidden md:p-2 md:[background:radial-gradient(60%_55%_at_0%_0%,#E9EEFA_0%,transparent_70%),radial-gradient(55%_60%_at_100%_100%,#FBE3D6_0%,transparent_72%),#F4F4F6] lg:p-4"
+      >
         {/* The activity column's one announcement line: finishes only (the chat already says when work starts). */}
         <p role="status" className="sr-only">
           {said}
         </p>
         <StoryNav stories={data.queue} current={navCurrent} />
         {/* The builder: the conversation where the story is planned, built and changed. */}
-        <div className="px-4 pt-4 pb-6 md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col md:bg-white md:p-0">
-          {/* One header row across the top of the sheet from 1024 px: Stories / hq-21 / the story's name, then Team and
-              the page's buttons. The name is the page's heading, the last step of the trail. Narrower (phones, and the
-              sheet beside the activity at 768–1023 px): the trail and the buttons, then the name on its own row. */}
-          <header className="flex flex-none flex-wrap items-center gap-x-3 gap-y-1.5 md:px-4 md:py-3 lg:h-14 lg:flex-nowrap lg:px-6 lg:py-0">
+        <div className="px-4 pt-4 pb-6 md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col md:overflow-hidden md:rounded-[24px] md:bg-white md:p-0 md:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] md:ring-1 md:ring-black/[0.04]">
+          {/* One quiet row across the top of the card, like Ask PM's title row (Shubham, 25 Nov: simpler): the way back,
+              the story's name with its ID and its status (said once, here), then the people on it and ⋯, which also holds
+              Previous, Next and Copy link. Phones: the way back, the status and the buttons, then the name on its own row. */}
+          <header className="flex flex-none flex-wrap items-center gap-x-2 gap-y-1.5 md:px-5 md:py-3 lg:h-14 lg:flex-nowrap lg:py-0">
             <StoryNavToggle />
-            <nav aria-label="Breadcrumb" className="flex flex-none items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
-              <a href="/stories" className="inline-flex items-center gap-1.5 rounded-[4px] hover:text-[var(--tx)]">
-                <ArrowLeft aria-hidden="true" size={14} strokeWidth={1.75} />
-                Stories
+            <Tip label="All stories">
+              <a href="/stories" aria-label="All stories" className={`${ICON_BTN} max-xl:-ml-2`}>
+                <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.75} />
               </a>
-              <span aria-hidden="true">/</span>
-              <span className="tabular-nums" aria-current="page">
-                {ref}
-              </span>
-              <span aria-hidden="true" className="hidden lg:inline">
-                /
-              </span>
-            </nav>
+            </Tip>
             <h1
               title={story.title}
-              className="order-3 m-0 basis-full text-[20px] leading-7 font-semibold tracking-[-0.015em] text-[var(--tx)] lg:order-none lg:min-w-0 lg:basis-auto lg:truncate lg:text-[17px] lg:leading-6 lg:tracking-[-0.01em]"
+              className="order-3 m-0 basis-full text-[20px] leading-7 font-semibold tracking-[-0.015em] text-[var(--tx)] lg:order-none lg:min-w-0 lg:basis-auto lg:truncate lg:text-[15px] lg:leading-5 lg:font-medium lg:tracking-normal"
             >
               {story.title}
             </h1>
+            <span className="flex-none text-[13px] leading-[18px] text-[var(--tx2)] tabular-nums">{ref}</span>
+            <StatusBadge status={state.status} detail={status.detail ?? status.turn} dot={status.dot} />
             <span aria-hidden="true" className="hidden flex-1 lg:block" />
-            <span className="ml-auto flex flex-none items-center gap-0.5 lg:ml-0">
-              {/* The story's people chat (DESIGN.md §4.5: a facepile of members on the right), then the page's buttons. */}
-              <span className="mr-1.5 flex">
-                <TeamButton people={teamPeople} unread={teamUnread} onOpen={() => openTeam()} />
-              </span>
-              <Tip label={prev ? `Previous: ${prev.title}` : "No previous story"}>
-                <a
-                  href={prev ? `/stories/${storyRef(prev.id)}` : undefined}
-                  aria-label="Previous story"
-                  aria-disabled={!prev}
-                  className={`${ICON_BTN} ${prev ? "" : "pointer-events-none opacity-40"}`}
+            <span className="ml-auto flex flex-none items-center gap-1 lg:ml-0">
+              {teamChip}
+              {/* Who's on the story (DESIGN.md §4.5: a facepile of members on the right); a teammate here now has a
+                  green dot. Clicking the faces opens Team. */}
+              <TeamButton
+                people={present && teammate && !members.some((m) => m.id === teammate.id) ? [teammate, ...members] : members}
+                viewerId={data.viewer.id}
+                present={present && teammate ? { id: teammate.id, note: `${mateFirst} is here · ${DOING[state.status]}` } : undefined}
+                unread={teamUnread}
+                open={teamOpen}
+                onOpen={() => (teamOpen ? closeTeam() : openTeam())}
+                about={(p) =>
+                  [
+                    p.initials === ownerInitials ? "Owner" : null,
+                    created?.kind === "created" && created.by.kind === "person" && created.by.initials === p.initials ? "Wrote this story" : null,
+                    teamPeople.some((t) => t.id === p.id) ? "In Team" : null,
+                    present && teammate?.id === p.id ? "Here now" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                }
+                onMention={(p) => openTeam(`@${p.name.split(" ")[0]} `)}
+                onMessage={messagePrivately}
+              />
+              {/* ⋯ (DESIGN.md §4.5): Previous, Next and Copy link, then the status moves. The everyday next step is the
+                  chat's decision. */}
+              <StatusMenu
+                links={[
+                  { label: "Previous story", icon: ChevronLeft, hint: prev ? storyRef(prev.id) : undefined, disabled: !prev, onSelect: () => prev && window.location.assign(`/stories/${storyRef(prev.id)}`) },
+                  { label: "Next story", icon: ChevronRight, hint: next ? storyRef(next.id) : undefined, disabled: !next, onSelect: () => next && window.location.assign(`/stories/${storyRef(next.id)}`) },
+                  { label: "Copy link", icon: LinkIcon, onSelect: copyLink },
+                ]}
+                moves={statusMoves(state.status, state.need === "stuck")}
+                locked={locked}
+                onMove={changeStatus}
+                onCatchUp={catchUp}
+                storyLabel={ref}
+              />
+              {/* 768–1023 px, where there's no room for the activity card beside the chat: one icon in the corner that
+                  lights up while something is happening and opens into the activity, over the chat. */}
+              <span className="ml-1 flex max-md:hidden lg:hidden">
+                <ActivityCorner
+                  items={activity}
+                  yours={yours}
+                  open={cornerOpen}
+                  onOpenChange={(open) => {
+                    setCornerOpen(open);
+                    if (!open) setTeamOpen(false);
+                  }}
+                  title={tabs(true)}
                 >
-                  <ChevronLeft aria-hidden="true" size={16} strokeWidth={1.75} />
-                </a>
-              </Tip>
-              <Tip label={next ? `Next: ${next.title}` : "No next story"}>
-                <a
-                  href={next ? `/stories/${storyRef(next.id)}` : undefined}
-                  aria-label="Next story"
-                  aria-disabled={!next}
-                  className={`${ICON_BTN} ${next ? "" : "pointer-events-none opacity-40"}`}
-                >
-                  <ChevronRight aria-hidden="true" size={16} strokeWidth={1.75} />
-                </a>
-              </Tip>
-              <Tip label="Copy link">
-                <button type="button" aria-label="Copy link" onClick={copyLink} className={ICON_BTN}>
-                  <LinkIcon aria-hidden="true" size={16} strokeWidth={1.75} />
-                </button>
-              </Tip>
-              {/* The status moves (DESIGN.md §4.5: More in the header). The everyday next step is the chat's decision. */}
-              <StatusMenu moves={statusMoves(state.status, state.need === "stuck")} locked={locked} onMove={changeStatus} onCatchUp={catchUp} storyLabel={ref} />
-              {/* In the corner: the activity, as one icon that lights up while something is happening. It opens into
-                  the activity card, over the chat. */}
-              <span className="ml-1.5 flex max-md:hidden">
-                <ActivityCorner items={activity} yours={yours}>
-                  {rail(false)}
+                  {teamOpen ? teamBody(true, "h-[min(520px,calc(100dvh-var(--bar-h)-140px))]") : rail(false)}
                 </ActivityCorner>
               </span>
             </span>
@@ -1023,53 +1090,15 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
             </div>
           )}
 
+          {/* Under the header: the conversation. (Team is a tab in the card beside it; on phones, a full screen.) */}
+          <div className="md:relative md:flex md:min-h-0 md:min-w-0 md:flex-1">
           <section aria-label="Conversation" className="mt-3 flex min-w-0 flex-1 flex-col md:mt-0 md:min-h-0">
-            {/* At the top of the chat, as words: the story's status and what's under way, or whose turn it is.
-                Read-only; it's changed from the ⋯ menu in the top row. Tones from DESIGN.md §3.1: working is ink,
-                a person's turn is attention, done is positive, stopped is negative. */}
             {/* A teammate changed this story: one banner, until you've seen it. */}
             {banner && (
               <div className={`mb-1 flex-none ${COLUMN}`}>
                 <TeammateBanner change={banner} onSee={seeChange} onDismiss={() => setBanner(null)} />
               </div>
             )}
-            <div className={`flex h-10 min-w-0 flex-none items-center gap-2 text-[13px] leading-[18px] ${COLUMN}`}>
-              <StatusLine status={state.status} detail={status.detail ?? status.turn} dot={status.dot} />
-              {/* Requests still waiting in Team, and a nudge for the teammate the story waits on. Each opens Team. */}
-              {teamChips && (
-                <span className="ml-auto flex min-w-0 items-center gap-0.5">
-                  {waitingOnMe.length > 0 && (
-                    <TeamChip
-                      person={waitingOnMe[0]}
-                      text={`${names(waitingOnMe.map(firstName))} ${waitingOnMe.length === 1 ? "is" : "are"} waiting on you`}
-                      onYou
-                      onClick={() => openTeam()}
-                    />
-                  )}
-                  {waitingOnThem.length > 0 && <TeamChip person={waitingOnThem[0]} text={`Waiting on ${names(waitingOnThem.map(firstName))}`} onClick={() => openTeam()} />}
-                  {nudge && waitingOn && (
-                    <TeamChip
-                      icon={<BellRing aria-hidden="true" size={14} strokeWidth={1.75} />}
-                      text={`Nudge ${firstName(waitingOn)}`}
-                      onClick={() => openTeam(nudge)}
-                    />
-                  )}
-                </span>
-              )}
-              {/* Who else is on this story right now, so people don't step on each other. */}
-              {present && teammate && (
-                <span title={`${teammate.name} is on this story`} className={`${teamChips ? "" : "ml-auto"} flex flex-none items-center gap-1.5 text-[12px] leading-4 text-[var(--tx2)] ${chat.labelIn}`}>
-                  <span className="relative flex">
-                    <PersonAvatar initials={teammate.initials} size={20} />
-                    <span aria-hidden="true" className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-[var(--green)] ring-2 ring-white" />
-                  </span>
-                  <span className="max-sm:sr-only">
-                    {mateFirst} is here · {DOING[state.status]}
-                  </span>
-                </span>
-              )}
-            </div>
-
             <div className="relative flex min-h-0 flex-1 flex-col">
             {/* Older messages fade out under the box's header, as newer ones do under the message box. */}
             <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 z-10 hidden h-6 md:block ${chat.fadeTop}`} />
@@ -1079,19 +1108,18 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                 const el = e.currentTarget;
                 setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
               }}
-              onClick={focused ? dismissDecision : undefined}
               className={`md:min-h-0 md:flex-1 md:overflow-y-auto ${chat.transcript}`}
             >
               {/* The scroll area is the whole sheet, so the wheel works anywhere over it; the messages sit in the reading
-                  column and bubbles keep their own width. Behind a decision it softens and can't be used, until the
-                  decision is put back. */}
-              <div inert={focused} className={`${COLUMN} ${focused ? chat.recede : ""}`}>
+                  column and bubbles keep their own width. Always readable: a decision is a card at the end of the
+                  chat, never in front of it (Shubham, 25 Nov). */}
+              <div className={`pt-3 ${COLUMN}`}>
                 <StoryThread
                   entries={entries}
                   stories={data.stories}
                   viewerInitials={data.viewer.initials}
                   live={live}
-                  ask={focused ? null : ask}
+                  ask={ask}
                   refusal={askRefusal}
                   onAnswer={answer}
                   onSkipQuestion={state.need === "decision" && !busy ? act.defaults : undefined}
@@ -1100,10 +1128,10 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
               </div>
             </div>
 
-            <div className={`sticky bottom-0 flex-none bg-white pb-4 ${COLUMN}`}>
+            <div className={`sticky bottom-0 flex-none bg-white pt-2 pb-4 ${BOX_COLUMN}`}>
               {/* Messages fade out as they pass under the box. */}
               <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 -top-10 h-10 ${chat.fade}`} />
-              {!atBottom && !focused && (
+              {!atBottom && (
                 <button
                   type="button"
                   onClick={() => {
@@ -1116,9 +1144,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                   Jump to latest
                 </button>
               )}
-              {focused && <StoryDecision key={gateKey} ask={ask} refusal={askRefusal} onDismiss={dismissDecision} />}
-              {/* Kept while a decision is in front, so a half-written message isn't lost. */}
-              <div className={focused ? "hidden" : undefined}>
+              <div>
                 <StoryComposer
                   storyId={story.id}
                   people={data.people}
@@ -1136,7 +1162,35 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
             </div>
             </div>
           </section>
+          <AnimatePresence>
+            {isPhone && teamOpen && (
+              <StoryTeam key="team" title={privateWith ? `${privateWith.name} · Private` : "Team"} onClose={closeTeam}>
+                {teamBody(false, "flex-1")}
+              </StoryTeam>
+            )}
+          </AnimatePresence>
+          </div>
         </div>
+
+        {/* Beside the chat from 1024 px: one card with Activity · Team tabs, like Ask PM's "Chats · Team" side panel and
+            as wide (300 px, 320 px from 1280). Team is a tab here, not a pane in the chat, so the chat with the agent
+            keeps its width and nothing slides over it (Shubham, 25 Nov). The faces in the header switch it to Team; Esc
+            in Team goes back to Activity. `relative` keeps the rows' screen-reader text inside the scroll area. */}
+        <aside
+          aria-label="Activity and Team"
+          className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] lg:ml-4 lg:flex xl:w-[320px]"
+        >
+          <div className="flex-none px-4 pt-4">{tabs(false)}</div>
+          {teamOpen ? (
+            <div role="tabpanel" aria-label="Team" className="flex min-h-0 flex-1 flex-col">
+              {teamBody(false, "flex-1")}
+            </div>
+          ) : (
+            <div role="tabpanel" aria-label="Activity" className="relative min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-4">
+              {rail(false)}
+            </div>
+          )}
+        </aside>
       </main>
 
       <Toast toast={toast} onDismiss={dismissToast} offsetRight="0px" />

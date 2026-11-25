@@ -3,10 +3,9 @@ import { Check, ChevronRight, File as FileIcon, FileImage, FilePlay } from "luci
 import type { AskCard, AskRefusal, Author, FileRef, LiveState, RunPhase, ThreadEntry } from "@/types/stories";
 import { BTN_PRIMARY, BTN_SECONDARY } from "@/components/dashboard/classes";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
-import { AgentAvatar } from "./AgentAvatar";
+import { BotAvatar } from "@/components/ask/BotAvatar";
 import chat from "./chat.module.css";
 import { elapsed, useNow } from "./clock";
-import { Mascot } from "./Mascot";
 import { PHASE_LABEL, PHASE_NOTE, runLine, runTime } from "./phases";
 import { RichText } from "./RichText";
 import { Refusal } from "./TeammateBanner";
@@ -28,12 +27,13 @@ interface StoryThreadProps {
   refusal?: AskRefusal;
 }
 
-// Bubbles: the agent's are soft grey, teammates' white with a hairline, the viewer's dark on the right.
-const TEXT = "text-[14px] leading-5 tracking-[-0.15px] whitespace-pre-wrap";
-const AGENT_BUBBLE = `w-fit max-w-[min(640px,100%)] rounded-[16px] bg-[#F2F2F0] px-3.5 py-2 text-[var(--tx)] ${TEXT}`;
-const PERSON_BUBBLE = `w-fit max-w-[min(640px,100%)] rounded-[16px] border border-[var(--card-line)] bg-white px-3.5 py-2 text-[var(--tx)] ${TEXT}`;
-const MINE_BUBBLE = `w-fit max-w-[min(560px,85%)] rounded-[18px] bg-[var(--ink)] px-3.5 py-2 text-white ${TEXT}`;
-const CARD = "w-full max-w-[460px] rounded-[16px] border border-[var(--card-line)] bg-white p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(0_0_0/0.12)]";
+// One design language with Ask PM's chat (Shubham, 25 Nov: the two are the same thing, so they should look it). The
+// agent's and teammates' words sit on the page with no bubble, 15/24, under a face and a "name · time" line; yours
+// are a light grey bubble on the right. Cards are Ask's: 18 px corners, a soft shadow and a faint ring.
+const TEXT = "text-[15px] leading-6 text-pretty whitespace-pre-wrap text-[var(--tx)]";
+const THEIR_TEXT = `max-w-full ${TEXT}`;
+const MINE_BUBBLE = `w-fit max-w-[80%] rounded-[20px] bg-[#F2F2F4] px-4 py-2.5 ${TEXT}`;
+const CARD = "w-full max-w-[460px] rounded-[18px] bg-white p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_6px_20px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04]";
 
 type AuthorKey = string;
 const keyOf = (a: Author): AuthorKey => (a.kind === "agent" ? "agent" : a.initials);
@@ -79,17 +79,17 @@ function Files({ files, mine }: { files: FileRef[]; mine: boolean }) {
   );
 }
 
-/** A checklist bubble: what was done, each line with a tick (the agent's "receipt"). */
+/** A checklist: what was done, each line with a tick (the agent's "receipt"). */
 function Checklist({ items, fresh }: { items: string[]; fresh?: boolean }) {
   return (
-    <ul className={`${AGENT_BUBBLE} m-0 flex list-none flex-col gap-1`}>
+    <ul className={`${TEXT} m-0 flex list-none flex-col gap-1 p-0`}>
       {items.map((item, i) => (
         <li key={item} className="flex items-start gap-2">
           <Check
             aria-hidden="true"
             size={14}
             strokeWidth={2.25}
-            className={`mt-[3px] flex-none text-[var(--green)] ${fresh ? chat.check : ""}`}
+            className={`mt-[5px] flex-none text-[var(--green)] ${fresh ? chat.check : ""}`}
             style={fresh ? { animationDelay: `${i * 90}ms` } : undefined}
           />
           <span>{item}</span>
@@ -178,7 +178,7 @@ function Question({
   const answered = entry.answer && !changing;
   if (answered && entry.answer) {
     return (
-      <div className={AGENT_BUBBLE}>
+      <div className={THEIR_TEXT}>
         <p className="m-0 text-[var(--tx2)]">{entry.question}</p>
         <p className="m-0 mt-1 flex flex-wrap items-center gap-x-2">
           <Check aria-hidden="true" size={14} strokeWidth={2.25} className={`text-[var(--green)] ${entry.fresh ? chat.check : ""}`} />
@@ -248,25 +248,26 @@ function Question({
   );
 }
 
-/** The agent's side of the conversation: the mascot once per group, then its bubbles and cards. */
+/** The agent's (or a teammate's) side: a face and "name · time" once per group, as in Ask PM, then the words and
+ *  cards with 12 px between them. A new group stands 28 px off the one before. */
 function TheirRow({ author, head, at, children }: { author: Author; head: boolean; at: string; children: ReactNode }) {
   return (
-    <div className="flex gap-2.5">
-      <div className="w-8 flex-none">
+    <div className={`flex gap-3 ${head ? "mt-4" : ""}`}>
+      <div className="w-[30px] flex-none">
         {head &&
           (author.kind === "agent" ? (
-            <AgentAvatar size={32} />
+            <BotAvatar id="builder" size={30} className="mt-0.5" />
           ) : (
-            <span className="flex size-8 items-center justify-center">
+            <span className="mt-0.5 flex size-[30px] items-center justify-center">
               <PersonAvatar initials={author.initials} size={28} />
             </span>
           ))}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-3">
         {head && (
-          <p className="m-0 flex items-baseline gap-2 px-1 pt-1.5 text-[13px] leading-[18px]">
-            <span className="font-semibold text-[var(--tx)]">{author.kind === "agent" ? "Agent" : author.name}</span>
-            <span className="text-[12px] text-[var(--tx2)]">{at}</span>
+          <p className="m-0 -mb-1.5 text-[13px] leading-[18px]">
+            <span className="font-medium text-[var(--tx)]">{author.kind === "agent" ? "Agent" : author.name}</span>
+            <span className="text-[var(--tx2)]"> · {at}</span>
           </p>
         )}
         {children}
@@ -283,30 +284,53 @@ function TheirRow({ author, head, at, children }: { author: Author; head: boolea
 export function StoryThread({ entries, stories, viewerInitials, live, ask, onAnswer, onSkipQuestion, highlight, refusal }: StoryThreadProps) {
   const { rows, lastKey } = layout(entries);
 
-  return (
-    <div className="flex flex-col gap-2 pt-2 pb-6">
-      {rows.map(({ entry, divider, head }) => {
-        const anim = entry.fresh ? chat.enter : "";
+  // The story's own updates (who created it, stage changes) run together: one quiet line per day, "Nov 11 · Plan
+  // written · Plan approved by Josh", so the conversation leads (Shubham, 25 Nov: simpler). Each update keeps its own
+  // span, so "See what changed" can still find and tint it.
+  type System = Extract<ThreadEntry, { kind: "created" | "stage" }>;
+  const items: ({ kind: "updates"; divider: string | null; entries: System[] } | { kind: "row"; row: (typeof rows)[number] })[] = [];
+  for (const row of rows) {
+    const { entry, divider } = row;
+    if (entry.kind === "created" || entry.kind === "stage") {
+      const last = items[items.length - 1];
+      if (last?.kind === "updates" && !divider) last.entries.push(entry);
+      else items.push({ kind: "updates", divider, entries: [entry] });
+    } else items.push({ kind: "row", row });
+  }
 
-        let body: ReactNode = null;
-        if (entry.kind === "created" || entry.kind === "stage") {
-          body = (
-            // data-entry: "See what changed" on a teammate's banner scrolls here; `highlight` tints it for a moment.
-            <p
-              data-entry={entry.id}
-              key={entry.id === highlight ? `${entry.id}-lit` : entry.id}
-              className={`m-0 rounded-md py-1 text-center text-[12px] leading-4 text-[var(--tx2)] ${anim} ${entry.id === highlight ? chat.flash : ""}`}
-            >
-              {entry.kind === "created" ? (
-                <>
-                  <span className="font-medium text-[var(--tx)]">{entry.by.kind === "agent" ? "Agent" : entry.by.name}</span> created this story
-                </>
-              ) : (
-                entry.text
-              )}
+  return (
+    <div className="flex flex-col gap-3 pt-2 pb-6">
+      {items.map((item) => {
+        if (item.kind === "updates") {
+          return (
+            <p key={item.entries[0].id} className="m-0 py-0.5 text-center text-[12px] leading-4 text-balance text-[var(--tx2)]">
+              {item.divider && <span className="font-medium">{item.divider}</span>}
+              {item.entries.map((entry, i) => (
+                <Fragment key={entry.id}>
+                  {(i > 0 || item.divider) && <span aria-hidden="true"> · </span>}
+                  {/* data-entry: "See what changed" on a teammate's banner scrolls here; `highlight` tints it for a moment. */}
+                  <span
+                    data-entry={entry.id}
+                    key={entry.id === highlight ? `${entry.id}-lit` : entry.id}
+                    className={`rounded-md ${entry.fresh ? chat.enter : ""} ${entry.id === highlight ? chat.flash : ""}`}
+                  >
+                    {entry.kind === "created" ? (
+                      <>
+                        <span className="text-[var(--tx)]">{entry.by.kind === "agent" ? "Agent" : entry.by.name}</span> created this story
+                      </>
+                    ) : (
+                      entry.text
+                    )}
+                  </span>
+                </Fragment>
+              ))}
             </p>
           );
-        } else if (entry.kind === "run" && entry.running) {
+        }
+        const { entry, divider, head } = item.row;
+        if (entry.kind === "created" || entry.kind === "stage") return null; // grouped above, into the day's line
+        let body: ReactNode = null;
+        if (entry.kind === "run" && entry.running) {
           body = null; // the live line shows it
         } else if (entry.kind === "run" || entry.kind === "question") {
           body = (
@@ -326,17 +350,17 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
           const bubbles = (
             <>
               {entry.text && entry.text.length > 0 && (
-                <div className={`${mine ? MINE_BUBBLE : entry.author.kind === "agent" ? AGENT_BUBBLE : PERSON_BUBBLE} ${land}`}>
-                  <RichText segments={entry.text} stories={stories} tone={mine ? "dark" : "light"} />
+                <div className={`${mine ? MINE_BUBBLE : THEIR_TEXT} ${land}`}>
+                  <RichText segments={entry.text} stories={stories} />
                 </div>
               )}
               {entry.report && (
                 <>
-                  <div className={`${AGENT_BUBBLE} ${land}`}>{entry.report.outcome}</div>
-                  {entry.report.means && <div className={`${AGENT_BUBBLE} ${land}`}>{entry.report.means}</div>}
+                  <div className={`${THEIR_TEXT} ${land}`}>{entry.report.outcome}</div>
+                  {entry.report.means && <div className={`${THEIR_TEXT} ${land}`}>{entry.report.means}</div>}
                   {entry.report.details && <Checklist items={entry.report.details} fresh={entry.fresh} />}
                   {entry.report.next && (
-                    <div className={`${AGENT_BUBBLE} ${land}`}>
+                    <div className={`${THEIR_TEXT} ${land}`}>
                       <span className="font-semibold">Next → </span>
                       {entry.report.next}
                     </div>
@@ -357,9 +381,9 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
               )}
             </>
           );
+          // Yours: the bubble alone, as in Ask PM; the day sits in the divider and the time in the tooltip.
           body = mine ? (
-            <div className="flex flex-col items-end gap-1 pl-12">
-              {head && <p className="m-0 px-1 pt-1.5 text-[12px] leading-4 text-[var(--tx2)]">{entry.at}</p>}
+            <div title={entry.at} className={`flex flex-col items-end gap-1.5 pl-12 ${head ? "mt-4" : ""}`}>
               {bubbles}
             </div>
           ) : (
@@ -409,22 +433,24 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
         </TheirRow>
       )}
 
-      {/* The robot, live: reading your message, working, or waiting on someone. The robot holds still (its poster)
-          and nothing here loops: the words and the elapsed time say it's busy (DESIGN.md §8.5), and the Builder's
-          ring in the activity column is the page's one loop (§3.7). */}
-      <div aria-live="polite" className="min-h-10">
+      {/* The robot, live: reading your message, working, or waiting on someone, as Ask PM's "is on it" pill beside
+          its face. The face holds still and nothing here loops: the words and the elapsed time say it's busy
+          (DESIGN.md §8.5), and the working ring on the activity icon is the page's one loop (§3.7). */}
+      <div aria-live="polite" className="mt-4 min-h-10">
         {live?.kind === "thinking" && (
-          <div className={`flex items-center gap-2.5 ${chat.enter}`}>
-            <Mascot size={36} />
-            <span className={`text-[13px] leading-[18px] text-[var(--tx2)] ${chat.labelIn}`}>Builder is reading your message</span>
+          <div className={`flex items-center gap-3 ${chat.enter}`}>
+            <BotAvatar id="builder" size={30} />
+            <span className={`inline-flex h-8 items-center rounded-full bg-[#F4F4F5] px-3.5 text-[13px] leading-[18px] text-[var(--tx2)] ${chat.labelIn}`}>
+              Builder is reading your message
+            </span>
           </div>
         )}
         {/* Working: only the current phase, by the robot's name, sliding in as it changes, with its step and the run's time. */}
         {live?.kind === "working" && (
-          <div className={`flex items-center gap-2.5 ${chat.enter}`}>
-            <Mascot size={36} />
-            <span className="flex min-w-0 items-baseline gap-2">
-              <span key={live.label} className={`truncate text-[13px] leading-[18px] font-medium text-[var(--tx)] ${chat.labelIn}`}>
+          <div className={`flex items-center gap-3 ${chat.enter}`}>
+            <BotAvatar id="builder" size={30} />
+            <span className="inline-flex h-8 min-w-0 items-center gap-2 rounded-full bg-[#F4F4F5] px-3.5">
+              <span key={live.label} className={`truncate text-[13px] leading-[18px] text-[var(--tx)] ${chat.labelIn}`}>
                 {live.label}
               </span>
               <LiveMeta step={live.step} of={live.of} since={live.since} />
