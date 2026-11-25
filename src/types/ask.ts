@@ -1,5 +1,6 @@
-// The Ask PM demo: one place to ask what's happening. You only talk to the PM, and it's the only bot you see:
-// it answers, hands work to the right bot out of sight, and tells you what came back.
+// The Ask PM demo: one place to ask what's happening. You only talk to the PM: it answers, hands work to the
+// right bot, and brings back what that bot made. The other bots never speak in the chat; their work shows as
+// handoff and activity lines, and as results credited "by <bot>".
 import type { TicketStatus } from "@/types/status";
 
 export type BotId = "pm" | "builder" | "designer" | "checker" | "fixer";
@@ -13,6 +14,8 @@ export interface Bot {
   does: string;
   /** What it's on right now, for the team list. */
   now: string;
+  /** What it never does, for the Team tab. */
+  never: string;
   /** Its fur colour (the avatar's backdrop tint and accents). */
   colour: string;
   tint: string;
@@ -30,15 +33,26 @@ export interface StoryRef {
   detail?: string;
 }
 
+/** One line of a bot's work log: done, a problem it hit, or still going. */
+export interface ActivityLine {
+  text: string;
+  tone?: "done" | "warn" | "work";
+}
+
 export type Block =
   | { kind: "text"; text: string }
   | { kind: "stats"; items: { label: string; value: number }[] }
   | { kind: "stories"; items: StoryRef[] }
+  /** The PM giving a job to a bot. `story` adds a Watch link to that story's page. */
+  | { kind: "handoff"; to: BotId; task: string; story?: number }
+  /** What a bot did, as quiet log lines (it doesn't speak). */
+  | { kind: "activity"; by: BotId; lines: ActivityLine[] }
   /** Something that needs your OK. Yes asks the PM `ask`; No just closes it. */
-  | { kind: "approval"; title: string; body: string; yes: { label: string; ask: string }; no: string }
-  | { kind: "designs"; options: { id: string; label: string; layout: "list" | "cards" | "split" }[] }
-  | { kind: "steps"; story: { id: number; title: string }; steps: string[] }
-  | { kind: "checks"; story: { id: number; title: string }; passed: number; failed: number; note: string }
+  | { kind: "approval"; title: string; body: string; by?: BotId; yes: { label: string; ask: string }; no: string }
+  | { kind: "designs"; by?: BotId; options: { id: string; label: string; layout: "list" | "cards" | "split" }[] }
+  | { kind: "steps"; by?: BotId; story: { id: number; title: string }; steps: string[] }
+  | { kind: "checks"; by?: BotId; story: { id: number; title: string }; passed: number; failed: number; note: string }
+  | { kind: "team" }
   | { kind: "suggest"; items: string[] };
 
 export interface ChatMessage {
@@ -66,8 +80,17 @@ export interface Turn {
   from: BotId;
   delay: number;
   blocks: Block[];
-  /** The bot working while you wait, named in the waiting line ("Designer is sketching…"). */
+  /** The bot working while you wait ("Designer is sketching…"); its handoff ticks when this message lands. */
   wait?: BotId;
+  /** Where a bot stands once this message lands, for the Team tab. */
+  status?: { bot: BotId; now: string; working: boolean };
+}
+
+/** A bot's line in the Team tab. `since` is when it started, for "4m". */
+export interface Activity {
+  now: string;
+  working: boolean;
+  since: number;
 }
 
 /** What the page hands the chat: the project's stories, already shaped for answers. */

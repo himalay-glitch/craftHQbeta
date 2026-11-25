@@ -28,7 +28,7 @@ export function RichText({
           return (
             <span key={i} className={CHIP}>
               <AgentAvatar size={20} />
-              PM
+              Agent
             </span>
           );
         }

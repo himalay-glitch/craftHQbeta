@@ -1,10 +1,11 @@
 import type { AskData, Block, BotId, StoryRef, Turn } from "@/types/ask";
 
 // The demo's team: no model behind it yet. What you asked is matched to a scripted answer built from the
-// project's own stories. You only ever talk to the PM, and it's the only bot you see. It answers what it can
-// itself, hands new work to the bot whose area it is (design → Designer, build or fix → Builder, test → Checker,
-// stuck → Fixer) out of sight, and tells you in its own words what came back. Naming a bot ("have Designer…") is a
-// hint to the PM about who should do it, not a conversation with that bot. Replace with the real agents later.
+// project's own stories. You only ever talk to the PM. It answers what it can itself, hands new work to the bot
+// whose area it is (design → Designer, build or fix → Builder, test → Checker, stuck → Fixer), and comes back with
+// what that bot made. The other bots never speak: their work shows as handoff and activity lines, and as results
+// credited "by <bot>". Naming a bot ("@Designer …", "ask Builder to fix it") is a hint to the PM about who should
+// do it, not a conversation with that bot. Replace with the real agents later.
 
 export const SUGGESTIONS = [
   "What’s happening right now?",
@@ -18,8 +19,8 @@ export const SUGGESTIONS = [
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** A message from the PM. `wait` is the bot working out of sight while you wait for it. */
-const pm = (blocks: Block[], delay = 700, wait?: BotId): Turn => ({ from: "pm", delay, blocks, wait });
+/** A message from the PM. `wait` is the bot working while you wait for it. */
+const pm = (blocks: Block[], delay = 700, more: Pick<Turn, "wait" | "status"> = {}): Turn => ({ from: "pm", delay, blocks, ...more });
 
 const FIX = /\bfix\b/i;
 const DESIGN = /\b(design|sketch|mock ?up|screens?|layout|ui|wireframe|look)\b/i;
@@ -108,10 +109,8 @@ function overview(d: AskData): Turn[] {
 function team(): Turn[] {
   return [
     pm([
-      {
-        kind: "text",
-        text: "You only need to talk to me. Behind me, Designer sketches screens, Builder writes the change, Checker tests every change before it reaches you, and Fixer gets failed builds running again. I hand each job to the right one and tell you how it went.",
-      },
+      { kind: "text", text: "Here’s the team. You talk to me; I hand each job to the right one and bring back what they make." },
+      { kind: "team" },
     ]),
   ];
 }
@@ -172,16 +171,27 @@ function stuck(d: AskData): Turn[] {
       [
         { kind: "text", text: `${plural(d.stuck.length, "story is", "stories are")} stuck, both on something that failed rather than on a person. I’ve asked Fixer to take hq-${first.id} first.` },
         { kind: "stories", items: d.stuck },
+        { kind: "handoff", to: "fixer", task: `Get hq-${first.id} running again`, story: first.id },
       ],
       700,
+      { status: { bot: "fixer", now: `Retrying hq-${first.id}`, working: true } },
     ),
     pm(
       [
         { kind: "text", text: `Fixer found it: hq-${first.id}’s build ran out of memory. It gave the build more, and the preview is starting now. I’ll tell you if it fails again.` },
+        {
+          kind: "activity",
+          by: "fixer",
+          lines: [
+            { text: `read the hq-${first.id} build log`, tone: "done" },
+            { text: "found the build ran out of memory", tone: "warn" },
+            { text: "restarted the preview with more memory", tone: "work" },
+          ],
+        },
         { kind: "stories", items: [{ ...first, status: "building", detail: "Preview restarting" }] },
       ],
       1600,
-      "fixer",
+      { wait: "fixer", status: { bot: "fixer", now: `Restarting hq-${first.id}`, working: true } },
     ),
   ];
 }
@@ -192,13 +202,24 @@ function check(d: AskData): Turn[] {
     pm(
       [
         { kind: "text", text: `I’ve asked Checker to run hq-${story.id} again on web and Android, against what the story asked for.` },
+        { kind: "handoff", to: "checker", task: `Check hq-${story.id} again`, story: story.id },
       ],
       700,
+      { status: { bot: "checker", now: `Checking hq-${story.id}`, working: true } },
     ),
     pm(
       [
         { kind: "text", text: "Checker is done. Nearly everything passes; one thing needs a fix before you review it." },
-        { kind: "checks", story, passed: 23, failed: 1, note: "On Android the event date shows as 11/20 instead of 20 Nov." },
+        {
+          kind: "activity",
+          by: "checker",
+          lines: [
+            { text: "signed in as the two sample users", tone: "done" },
+            { text: "ran 24 checks on web and Android", tone: "done" },
+            { text: "the event date shows as 11/20 on Android", tone: "warn" },
+          ],
+        },
+        { kind: "checks", by: "checker", story, passed: 23, failed: 1, note: "On Android the event date shows as 11/20 instead of 20 Nov." },
         {
           kind: "approval",
           title: `Send hq-${story.id} back to Builder?`,
@@ -208,7 +229,7 @@ function check(d: AskData): Turn[] {
         },
       ],
       2200,
-      "checker",
+      { wait: "checker", status: { bot: "checker", now: `Checked hq-${story.id} · 1 to fix`, working: false } },
     ),
   ];
 }
@@ -219,14 +240,25 @@ function design(d: AskData, q: string): Turn[] {
     pm(
       [
         { kind: "text", text: `Good idea. I’ve asked Designer to sketch a few directions for the ${what}, using ${d.project}’s existing screens.` },
+        { kind: "handoff", to: "designer", task: `Sketch the ${what}` },
       ],
       700,
+      { status: { bot: "designer", now: `Sketching the ${what}`, working: true } },
     ),
     pm(
       [
         { kind: "text", text: `Designer has three directions for the ${what}. A keeps everything in one list, B groups it into cards, C splits sections from details. Pick one and I’ll get it written up.` },
         {
+          kind: "activity",
+          by: "designer",
+          lines: [
+            { text: `looked through ${d.project}’s existing screens`, tone: "done" },
+            { text: "drew three directions", tone: "done" },
+          ],
+        },
+        {
           kind: "designs",
+          by: "designer",
           options: [
             { id: "A", label: "One list", layout: "list" },
             { id: "B", label: "Cards", layout: "cards" },
@@ -235,7 +267,7 @@ function design(d: AskData, q: string): Turn[] {
         },
       ],
       2400,
-      "designer",
+      { wait: "designer", status: { bot: "designer", now: "Sent three directions", working: false } },
     ),
   ];
 }
@@ -251,6 +283,7 @@ export function pickDesign(option: string, label: string, d: AskData): Turn[] {
         kind: "approval",
         title: `Start building hq-${id}?`,
         body: "Builder writes the change, Checker tests it, then it comes to you for review.",
+        by: "designer",
         yes: { label: "Start building", ask: "Build it now" },
         no: "Not yet",
       },
@@ -266,16 +299,18 @@ function build(d: AskData, q: string): Turn[] {
     pm(
       [
         { kind: "text", text: `On it. I’ve written “${story.title}” up as hq-${story.id} and handed it to Builder. Checker tests it before it reaches you.` },
+        { kind: "handoff", to: "builder", task: `Build hq-${story.id}` },
       ],
       700,
+      { status: { bot: "builder", now: `Building hq-${story.id}`, working: true } },
     ),
     pm(
       [
         { kind: "text", text: "Builder has started. Here’s where it is; I’ll bring you the preview once Checker has passed it." },
-        { kind: "steps", story, steps: ["Read the story and the screens", "Write the change", "Run the tests", "Open the pull request"] },
+        { kind: "steps", by: "builder", story, steps: ["Read the story and the screens", "Write the change", "Run the tests", "Open the pull request"] },
       ],
       2000,
-      "builder",
+      { wait: "builder" },
     ),
   ];
 }
@@ -286,16 +321,18 @@ function fix(d: AskData): Turn[] {
     pm(
       [
         { kind: "text", text: `I’ve sent the Android date fix on hq-${story.id} back to Builder.` },
+        { kind: "handoff", to: "builder", task: `Fix the date on hq-${story.id}`, story: story.id },
       ],
       700,
+      { status: { bot: "builder", now: `Fixing hq-${story.id}`, working: true } },
     ),
     pm(
       [
         { kind: "text", text: "Builder found it: the date used the phone’s short format. It’s switching to “20 Nov” everywhere, then Checker runs it again." },
-        { kind: "steps", story, steps: ["Find where the date is formatted", "Use the app’s date format", "Run the tests", "Hand it to the Checker"] },
+        { kind: "steps", by: "builder", story, steps: ["Find where the date is formatted", "Use the app’s date format", "Run the tests", "Hand it to the Checker"] },
       ],
       2000,
-      "builder",
+      { wait: "builder" },
     ),
   ];
 }

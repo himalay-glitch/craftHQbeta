@@ -6,6 +6,7 @@ import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
 import { AgentAvatar } from "./AgentAvatar";
 import chat from "./chat.module.css";
 import { elapsed, useNow } from "./clock";
+import { Mascot } from "./Mascot";
 import { PHASE_LABEL, PHASE_NOTE, runLine, runTime } from "./phases";
 import { RichText } from "./RichText";
 import { Refusal } from "./TeammateBanner";
@@ -49,7 +50,7 @@ function layout(entries: ThreadEntry[]) {
     const divider = day !== lastDay ? day : null;
     lastDay = day;
     const key =
-      entry.kind === "created" || entry.kind === "stage" || entry.kind === "run" ? null : entry.kind === "question" ? "agent" : keyOf(entry.author);
+      entry.kind === "created" || entry.kind === "stage" ? null : entry.kind === "run" || entry.kind === "question" ? "agent" : keyOf(entry.author);
     rows.push({ entry, divider, head: key !== null && (key !== lastKey || divider !== null) });
     lastKey = key;
   }
@@ -148,7 +149,7 @@ function RunFold({ phases }: { phases: RunPhase[] }) {
  */
 function Run({ entry }: { entry: Extract<ThreadEntry, { kind: "run" }> }) {
   if (entry.running) return null;
-  return <Fold line={`Builder · ${entry.summary}`} rows={entry.steps.map((label) => ({ label }))} />;
+  return <Fold line={entry.summary} rows={entry.steps.map((label) => ({ label }))} />;
 }
 
 /** "2 of 6 · 9s" beside the live phase: hidden from screen readers, so the polite region isn't read every second. */
@@ -236,7 +237,7 @@ function Question({
           <button
             type="button"
             onClick={onSkip}
-            title="PM takes the first option and the plan gets finished"
+            title="The agent picks the first option and finishes the plan"
             className="h-8 rounded-full px-3 text-[13px] leading-[18px] text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)]"
           >
             Let the defaults stand
@@ -247,7 +248,7 @@ function Question({
   );
 }
 
-/** The other side of the conversation: the PM (or a teammate) once per group, then the bubbles and cards. */
+/** The agent's side of the conversation: the mascot once per group, then its bubbles and cards. */
 function TheirRow({ author, head, at, children }: { author: Author; head: boolean; at: string; children: ReactNode }) {
   return (
     <div className="flex gap-2.5">
@@ -264,7 +265,7 @@ function TheirRow({ author, head, at, children }: { author: Author; head: boolea
       <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
         {head && (
           <p className="m-0 flex items-baseline gap-2 px-1 pt-1.5 text-[13px] leading-[18px]">
-            <span className="font-semibold text-[var(--tx)]">{author.kind === "agent" ? "PM" : author.name}</span>
+            <span className="font-semibold text-[var(--tx)]">{author.kind === "agent" ? "Agent" : author.name}</span>
             <span className="text-[12px] text-[var(--tx2)]">{at}</span>
           </p>
         )}
@@ -298,7 +299,7 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
             >
               {entry.kind === "created" ? (
                 <>
-                  <span className="font-medium text-[var(--tx)]">{entry.by.kind === "agent" ? "PM" : entry.by.name}</span> created this story
+                  <span className="font-medium text-[var(--tx)]">{entry.by.kind === "agent" ? "Agent" : entry.by.name}</span> created this story
                 </>
               ) : (
                 entry.text
@@ -307,18 +308,15 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
           );
         } else if (entry.kind === "run" && entry.running) {
           body = null; // the live line shows it
-        } else if (entry.kind === "run") {
-          // The Builder's work, out of sight: one quiet line under the conversation that opens into its steps.
-          body = (
-            <div className={`pl-[42px] ${entry.fresh ? chat.landTheirs : ""}`}>
-              <Run entry={entry} />
-            </div>
-          );
-        } else if (entry.kind === "question") {
+        } else if (entry.kind === "run" || entry.kind === "question") {
           body = (
             <TheirRow author={{ kind: "agent" }} head={head} at={entry.at}>
               <div className={`w-full ${entry.fresh ? chat.landTheirs : ""}`}>
-                <Question entry={entry} onAnswer={(o) => onAnswer(entry.id, o)} onSkip={onSkipQuestion} />
+                {entry.kind === "run" ? (
+                  <Run entry={entry} />
+                ) : (
+                  <Question entry={entry} onAnswer={(o) => onAnswer(entry.id, o)} onSkip={onSkipQuestion} />
+                )}
               </div>
             </TheirRow>
           );
@@ -417,15 +415,14 @@ export function StoryThread({ entries, stories, viewerInitials, live, ask, onAns
       <div aria-live="polite" className="min-h-10">
         {live?.kind === "thinking" && (
           <div className={`flex items-center gap-2.5 ${chat.enter}`}>
-            <AgentAvatar size={36} />
-            <span className={`text-[13px] leading-[18px] text-[var(--tx2)] ${chat.labelIn}`}>PM is reading your note</span>
+            <Mascot size={36} />
+            <span className={`text-[13px] leading-[18px] text-[var(--tx2)] ${chat.labelIn}`}>Builder is reading your message</span>
           </div>
         )}
         {/* Working: only the current phase, by the robot's name, sliding in as it changes, with its step and the run's time. */}
         {live?.kind === "working" && (
           <div className={`flex items-center gap-2.5 ${chat.enter}`}>
-            {/* The PM's face, saying who's at work out of sight ("Builder is making the change"). */}
-            <AgentAvatar size={36} />
+            <Mascot size={36} />
             <span className="flex min-w-0 items-baseline gap-2">
               <span key={live.label} className={`truncate text-[13px] leading-[18px] font-medium text-[var(--tx)] ${chat.labelIn}`}>
                 {live.label}

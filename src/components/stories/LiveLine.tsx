@@ -12,7 +12,7 @@ export const LIVE_WORDS: Record<PhaseKey, string> = {
   review: "Builder is reviewing its work",
   verify: "Checker is verifying the change",
   resume: "Builder is picking up where it left off",
-  reply: "PM is writing a reply",
+  reply: "Builder is writing a reply",
 };
 
 /** "Builder is making the change, started 4 minutes ago": for a card's or row's screen-reader summary. */

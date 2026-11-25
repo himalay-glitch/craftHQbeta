@@ -1,9 +1,6 @@
-import { BotAvatar } from "@/components/ask/BotAvatar";
+import { Mascot } from "./Mascot";
 
-/**
- * Who speaks on a story: the PM, the only bot you talk to (robots are their own shape; people are circles).
- * The Builder, Asker and Checker work out of sight; their work shows as quiet lines and in the activity log.
- */
-export function AgentAvatar({ size = 28 }: { size?: 20 | 28 | 32 | 36 | 40 }) {
-  return <BotAvatar id="pm" size={size} bare />;
+/** The agent's avatar: the orange plush mascot (robots are their own shape; people are circles). */
+export function AgentAvatar({ size = 28 }: { size?: 20 | 28 | 32 }) {
+  return <Mascot size={size} />;
 }

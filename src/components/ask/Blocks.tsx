@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Check, CircleCheck, CircleX, LoaderCircle } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, CircleAlert, CircleCheck, CircleX, LoaderCircle } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
-import type { AskData, Block, StoryRef } from "@/types/ask";
-import { TEAM } from "./team";
+import type { ActivityLine, AskData, Block, BotId, StoryRef } from "@/types/ask";
+import { BotAvatar } from "./BotAvatar";
+import { TEAM, TEAM_ORDER } from "./team";
 import styles from "./ask.module.css";
 
 // The pieces an answer is made of. Quiet by default: hairline cards, 15/24 text, colour only from status
@@ -48,6 +49,74 @@ function Stats({ items }: { items: { label: string; value: number }[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * The PM giving a job to a bot, as one quiet line: PM → Designer · the task. It spins until the PM brings the
+ * work back, then ticks. With a story, Watch opens that story's page, where the bot works live.
+ * Not for anything you need to act on: that's an approval card.
+ */
+function Handoff({ to, task, story, done }: { to: BotId; task: string; story?: number; done: boolean }) {
+  const bot = TEAM[to];
+  return (
+    <div className="flex min-h-7 items-center gap-1.5 text-[13px] leading-[18px] text-[var(--tx2)]">
+      <BotAvatar id="pm" size={20} />
+      <ArrowRight aria-hidden="true" size={12} strokeWidth={2} className="flex-none" />
+      <BotAvatar id={to} size={20} />
+      <span className="ml-1 min-w-0 truncate">
+        Handed to <span className="font-medium text-[var(--tx)]">{bot.name}</span> · {task}
+      </span>
+      {done ? (
+        <Check aria-label="Done" size={14} strokeWidth={2} className="flex-none text-success" />
+      ) : (
+        <LoaderCircle aria-label="Working" size={14} strokeWidth={2} className="flex-none motion-safe:animate-spin" style={{ color: bot.colour }} />
+      )}
+      {story !== undefined && (
+        <a
+          href={`/stories/hq-${story}`}
+          className="ml-auto flex-none rounded-full px-2 py-0.5 font-medium text-[var(--cta)] transition-colors hover:bg-[var(--row-h)]"
+        >
+          Watch
+        </a>
+      )}
+    </div>
+  );
+}
+
+const TONE = {
+  done: <CircleCheck aria-hidden="true" size={13} strokeWidth={2} className="flex-none text-success" />,
+  warn: <CircleAlert aria-hidden="true" size={13} strokeWidth={2} className="flex-none text-warning" />,
+  work: <LoaderCircle aria-hidden="true" size={13} strokeWidth={2} className="flex-none motion-safe:animate-spin" />,
+};
+
+/**
+ * What a bot did, as quiet log lines under the PM's words: the bot works, it doesn't talk.
+ * Not for results you look at (designs, checks, steps carry those) or anything that needs you.
+ */
+function Activity({ by, lines }: { by: BotId; lines: ActivityLine[] }) {
+  const bot = TEAM[by];
+  return (
+    <ul className="list-none space-y-1 border-l-2 pl-3" style={{ borderColor: `color-mix(in oklab, ${bot.colour} 35%, white)` }}>
+      {lines.map((l) => (
+        <li key={l.text} className="flex items-center gap-2 text-[12px] leading-4 text-[var(--tx2)]">
+          {TONE[l.tone ?? "done"]}
+          <span className="min-w-0">
+            <span className="font-medium text-[var(--tx)]">{bot.name}</span> {l.text}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** "by Designer": who made a result the PM brought back. */
+function Credit({ by }: { by: BotId }) {
+  return (
+    <p className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-[var(--tx2)]">
+      <BotAvatar id={by} size={16} />
+      by {TEAM[by].name}
+    </p>
   );
 }
 
@@ -266,6 +335,28 @@ function Checks({ story, passed, failed, note }: { story: { id: number; title: s
   );
 }
 
+function Team() {
+  return (
+    <ul className="grid list-none grid-cols-1 gap-2 sm:grid-cols-2">
+      {TEAM_ORDER.map((id) => {
+        const bot = TEAM[id];
+        return (
+          <li key={id} className={`${CARD} flex items-start gap-3 px-3 py-2.5`}>
+            <BotAvatar id={id} size={40} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] leading-5 font-medium text-[var(--tx)]">
+                {bot.name}
+                {id === "pm" && <span className="font-normal text-[var(--tx2)]"> · you talk to this one</span>}
+              </span>
+              <span className="block text-[12px] leading-4 text-pretty text-[var(--tx2)]">{bot.does}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function Suggest({ items, onAsk }: { items: string[]; onAsk: (q: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -286,19 +377,35 @@ function Suggest({ items, onAsk }: { items: string[]; onAsk: (q: string) => void
 export interface BlockActions {
   onAsk: (q: string) => void;
   onPickDesign: (id: string, label: string) => void;
+  /** Handoffs whose work the PM has brought back, so their spinner becomes a tick. */
+  handedOff: Set<BotId>;
   data: AskData;
 }
 
-/**
- * Every block but text (the message streams its text itself). Kinds that older saved chats may hold (the bots'
- * handoff and work lines, the team cards) aren't shown any more: the team works out of sight.
- */
+/** Every block but text (the message streams its text itself). A result a bot made says so underneath. */
 export function BlockView({ block, actions }: { block: Exclude<Block, { kind: "text" }>; actions: BlockActions }) {
+  const view = viewOf(block, actions);
+  const by = "by" in block && block.kind !== "activity" && block.kind !== "approval" ? block.by : undefined;
+  return by ? (
+    <div>
+      {view}
+      <Credit by={by} />
+    </div>
+  ) : (
+    view
+  );
+}
+
+function viewOf(block: Exclude<Block, { kind: "text" }>, actions: BlockActions) {
   switch (block.kind) {
     case "stats":
       return <Stats items={block.items} />;
     case "stories":
       return <Stories items={block.items} />;
+    case "handoff":
+      return <Handoff to={block.to} task={block.task} story={block.story} done={actions.handedOff.has(block.to)} />;
+    case "activity":
+      return <Activity by={block.by} lines={block.lines} />;
     case "approval":
       return <Approval title={block.title} body={block.body} yes={block.yes} no={block.no} onAsk={actions.onAsk} />;
     case "designs":
@@ -307,9 +414,9 @@ export function BlockView({ block, actions }: { block: Exclude<Block, { kind: "t
       return <Steps story={block.story} steps={block.steps} />;
     case "checks":
       return <Checks story={block.story} passed={block.passed} failed={block.failed} note={block.note} />;
+    case "team":
+      return <Team />;
     case "suggest":
       return <Suggest items={block.items} onAsk={actions.onAsk} />;
-    default:
-      return null;
   }
 }

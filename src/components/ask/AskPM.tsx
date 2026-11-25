@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { ArrowDown, History, SquarePen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
-import type { AskData, BotId, ChatMessage, Turn } from "@/types/ask";
+import type { Activity, AskData, BotId, ChatMessage, Turn } from "@/types/ask";
 import { AskPanel, type ListedChat } from "./AskPanel";
 import type { BlockActions } from "./Blocks";
 import { answer, pickDesign, understands } from "./brain";
@@ -26,15 +26,27 @@ function useReducedMotion() {
   );
 }
 
-// Three things to start with. Everything goes to the PM; who does the work happens out of sight.
-const STARTERS: { title: string; text: string; ask: string }[] = [
-  { title: "What’s happening?", text: "A quick read on every story, and what needs you", ask: "What’s happening right now?" },
-  { title: "Design a screen", text: "Three directions to pick from, in minutes", ask: "Design a settings page" },
-  { title: "Build something", text: "Turn an idea into a story and get it started", ask: "Build check-in reminders" },
+/** Where the team stands when you arrive (the dashboard's running stories). */
+function startingActivity(t: number): Record<BotId, Activity> {
+  return {
+    pm: { now: "Talking with you", working: false, since: t },
+    builder: { now: "Building hq-54", working: true, since: t - 4 * 60000 },
+    designer: { now: "Designing hq-23", working: true, since: t - 7 * 60000 },
+    checker: { now: "Checking hq-43", working: true, since: t - 60000 },
+    fixer: { now: "Retrying hq-21", working: true, since: t },
+  };
+}
+
+// The welcome's three cards, each fronted by the bot the PM gives it to (the reference's 3D icons). Kept calm:
+// no lists or labels here; the work itself happens behind the PM.
+const STARTERS: { bot: BotId; title: string; text: string; ask: string }[] = [
+  { bot: "pm", title: "What’s happening?", text: "A quick read on every story, and what needs you", ask: "What’s happening right now?" },
+  { bot: "designer", title: "Design a screen", text: "Three directions to pick from, in minutes", ask: "Design a settings page" },
+  { bot: "builder", title: "Build something", text: "Turn an idea into a story and get it started", ask: "Build check-in reminders" },
 ];
 const MORE = ["What merged this week?", "What’s stuck, and why?", "Who’s on the team?"];
 
-/** The empty state, kept calm: the PM over a soft glow, a greeting, three things to start with. */
+/** The empty state: the PM over a soft glow, a greeting, three things to start with. */
 function Welcome({ data, onAsk }: { data: AskData; onAsk: (q: string) => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
@@ -58,7 +70,8 @@ function Welcome({ data, onAsk }: { data: AskData; onAsk: (q: string) => void })
             onClick={() => onAsk(s.ask)}
             className="flex flex-col rounded-[18px] bg-white p-4 text-left shadow-[0_1px_2px_rgb(0_0_0/0.04),0_6px_20px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] transition-[transform,box-shadow] duration-[160ms] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgb(0_0_0/0.04),0_12px_28px_rgb(0_0_0/0.08)] motion-reduce:hover:translate-y-0"
           >
-            <span className="text-[14px] leading-5 font-semibold text-[var(--tx)]">{s.title}</span>
+            <BotAvatar id={s.bot} size={40} bare className="-ml-1" />
+            <span className="mt-6 text-[14px] leading-5 font-semibold text-[var(--tx)]">{s.title}</span>
             <span className="mt-1 text-[13px] leading-[18px] text-pretty text-[var(--tx2)]">{s.text}</span>
           </button>
         ))}
@@ -93,9 +106,9 @@ function filesNote(files: Files): Turn {
 }
 
 /**
- * Ask PM (demo): the one place to ask what's happening and hand out work. You only talk to the PM, and it's the
- * only bot you see: it answers, gives each job to the right bot out of sight, and tells you what came back. The
- * panel beside the chat keeps every past chat.
+ * Ask PM (demo): the one place to ask what's happening and hand out work. You only talk to the PM: it answers,
+ * gives each job to the right bot and brings back what that bot made. The panel beside the chat keeps every past
+ * chat and shows the team at work.
  */
 export function AskPM({ data }: { data: AskData }) {
   const reduced = useReducedMotion();
@@ -107,6 +120,8 @@ export function AskPM({ data }: { data: AskData }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [announce, setAnnounce] = useState("");
+  const [handedOff, setHandedOff] = useState<Set<BotId>>(new Set());
+  const [activity, setActivity] = useState(() => startingActivity(Date.now()));
   const [atBottom, setAtBottom] = useState(true);
   const timers = useRef<number[]>([]);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -148,7 +163,20 @@ export function AskPM({ data }: { data: AskData }) {
             setThinking(null);
             setMessages((m) => [...m, { id, from: turn.from, blocks: turn.blocks, at: t }]);
             setLiveIds((l) => new Set(l).add(id));
+            // The work a bot was doing has come back: its handoff ticks.
+            if (turn.wait) setHandedOff((h) => new Set(h).add(turn.wait as BotId));
             setAnnounce(`${TEAM[turn.from].name}: ${plainText(turn.blocks)}`);
+            // The Team tab follows: whoever was handed work starts on it, and the PM's news says where each stands.
+            setActivity((a) => {
+              const next = { ...a };
+              for (const b of turn.blocks) if (b.kind === "handoff") next[b.to] = { now: b.task, working: true, since: t };
+              if (turn.status) {
+                const { bot, ...st } = turn.status;
+                const prev = next[bot]; // after any handoff above, so a new job's clock starts now
+                next[bot] = { ...st, since: st.working && prev.working ? prev.since : t };
+              }
+              return next;
+            });
             if (i === turns.length - 1) setBusy(false);
           }, at),
         );
@@ -199,6 +227,7 @@ export function AskPM({ data }: { data: AskData }) {
       setMessages((m) => [...m, { id: newMessageId(), from: "me", blocks: [{ kind: "text", text: `Let’s go with ${id}.` }], at: Date.now() }]);
       play(pickDesign(id, label, data));
     },
+    handedOff,
     data,
   };
 
@@ -228,6 +257,7 @@ export function AskPM({ data }: { data: AskData }) {
     setMessages([]);
     setChatId(null);
     setLiveIds(new Set());
+    setHandedOff(new Set());
     field.current?.focus();
   };
 
@@ -239,6 +269,8 @@ export function AskPM({ data }: { data: AskData }) {
     setMessages(chat.messages);
     setChatId(chat.id);
     setLiveIds(new Set());
+    // Everything handed out in a past chat has come back (and older chats where bots spoke for themselves).
+    setHandedOff(new Set(chat.messages.flatMap((m) => [...(m.from === "me" ? [] : [m.from]), ...m.blocks.flatMap((b) => (b.kind === "handoff" ? [b.to] : []))])));
   };
 
   const removeChat = (chat: ListedChat) => {
@@ -352,6 +384,8 @@ export function AskPM({ data }: { data: AskData }) {
           currentId={chatId}
           onOpenChat={openChat}
           onDeleteChat={removeChat}
+          activity={activity}
+          onAskAbout={(id) => ask(`What is ${TEAM[id].name} doing?`)}
           onNewChat={reset}
         />
       </div>
