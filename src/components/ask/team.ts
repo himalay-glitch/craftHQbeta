@@ -14,7 +14,7 @@ export const TEAM: Record<BotId, Bot> = {
     colour: "#F1BA3A",
     tint: "#FDF3D6",
     poster: "/images/bots/team/pm",
-    // video: "/videos/bots/pm-idle" — off until the blink loop is re-rendered with the new eyes
+    video: "/videos/bots/pm-idle", // a gentle breathe and one sweet blink (2 s loop), in the welcome hero
   },
   builder: {
     id: "builder",
