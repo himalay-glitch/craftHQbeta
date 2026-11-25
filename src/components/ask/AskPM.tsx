@@ -109,7 +109,17 @@ function filesNote(files: Files): Turn {
  * Ask PM (demo): the one place to ask what's happening. The bots answer for themselves, the PM routes new work,
  * and the panel beside the chat keeps every past chat and shows the bots at work.
  */
-export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this is: the PM's (Ask PM) or one bot's. */ bot?: BotId }) {
+export function AskPM({
+  data,
+  bot = "pm",
+  fresh = false,
+}: {
+  data: AskData;
+  /** Whose chat this is: the PM's (Ask PM) or one bot's. */
+  bot?: BotId;
+  /** First time: this bot has nothing on yet (?state=new on a bot's page). */
+  fresh?: boolean;
+}) {
   const reduced = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // The open chat's id (made when its first message is sent), and the messages that arrived live, which stream in.
@@ -120,7 +130,11 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
   const [busy, setBusy] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [handedOff, setHandedOff] = useState<Set<BotId>>(new Set());
-  const [activity, setActivity] = useState(() => startingActivity(Date.now()));
+  const [activity, setActivity] = useState(() => {
+    const t = Date.now();
+    const a = startingActivity(t);
+    return fresh && bot !== "pm" ? { ...a, [bot]: { now: "Ready when you are", working: false, since: t } } : a;
+  });
   const [atBottom, setAtBottom] = useState(true);
   const timers = useRef<number[]>([]);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -213,11 +227,11 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
       ]);
       setInput("");
       // With files, a note the script doesn't follow just gets the PM's acknowledgement, not its generic reply.
-      const turns = text && (!files.length || understands(text)) ? answerAs(bot, text, data) : [];
+      const turns = text && (!files.length || understands(text)) ? answerAs(bot, text, data, fresh) : [];
       play(files.length ? [filesNote(files), ...turns] : turns);
       field.current?.focus();
     },
-    [bot, busy, chatId, data, play],
+    [bot, busy, chatId, data, fresh, play],
   );
   const ask = useCallback((q: string) => send(q), [send]);
 
@@ -361,7 +375,7 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
                   bot === "pm" ? (
                     <Welcome data={data} onAsk={ask} />
                   ) : (
-                    <BotWelcome bot={bot} activity={activity[bot]} onAsk={ask} />
+                    <BotWelcome bot={bot} activity={activity[bot]} onAsk={ask} fresh={fresh} />
                   )
                 ) : (
                   <div ref={thread} className="space-y-7 pt-3 pb-6">

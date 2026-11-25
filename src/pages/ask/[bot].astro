@@ -6,13 +6,15 @@ import { TEAM } from "@/components/ask/team";
 import type { BotId } from "@/types/ask";
 
 // A chat with one bot (demo): /ask/builder, /ask/designer, /ask/checker, /ask/fixer. The PM's own chat is /ask.
-export function getStaticPaths() {
-  return (["builder", "designer", "checker", "fixer"] as BotId[]).map((bot) => ({ params: { bot } }));
-}
+// Rendered on request so `?state=new` (the first-time view: nothing on yet) is known before the page paints.
+export const prerender = false;
 
+const BOTS: BotId[] = ["builder", "designer", "checker", "fixer"];
 const bot = Astro.params.bot as BotId;
+if (!BOTS.includes(bot)) return Astro.redirect("/ask");
+const fresh = Astro.url.searchParams.get("state") === "new";
 ---
 
 <AppLayout title={`${TEAM[bot].name} · CraftHQ`} viewer={askViewer} search={askSearch}>
-  <AskPM client:load data={askData} bot={bot} />
+  <AskPM client:load data={askData} bot={bot} fresh={fresh} />
 </AppLayout>

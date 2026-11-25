@@ -322,17 +322,53 @@ export const BOT_ASKS: Record<Exclude<BotId, "pm">, string[]> = {
 };
 
 const ASKING_STATUS = /\b(what are you|doing|working on|up to|how are you|busy)\b/i;
+const INTRO = /\b(what can you do|who are you|how do you|what do you (check|do)|how do i)\b/i;
+
+/** First-time quick asks, for a bot with nothing on yet (?state=new). */
+export const BOT_FIRST_ASKS: Record<Exclude<BotId, "pm">, string[]> = {
+  builder: ["What can you do?", "Build check-in reminders", "How do you work with the Checker?"],
+  designer: ["What can you do?", "Design a settings page", "Sketch an onboarding flow"],
+  checker: ["What can you do?", "What do you check?", "How do I review a story?"],
+  fixer: ["What can you do?", "What do you do when a build fails?", "How do I know something’s stuck?"],
+};
+
+/** A bot introducing itself: what it does and how it works with the others. */
+function intro(bot: Exclude<BotId, "pm">): Turn[] {
+  const text: Record<typeof bot, string> = {
+    builder:
+      "I write the code. Give me a story and I’ll make the change, run the tests and open a pull request. The Checker tests it on web and phones before it reaches you, and the Fixer steps in if a build fails.",
+    designer:
+      "I sketch screens and flows. Tell me what you need and I’ll come back with a few directions to pick from; the one you pick becomes a story for the Builder.",
+    checker:
+      "I test every change against what the story asked for, on web, Android and iOS. When everything passes, it’s ready for you: open it, try it, then accept it or ask for changes.",
+    fixer:
+      "I pick up anything that fails: a preview that won’t start, a check that breaks, a build that gets stuck. I retry it, fix what I can and tell you what I found. Stuck stories show in red on the dashboard, with me on them.",
+  };
+  return [say(bot, [{ kind: "text", text: text[bot] }, { kind: "suggest", items: BOT_FIRST_ASKS[bot].filter((q) => !INTRO.test(q)) }])];
+}
+
+/** Nothing on yet: free, and saying what it could take. */
+function freeStatus(bot: Exclude<BotId, "pm">): Turn[] {
+  const text: Record<typeof bot, string> = {
+    builder: "Nothing on my bench yet. Give me a story and I’ll start building.",
+    designer: "My drawing board’s empty. Tell me what to sketch.",
+    checker: "Nothing to test yet. I’ll pick up the Builder’s first change as soon as it’s done.",
+    fixer: "Nothing’s broken, so I’m free. I’ll step in the moment something fails.",
+  };
+  return [say(bot, [{ kind: "text", text: text[bot] }, { kind: "suggest", items: BOT_FIRST_ASKS[bot] }])];
+}
 
 /**
  * In a bot's own chat, that bot answers. Anything outside its job, it says whose it is, and that bot answers in the
  * same thread. Naming another bot (@Designer …) goes straight to it.
  */
-export function answerAs(bot: BotId, question: string, d: AskData): Turn[] {
+export function answerAs(bot: BotId, question: string, d: AskData, fresh = false): Turn[] {
   if (bot === "pm") return answer(question, d);
   const q = question.trim();
   const other = addressee(q);
   if (other && other !== bot) return answer(q, d);
-  if (ASKING_STATUS.test(q)) return status(bot);
+  if (INTRO.test(q)) return intro(bot);
+  if (ASKING_STATUS.test(q)) return fresh ? freeStatus(bot) : status(bot);
   const rest = q.replace(new RegExp(`@?\\b${bot}\\b`, "gi"), "");
   switch (bot) {
     case "builder":

@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Check, LoaderCircle } from "lucide-react";
+import { Check, LoaderCircle, Plus } from "lucide-react";
 import type { Activity, BotId } from "@/types/ask";
 import { BotAvatar } from "./BotAvatar";
-import { BOT_ASKS } from "./brain";
+import { BOT_ASKS, BOT_FIRST_ASKS } from "./brain";
 import { TEAM } from "./team";
 import styles from "./ask.module.css";
 
@@ -107,11 +107,30 @@ function nowFor(bot: Worker, checks: number): Now {
   }
 }
 
+// First time, nothing on yet (?state=new): what the empty strip says, in the bot's own words.
+const FIRST: Record<Worker, { title: string; text: string }> = {
+  builder: { title: "Nothing on the bench yet", text: "Give me a story and I’ll write the change, run the tests and open the pull request." },
+  designer: { title: "The drawing board is empty", text: "Ask me to sketch a screen or a flow, and I’ll come back with a few directions to pick from." },
+  checker: { title: "Nothing to test yet", text: "When the Builder finishes a change, I test it on web and phones against what the story asked for." },
+  fixer: { title: "Nothing’s broken", text: "If a build or a check fails, I pick it up, retry it and tell you what I found." },
+};
+
 /**
  * A bot's own chat, before you've written. Calm on purpose: the bot, its name, one live line, one light strip with
- * what it has on, and three things to ask. No other bots here: this is a one-to-one.
+ * what it has on, and three things to ask. No other bots here: this is a one-to-one. `fresh` is the first-time view:
+ * nothing on yet, so the line says it's ready and the strip is an empty, dashed invitation.
  */
-export function BotWelcome({ bot, activity, onAsk }: { bot: Worker; activity: Activity; onAsk: (q: string) => void }) {
+export function BotWelcome({
+  bot,
+  activity,
+  onAsk,
+  fresh = false,
+}: {
+  bot: Worker;
+  activity: Activity;
+  onAsk: (q: string) => void;
+  fresh?: boolean;
+}) {
   const info = TEAM[bot];
   const clock = useClock();
   const elapsed = clock === null ? "" : since(clock - activity.since);
@@ -136,13 +155,35 @@ export function BotWelcome({ bot, activity, onAsk }: { bot: Worker; activity: Ac
         <BotAvatar id={bot} size={96} bare animate className="overflow-visible!" />
       </div>
       <h1 className="mt-4 text-[28px] leading-9 font-semibold tracking-[-0.02em] text-[var(--tx)]">{info.name}</h1>
-      <p className="mt-1 inline-flex items-center gap-1.5 text-[14px] leading-5 text-[var(--tx2)]">
-        <span aria-hidden="true" className="size-1.5 rounded-full motion-safe:animate-pulse" style={{ background: info.colour }} />
-        {activity.now}
-        {activity.working && elapsed && <span className="tabular-nums">· {elapsed}</span>}
-      </p>
+      {fresh ? (
+        <p className="mt-1 inline-flex items-center gap-1.5 text-[14px] leading-5 text-[var(--tx2)]">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--ctl)]" />
+          Ready when you are
+        </p>
+      ) : (
+        <p className="mt-1 inline-flex items-center gap-1.5 text-[14px] leading-5 text-[var(--tx2)]">
+          <span aria-hidden="true" className="size-1.5 rounded-full motion-safe:animate-pulse" style={{ background: info.colour }} />
+          {activity.now}
+          {activity.working && elapsed && <span className="tabular-nums">· {elapsed}</span>}
+        </p>
+      )}
 
-      {/* What it has on: one light strip. */}
+      {/* What it has on: one light strip. First time, an empty dashed one that invites you to start. */}
+      {fresh ? (
+        <div className="mt-8 flex w-full max-w-[500px] items-center gap-3.5 rounded-[16px] border border-dashed border-black/[0.14] px-4 py-3.5 text-left">
+          <span
+            aria-hidden="true"
+            className="inline-flex size-9 flex-none items-center justify-center rounded-full"
+            style={{ background: info.tint, color: info.colour }}
+          >
+            <Plus size={16} strokeWidth={2.25} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14px] leading-5 font-medium text-[var(--tx)]">{FIRST[bot].title}</span>
+            <span className="mt-0.5 block text-[13px] leading-[18px] text-pretty text-[var(--tx2)]">{FIRST[bot].text}</span>
+          </span>
+        </div>
+      ) : (
       <a
         href={`/dashboard?story=hq-${now.id}`}
         className="group mt-8 block w-full max-w-[500px] rounded-[16px] bg-white/70 px-4 py-3.5 text-left ring-1 ring-black/[0.06] transition-[background-color,box-shadow] duration-[160ms] hover:bg-white hover:shadow-[0_6px_20px_rgb(0_0_0/0.06)]"
@@ -160,9 +201,10 @@ export function BotWelcome({ bot, activity, onAsk }: { bot: Worker; activity: Ac
         </span>
         <span className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] leading-4 text-[var(--tx2)]">{now.detail}</span>
       </a>
+      )}
 
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        {BOT_ASKS[bot].slice(0, 3).map((q) => (
+        {(fresh ? BOT_FIRST_ASKS[bot] : BOT_ASKS[bot].slice(0, 3)).map((q) => (
           <button
             key={q}
             type="button"
