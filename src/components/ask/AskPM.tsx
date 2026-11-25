@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowDown, History, SquarePen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
@@ -125,25 +125,37 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
   const timers = useRef<number[]>([]);
   const field = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  const pinned = useRef(true);
+  const thread = useRef<HTMLDivElement>(null);
   const loaded = useRef<ChatMessage[] | null>(null);
 
-  // Follow the conversation while you're at the bottom; leave you be if you've scrolled up to read.
+  // Auto-scroll: while you're at the bottom (`stick`), any growth of the thread (a new message, streaming words, a
+  // card, an image loading) snaps the newest line into view, instantly, so there's no animation to fight. Only you
+  // scrolling up stops it; coming back to the bottom, sending, or Latest starts it again. The welcome never scrolls.
+  const stick = useRef(true);
+  const toBottom = useCallback((smooth = false) => {
+    const el = scroller.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  }, []);
   const onScroll = () => {
     const el = scroller.current;
     if (!el) return;
-    const bottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 80;
-    pinned.current = bottom;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    stick.current = bottom;
     setAtBottom(bottom);
   };
-  const follow = useCallback(() => {
-    const el = scroller.current;
-    if (el && pinned.current) el.scrollTo({ top: el.scrollHeight, behavior: reduced ? "auto" : "smooth" });
-  }, [reduced]);
-  useLayoutEffect(follow, [messages, thinking, follow]);
+  const hasThread = messages.length > 0;
+  useEffect(() => {
+    const el = thread.current;
+    if (!hasThread || !el) return;
+    const follow = new ResizeObserver(() => {
+      if (stick.current) toBottom();
+    });
+    follow.observe(el);
+    return () => follow.disconnect();
+  }, [hasThread, toBottom]);
   const toLatest = () => {
-    pinned.current = true;
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+    stick.current = true;
+    toBottom(!reduced);
   };
 
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
@@ -188,7 +200,7 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
     (raw: string, files: Files = []) => {
       const text = raw.trim();
       if ((!text && files.length === 0) || busy) return;
-      pinned.current = true;
+      stick.current = true;
       if (!chatId) setChatId(newChatId());
       setMessages((m) => [
         ...m,
@@ -255,6 +267,8 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
   const reset = () => {
     stop();
     loaded.current = null;
+    stick.current = true;
+    scroller.current?.scrollTo({ top: 0 });
     setMessages([]);
     setChatId(null);
     setLiveIds(new Set());
@@ -266,7 +280,7 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
   const openChat = (chat: ListedChat) => {
     stop();
     loaded.current = chat.messages;
-    pinned.current = true;
+    stick.current = true;
     setMessages(chat.messages);
     setChatId(chat.id);
     setLiveIds(new Set());
@@ -344,7 +358,7 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
                     <BotWelcome bot={bot} activity={activity[bot]} onAsk={ask} />
                   )
                 ) : (
-                  <div className="space-y-7 pt-3 pb-6">
+                  <div ref={thread} className="space-y-7 pt-3 pb-6">
                     {messages.map((m) =>
                       m.from === "me" ? (
                         <UserMessage key={m.id} message={m} />
@@ -355,7 +369,6 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
                           stream={!reduced && m.id === lastBot && liveIds.has(m.id)}
                           newest={m.id === lastBot}
                           actions={actions}
-                          onTick={follow}
                         />
                       ),
                     )}
