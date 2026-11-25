@@ -1,5 +1,5 @@
 import type { AskData, Block, BotId, StoryRef, Turn } from "@/types/ask";
-import { TEAM } from "./team";
+import { FORMER_IDS, TEAM, isFormerId } from "./team";
 
 // The demo's team: no model behind it yet. What you asked is matched to a scripted answer built from the
 // project's own stories. The bot it concerns answers in its own voice: name a bot (or click it) and that bot
@@ -34,11 +34,9 @@ function addressee(q: string): BotId | null {
   const m = q.match(/@?\b(pm|developer|designer|tester|debugger|builder|checker|fixer)\b/i);
   if (!m) return null;
   const id = m[1].toLowerCase();
-  return (FORMER_NAMES[id] ?? id) as BotId;
+  // "@Builder" still reaches the Developer.
+  return isFormerId(id) ? FORMER_IDS[id] : (id as BotId);
 }
-
-/** The agents' first names, so "@Builder" still reaches the Developer. */
-const FORMER_NAMES: Record<string, BotId> = { builder: "developer", checker: "tester", fixer: "debugger" };
 
 /** Does the script have a real answer for this, rather than its "here's what I can do" reply? */
 export function understands(question: string) {

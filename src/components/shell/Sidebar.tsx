@@ -1,6 +1,7 @@
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
-import { PanelLeft } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Grid2x2Plus, PanelLeft } from "lucide-react";
 import { BotAvatar } from "@/components/ask/BotAvatar";
+import { ConnectAccountsModal } from "@/components/connect-accounts";
 import { TEAM, TEAM_ORDER } from "@/components/ask/team";
 import { TOOLTIP } from "@/components/dashboard/classes";
 import type { BotId } from "@/types/ask";
@@ -115,12 +116,16 @@ function BotItem({ id, current }: { id: BotId; current: boolean }) {
 
 /**
  * The main links under the top bar, on its grey, from 1024 px (narrower screens keep the top bar's menu), then
- * the bots. A 56 px rail by default; 176 px with labels when opened. Settings and the toggle sit at the bottom.
+ * the agents. A 56 px rail by default; 176 px with labels when opened. Connectors, Settings and the toggle sit at
+ * the bottom. Connectors (Shubham's idea) opens the connect-accounts modal: the services CraftHQ works through
+ * (GitHub, Claude), which are connected, and a way to connect the rest. It lives in this island because islands
+ * don't share state.
  */
 export function Sidebar({ current }: { current: string }) {
   const path = currentPath(current);
   // The server can't see the saved choice, so it renders the rail; the attribute already has the right width.
   const expanded = useSyncExternalStore(subscribe, isExpanded, () => false);
+  const [connectors, setConnectors] = useState(false);
 
   // `[` toggles it from anywhere, except while typing or with a modifier held (DESIGN.md §8.1).
   useEffect(() => {
@@ -148,7 +153,7 @@ export function Sidebar({ current }: { current: string }) {
     >
       <div className="flex min-h-0 flex-col">
         <ul className="flex list-none flex-col gap-0.5">{list(false)}</ul>
-        {/* The bots: a short rule in the rail; a "Bots" label when the sidebar is open. */}
+        {/* The agents: a short rule in the rail; an "Agents" label when the sidebar is open. */}
         <div aria-hidden="true" className="mx-auto my-3 h-px w-6 bg-black/10 [html[data-sidebar=expanded]_&]:hidden" />
         <p
           aria-hidden="true"
@@ -163,6 +168,26 @@ export function Sidebar({ current }: { current: string }) {
         </ul>
       </div>
       <ul className="flex list-none flex-col gap-0.5">
+        <li className="relative">
+          <button
+            type="button"
+            aria-label="Connectors"
+            aria-haspopup="dialog"
+            onClick={() => setConnectors(true)}
+            className={`${ITEM} w-full hover:bg-black/[0.04]`}
+          >
+            <Grid2x2Plus
+              aria-hidden="true"
+              size={16}
+              strokeWidth={1.75}
+              className="flex-none text-[var(--tx2)] group-hover:text-[var(--tx)]"
+            />
+            <span aria-hidden="true" className={LABEL}>
+              Connectors
+            </span>
+          </button>
+          <RailName>Connectors</RailName>
+        </li>
         {list(true)}
         <li className="relative">
           <button
@@ -182,6 +207,7 @@ export function Sidebar({ current }: { current: string }) {
           </RailName>
         </li>
       </ul>
+      <ConnectAccountsModal open={connectors} onClose={() => setConnectors(false)} />
     </nav>
   );
 }

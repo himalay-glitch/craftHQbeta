@@ -59,3 +59,13 @@ export const TEAM: Record<BotId, Bot> = {
 };
 
 export const TEAM_ORDER: BotId[] = ["pm", "developer", "designer", "tester", "debugger"];
+
+/**
+ * The agents' first names (Builder, Checker, Fixer). Old links, @mentions, saved chats and code still using them
+ * reach the renamed agent. New code uses the new ids.
+ */
+export const FORMER_IDS = { builder: "developer", checker: "tester", fixer: "debugger" } as const satisfies Record<string, BotId>;
+export type FormerBotId = keyof typeof FORMER_IDS;
+export const isFormerId = (id: string): id is FormerBotId => Object.hasOwn(FORMER_IDS, id);
+/** An agent's id today, given its current or its first id. */
+export const currentId = (id: BotId | FormerBotId): BotId => (isFormerId(id) ? FORMER_IDS[id] : id);

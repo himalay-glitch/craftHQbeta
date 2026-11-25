@@ -2,7 +2,7 @@
 import AppLayout from "@/layouts/AppLayout.astro";
 import { AskPM } from "@/components/ask/AskPM";
 import { askData, askSearch, askViewer } from "@/components/ask/askData";
-import { TEAM } from "@/components/ask/team";
+import { FORMER_IDS, TEAM, isFormerId } from "@/components/ask/team";
 import type { BotId } from "@/types/ask";
 
 // A chat with one agent (demo): /ask/developer, /ask/designer, /ask/tester, /ask/debugger. The PM's own chat is /ask.
@@ -10,10 +10,9 @@ import type { BotId } from "@/types/ask";
 export const prerender = false;
 
 const BOTS: BotId[] = ["developer", "designer", "tester", "debugger"];
-// The agents' first names, so old links (/ask/builder …) land on the renamed page.
-const FORMER: Record<string, BotId> = { builder: "developer", checker: "tester", fixer: "debugger" };
+// Old links (/ask/builder …) land on the renamed agent's page.
 const asked = Astro.params.bot ?? "";
-if (FORMER[asked]) return Astro.redirect(`/ask/${FORMER[asked]}${Astro.url.search}`, 301);
+if (isFormerId(asked)) return Astro.redirect(`/ask/${FORMER_IDS[asked]}${Astro.url.search}`, 301);
 const bot = asked as BotId;
 if (!BOTS.includes(bot)) return Astro.redirect("/ask");
 const fresh = Astro.url.searchParams.get("state") === "new";
