@@ -44,16 +44,8 @@ export function TopBar({ viewer, search, current }: TopBarProps) {
             </DropdownMenu.Root>
 
             <a href="/dashboard" className="flex-none rounded-[4px]">
-              {/* Black-glass wordmark with the red glass slash on the Q (design/blender/crafthq_logo_glass_v002.blend),
-                  shrunk ahead of time for each screen density so its edges stay crisp. */}
-              <img
-                src="/dashboard/crafthq-logo-44.webp"
-                srcSet="/dashboard/crafthq-logo-22.webp 1x, /dashboard/crafthq-logo-44.webp 2x, /dashboard/crafthq-logo-66.webp 3x"
-                width={128}
-                height={22}
-                alt="CraftHQ"
-                className="block h-[22px] w-auto"
-              />
+              {/* Black-glass wordmark rendered in Blender (design/blender/crafthq_logo_glass_v001.blend). */}
+              <img src="/dashboard/crafthq-logo-glass.webp" width={84} height={24} alt="CraftHQ" className="block h-6 w-auto" />
             </a>
           </div>
 
