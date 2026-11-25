@@ -10,16 +10,17 @@ const CARD =
   "transition-[transform,box-shadow,border-color] duration-[160ms] ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 " +
   "hover:shadow-[var(--shadow-card-h)] motion-reduce:hover:translate-y-0";
 
-// Each card's status indicator: its icon in a 24 px tinted circle, in the same tones and icons as the status pills
+// Each card's status indicator: its white icon in a 24 px solid circle, in the same tones and icons as the status pills
 // in the table (DESIGN.md §7.12). Robots at work are CraftHQ blue and turn (green means merged); waiting is grey;
 // a person's turn is amber; stuck is red, with a soft ring pulsing out. At 0 the indicator goes grey and still,
 // so colour only shows where there's something to look at.
-// The tints are a step deeper than the pills' so the indicators read at a glance; every icon stays above 4.5:1 on its tint.
+// Solid circles with a white icon, so each status reads at a glance; every fill keeps the icon above 3:1
+// (WCAG's bar for graphics). Grey covers Queued and any card at 0.
 const TONE = {
-  active: "bg-[#D5E3FD] text-[#1F57C3]",
-  neutral: "bg-[#E6E6E9] text-[#55565A]",
-  attention: "bg-[#FCE3BF] text-[#A34A06]",
-  negative: "bg-[#FAD2D2] text-[#B3261E]",
+  active: "bg-[#2F6FED] text-white",
+  neutral: "bg-[#8E8F94] text-white",
+  attention: "bg-[#D97706] text-white",
+  negative: "bg-[#DC2626] text-white",
 } as const;
 type Tone = keyof typeof TONE;
 
