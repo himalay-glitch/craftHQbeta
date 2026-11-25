@@ -23,8 +23,8 @@ What the dashboard is, where its look and content come from, and how it behaves.
 │ CraftHQ                          ( ⌕ Search            )                           (AD) │ 48 top bar #F9F9F9
 ├────┬─────────────────────────────────────────────────────────────────────────────────────┤
 │ ▦  │ WePop                                                              ( + New story )  │ rail 56 #F9F9F9
-│ ☰  │ ┌ Needs you ┐ ┌ Ready to review ┐ ┌ Stuck ┐ ┌ ● Running ┐ ┌ Queued ┐                  │ five stat cards
-│ ▭  │ │ 12        │ │ 5               │ │ 2     │ │ 9         │ │ 0      │                  │
+│ ☰  │ ┌ ◌ Running ┐ ┌ ◷ Queued ┐ ┌ ! Needs you ┐ ┌ ⇅ Ready to review ┐ ┌ ✕ Stuck ┐     │ five stat cards
+│ ▭  │ │ 9         │ │ 0        │ │ 12          │ │ 5                 │ │ 2       │     │
 │ ▯  │ └───────────┘ └─────────────────┘ └───────┘ └───────────┘ └────────┘                  │
 │    │ ( Show: Mine ⌄ ) ( Filter ⌄ )                                                       │ pills 30
 │    │ ┌ Story ──────────── Status ───── Action ──────────── Owner  Waiting on  Updated ┐   │
@@ -43,26 +43,26 @@ Beside the sidebar, content is capped at 1280 px and centred, with 32 px side pa
 ## 3. Parts
 
 ### Top bar and sidebar (`TopBar`, `Sidebar`, `nav.ts`, `SearchBox`, `AvatarMenu`)
-- **Top bar:** 48 px, `#F9F9F9`, sticky, the full width of the window, as in Asana. The glass wordmark on the left (24 px tall; `public/dashboard/crafthq-logo-glass.webp`, from #6), search in the middle, the account menu on the right.
+- **Top bar:** 48 px, `#F9F9F9`, sticky, the full width of the window, as in Asana. The CHQ mark on the left: black glass with a red glass slash on the Q, 24 px tall (`public/dashboard/crafthq-chq-{24,48,72}.webp` for 1x/2x/3x screens, shrunk from `design/renders/logo_chq_v001/out/chq_front.png`; the login header uses the same files), search in the middle, the account menu on the right.
 - **Sidebar:** a **56 px rail** of icons (`DESIGN.md` §4.3's collapsed rail), on the same grey, under the top bar and sticky, from 1024 px. The prototype's links, each a 16 px lucide icon: Dashboard (`LayoutDashboard`), Stories (`ListTodo`), Feature pages (`PanelsTopLeft`), Docs (`BookOpen`); Settings (`Settings`) and the toggle (`PanelLeft`) are pinned to the bottom. Items are 32 px with the icon centred; hover is a 4% black fill, the current page a 6% fill with a dark icon. Hovering or focusing an icon shows its name at once, in the dark tooltip style, 12 px to its right. It's plain CSS, so it works from the first paint with no delay; every link keeps its name for screen readers.
 - **Opening it:** `[` (not while typing) or the toggle opens it to 176 px with 14/20 labels beside the icons, and the choice is remembered per browser. The width is set on `<html data-sidebar>` by an inline script before the page paints, so it never jumps on load; `--sidebar-w` follows it (the toast centres with it). It's plain links in the HTML and hydrates when idle, for the toggle and `[`.
-- **Bots:** under the links, a short rule, then the five bots (PM, Builder, Designer, Checker, Fixer) as 24 px faces; a working bot has a small pulsing green dot. Hovering names it and what it's on ("Builder · Building hq-54"). Clicking opens Ask PM, which asks what that bot is doing (`/ask?about=builder`). Opened, they sit under a "Bots" label with their names. This replaces the old Bots tab's cards.
+- **Bots:** under the links, a short rule, then the five bots (PM, Builder, Designer, Checker, Fixer) as 24 px faces; a working bot has a small pulsing green dot. Hovering names it and what it's on ("Builder · Building hq-54"). Clicking opens that bot's own chat (`/ask/builder`, `/ask/designer` …; the PM's is Ask PM), which is highlighted here while it's open. Opened, they sit under a "Bots" label with their names. This replaces the old Bots tab's cards.
 - **Below 1024 px** there's no sidebar; the same links, with their icons, are in the top bar's menu.
 - **Search:** a 32 px pill field. `/` focuses it. It searches every story by title or ID, and choosing one opens its panel on the dashboard through the URL (`?story=hq-43`). Below 1024 px it collapses to an icon.
 - **Account menu** (Radix): name, email, the workspace line from the prototype, Settings, Sign out (goes to `/login` until there's a sign-out endpoint).
 
 ### Stats (`SummaryCards`)
-Five cards: the three that filter the table, then the agent's two. Running and Queued are separate stats, as on the live app's "Agent's turn" card (`screencapture-app-crafthq-ai-2026-11-19-14_17_03.pdf`: 1 Running · 0 Queued); they replace the prototype's "With the agent" (which showed running, with queued in its line) and "Done", the least important card. Every card does something, so each lifts on hover (the reference's raised card):
+Five cards: the agent's two first, then the three that filter the table. Each label has a coloured status indicator (below). Running and Queued are separate stats, as on the live app's "Agent's turn" card (`screencapture-app-crafthq-ai-2026-11-19-14_17_03.pdf`: 1 Running · 0 Queued); they replace the prototype's "With the agent" (which showed running, with queued in its line) and "Done", the least important card. Every card does something, so each lifts on hover (the reference's raised card):
 
-| Card | Value | Line | Click |
-|---|---|---|---|
-| Needs you | stories waiting on you | "3 more waiting on others" | Show: Mine, Filter: Everything |
-| Ready to review | Review stories | "Test, then accept or ask for changes" | toggles Filter: Review |
-| Stuck (the Stuck alert beside the label while it's above 0) | Stuck stories | "Not being picked up" | toggles Filter: Stuck |
-| Running (green dot while it's above 0) | stories the agent is working on | "2 in progress, 7 in review", or "The agent is idle" | Details, With the agent tab |
-| Queued | stories waiting for the agent to start | "Agent checked just now" (the loop tick) | Details, With the agent tab |
+| Card | Indicator | Value | Line | Click |
+|---|---|---|---|---|
+| Running | `LoaderCircle`, turning, green | stories the agent is working on | "2 in progress, 7 in review", or "The agent is idle" | Details, With the agent tab |
+| Queued | `Clock`, grey | stories waiting for the agent to start | "Agent checked just now" (the loop tick) | Details, With the agent tab |
+| Needs you | `CircleExclamationPoint`, amber (as Needs input) | stories waiting on you | "3 more waiting on others" | Show: Mine, Filter: Everything |
+| Ready to review | `GitPullRequest`, amber (as In review) | Review stories | "Test, then accept or ask for changes" | toggles Filter: Review |
+| Stuck | `CircleX`, red (as Failed), with the Stuck alert | Stuck stories | "Not being picked up" | toggles Filter: Stuck |
 
-A card whose filter is on has a blue edge. Values are never coloured.
+Each indicator is a white icon (14 px) in a solid 24 px circle, in the tones of the table's status pills (`DESIGN.md` §7.12): robots at work are green `#16A34A` and the icon turns (with reduced motion it's still; green here means running, by choice, though `DESIGN.md` keeps green for merged), waiting is grey `#8E8F94`, a person's turn amber `#D97706`, stuck red `#DC2626`. Every fill keeps the white icon above 3:1. At 0 a card's indicator goes grey and still, so colour shows only where there's something to look at. A card whose filter is on has a blue edge. Values are never coloured.
 
 ### Filters (`FilterPill`, Radix menus)
 - **Show:** Mine (default: waiting on you, plus Stuck) or Team. Counts beside each option.
@@ -80,7 +80,7 @@ A card whose filter is on has a blue edge. Values are never coloured.
 
 **Status:** one look for the whole app, so the dashboard and Stories name a story alike: the shared `StatusPill` (`src/components/ui/`, `DESIGN.md` §7.12), with its tones and icons. A status never says "you", so the groups map to statuses (`NEED_STATUS` in `format.ts`): Stuck → **Failed** (each stopped on a failed preview or check); Review → **In review**; Decision, Planning, Triage and Say what to do next → **Needs input**, with the Action column saying what input. The groups still set the order, the Filter menu and the cards.
 
-**Stuck alert:** Stuck is the one group nobody is moving, so its card carries an alert while the count is above 0: a 14 px red `CircleExclamationPoint` beside the label, with a red ring that grows 5 px out and fades (from 40% opacity, over the first 70% of a 2 s cycle, then a rest). With reduced motion the icon stands alone. In the rows, Stuck stories show the shared Failed pill.
+**Stuck alert:** Stuck is the one group nobody is moving, so while its count is above 0 its red indicator carries a soft ring that grows 5 px out and fades (from 40% opacity, over the first 70% of a 2 s cycle, then a rest). With reduced motion the ring is gone and the indicator stands alone. In the rows, Stuck stories show the shared Failed pill.
 
 ### Panels (`SidePanel`, `StoryPanel`, `ActivityPanel`, `NewStoryPanel`)
 - 480 px from the right, under the top bar. On screens 1024 px and wider it floats over the page with its shadow, with no scrim: the table keeps its full width underneath and stays clickable. Below that it covers the page with a scrim. Slides in over 200 ms; fades with reduced motion.

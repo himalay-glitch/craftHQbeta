@@ -109,13 +109,11 @@ export function BotMessage({
   stream,
   newest,
   actions,
-  onTick,
 }: {
   message: ChatMessage;
   stream: boolean;
   newest: boolean;
   actions: BlockActions;
-  onTick: () => void;
 }) {
   const bot = TEAM[message.from as BotId];
   const total = message.blocks.reduce((n, b) => n + words(b), 0);
@@ -125,7 +123,6 @@ export function BotMessage({
     const t = window.setTimeout(() => setShown((s) => Math.min(total, s + 2)), WORD_MS * 2);
     return () => window.clearTimeout(t);
   }, [shown, total]);
-  useEffect(onTick, [shown, onTick]);
 
   // Where each block's words start in the message, so each knows when it may show.
   const starts = message.blocks.map((_, i) => message.blocks.slice(0, i).reduce((n, b) => n + words(b), 0));

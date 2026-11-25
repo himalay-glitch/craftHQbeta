@@ -76,6 +76,7 @@ export function AskPanel({
   activity,
   onAskAbout,
   onNewChat,
+  currentBot = "pm",
 }: {
   chats: ListedChat[];
   currentId: string | null;
@@ -84,6 +85,8 @@ export function AskPanel({
   activity: Record<BotId, Activity>;
   onAskAbout: (id: BotId) => void;
   onNewChat: () => void;
+  /** Whose chat is open, so its row in Bots reads as the current one. */
+  currentBot?: BotId;
 }) {
   const [tab, setTab] = useState<"chats" | "team">("chats");
   const [query, setQuery] = useState("");
@@ -189,7 +192,7 @@ export function AskPanel({
             );
           })}
           {shownChats.length === 0 && (
-            <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">{q ? `No chat matches “${query}”.` : "Your chats will show up here."}</li>
+            <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">{q ? `No chat matches “${query}”.` : `Your chats${currentBot === "pm" ? "" : ` with the ${TEAM[currentBot].name}`} will show up here.`}</li>
           )}
         </ul>
       ) : (

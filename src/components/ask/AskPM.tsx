@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowDown, History, SquarePen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
 import type { Activity, AskData, BotId, ChatMessage, Turn } from "@/types/ask";
 import { AskPanel, type ListedChat } from "./AskPanel";
 import type { BlockActions } from "./Blocks";
-import { answer, pickDesign, understands } from "./brain";
+import { answerAs, pickDesign, understands } from "./brain";
+import { BotWelcome } from "./BotWelcome";
 import { BotAvatar } from "./BotAvatar";
 import { Composer } from "./Composer";
 import { deleteChat, newChatId, newMessageId, saveChat, seedChats, titleOf, useSavedChats } from "./history";
@@ -110,7 +111,17 @@ function filesNote(files: Files): Turn {
  * gives each job to the right bot and brings back what that bot made. The panel beside the chat keeps every past
  * chat and shows the team at work.
  */
-export function AskPM({ data }: { data: AskData }) {
+export function AskPM({
+  data,
+  bot = "pm",
+  fresh = false,
+}: {
+  data: AskData;
+  /** Whose chat this is: the PM's (Ask PM) or one bot's. */
+  bot?: BotId;
+  /** First time: this bot has nothing on yet (?state=new on a bot's page). */
+  fresh?: boolean;
+}) {
   const reduced = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // The open chat's id (made when its first message is sent), and the messages that arrived live, which stream in.
@@ -121,30 +132,51 @@ export function AskPM({ data }: { data: AskData }) {
   const [busy, setBusy] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [handedOff, setHandedOff] = useState<Set<BotId>>(new Set());
-  const [activity, setActivity] = useState(() => startingActivity(Date.now()));
+  const [activity, setActivity] = useState(() => {
+    const t = Date.now();
+    const a = startingActivity(t);
+    return fresh && bot !== "pm" ? { ...a, [bot]: { now: "Ready when you are", working: false, since: t } } : a;
+  });
   const [atBottom, setAtBottom] = useState(true);
   const timers = useRef<number[]>([]);
   const field = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  const pinned = useRef(true);
+  const thread = useRef<HTMLDivElement>(null);
   const loaded = useRef<ChatMessage[] | null>(null);
 
-  // Follow the conversation while you're at the bottom; leave you be if you've scrolled up to read.
+  // Auto-scroll: while you're at the bottom (`stick`), any growth of the thread (a new message, streaming words, a
+  // card, an image loading) snaps the newest line into view, instantly, so there's no animation to fight. Only you
+  // scrolling up stops it; coming back to the bottom, sending, or Latest starts it again. The welcome never scrolls.
+  const stick = useRef(true);
+  const toBottom = useCallback((smooth = false) => {
+    const el = scroller.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  }, []);
+  // Only a scroll UP is you leaving the bottom. Our own jumps only ever go down, and the thread can grow again before
+  // a jump's scroll event arrives, so "not at the bottom" alone would wrongly switch following off.
+  const lastTop = useRef(0);
   const onScroll = () => {
     const el = scroller.current;
     if (!el) return;
-    const bottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 80;
-    pinned.current = bottom;
-    setAtBottom(bottom);
+    const up = el.scrollTop < lastTop.current - 2;
+    lastTop.current = el.scrollTop;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 48) stick.current = true;
+    else if (up) stick.current = false;
+    setAtBottom(stick.current);
   };
-  const follow = useCallback(() => {
-    const el = scroller.current;
-    if (el && pinned.current) el.scrollTo({ top: el.scrollHeight, behavior: reduced ? "auto" : "smooth" });
-  }, [reduced]);
-  useLayoutEffect(follow, [messages, thinking, follow]);
+  const hasThread = messages.length > 0;
+  useEffect(() => {
+    const el = thread.current;
+    if (!hasThread || !el) return;
+    const follow = new ResizeObserver(() => {
+      if (stick.current) toBottom();
+    });
+    follow.observe(el);
+    return () => follow.disconnect();
+  }, [hasThread, toBottom]);
   const toLatest = () => {
-    pinned.current = true;
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+    stick.current = true;
+    toBottom(!reduced);
   };
 
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
@@ -191,7 +223,7 @@ export function AskPM({ data }: { data: AskData }) {
     (raw: string, files: Files = []) => {
       const text = raw.trim();
       if ((!text && files.length === 0) || busy) return;
-      pinned.current = true;
+      stick.current = true;
       if (!chatId) setChatId(newChatId());
       setMessages((m) => [
         ...m,
@@ -199,11 +231,11 @@ export function AskPM({ data }: { data: AskData }) {
       ]);
       setInput("");
       // With files, a note the script doesn't follow just gets the PM's acknowledgement, not its generic reply.
-      const turns = text && (!files.length || understands(text)) ? answer(text, data) : [];
+      const turns = text && (!files.length || understands(text)) ? answerAs(bot, text, data, fresh) : [];
       play(files.length ? [filesNote(files), ...turns] : turns);
       field.current?.focus();
     },
-    [busy, chatId, data, play],
+    [bot, busy, chatId, data, fresh, play],
   );
   const ask = useCallback((q: string) => send(q), [send]);
 
@@ -234,12 +266,16 @@ export function AskPM({ data }: { data: AskData }) {
   // Every change to the open chat is saved, so New chat never loses it. Just reopening one doesn't count as a change.
   useEffect(() => {
     if (!chatId || messages.length === 0 || messages === loaded.current) return;
-    saveChat({ id: chatId, title: titleOf(messages), updatedAt: Date.now(), messages });
-  }, [chatId, messages]);
+    saveChat({ id: chatId, title: titleOf(messages), updatedAt: Date.now(), messages, bot });
+  }, [bot, chatId, messages]);
 
   const saved = useSavedChats();
   const seeds = useMemo(() => seedChats(data), [data]);
-  const chats: ListedChat[] = [...saved.filter((c) => !c.deleted), ...seeds.filter((s) => !saved.some((c) => c.id === s.id))];
+  // Each chat lists its own history: the PM's (with the examples) or this bot's.
+  const chats: ListedChat[] = [
+    ...saved.filter((c) => !c.deleted && (c.bot ?? "pm") === bot),
+    ...(bot === "pm" ? seeds.filter((s) => !saved.some((c) => c.id === s.id)) : []),
+  ];
 
   /** Stops the bots mid-answer: nothing more arrives for this question. */
   const stop = () => {
@@ -254,6 +290,9 @@ export function AskPM({ data }: { data: AskData }) {
   const reset = () => {
     stop();
     loaded.current = null;
+    stick.current = true;
+    lastTop.current = 0;
+    scroller.current?.scrollTo({ top: 0 });
     setMessages([]);
     setChatId(null);
     setLiveIds(new Set());
@@ -265,7 +304,7 @@ export function AskPM({ data }: { data: AskData }) {
   const openChat = (chat: ListedChat) => {
     stop();
     loaded.current = chat.messages;
-    pinned.current = true;
+    stick.current = true;
     setMessages(chat.messages);
     setChatId(chat.id);
     setLiveIds(new Set());
@@ -339,9 +378,13 @@ export function AskPM({ data }: { data: AskData }) {
             <div ref={scroller} onScroll={onScroll} className="h-full overflow-y-auto">
               <div className="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-6">
                 {messages.length === 0 ? (
-                  <Welcome data={data} onAsk={ask} />
+                  bot === "pm" ? (
+                    <Welcome data={data} onAsk={ask} />
+                  ) : (
+                    <BotWelcome bot={bot} activity={activity[bot]} onAsk={ask} fresh={fresh} />
+                  )
                 ) : (
-                  <div className="space-y-7 pt-3 pb-6">
+                  <div ref={thread} className="space-y-7 pt-3 pb-6">
                     {messages.map((m) =>
                       m.from === "me" ? (
                         <UserMessage key={m.id} message={m} />
@@ -352,7 +395,6 @@ export function AskPM({ data }: { data: AskData }) {
                           stream={!reduced && m.id === lastBot && liveIds.has(m.id)}
                           newest={m.id === lastBot}
                           actions={actions}
-                          onTick={follow}
                         />
                       ),
                     )}
@@ -385,7 +427,9 @@ export function AskPM({ data }: { data: AskData }) {
           onOpenChat={openChat}
           onDeleteChat={removeChat}
           activity={activity}
-          onAskAbout={(id) => ask(`What is ${TEAM[id].name} doing?`)}
+          // You only talk to the PM (Shubham, 25 Nov): a bot here asks the PM what it's doing, in this chat.
+          onAskAbout={(id) => ask(id === "pm" ? "What’s happening right now?" : `What is ${TEAM[id].name} doing?`)}
+          currentBot={bot}
           onNewChat={reset}
         />
       </div>

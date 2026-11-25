@@ -1,44 +1,11 @@
 ---
 import AppLayout from "@/layouts/AppLayout.astro";
 import { AskPM } from "@/components/ask/AskPM";
-import { NEED_STATUS, rowAction } from "@/components/dashboard/format";
-import type { AskData, StoryRef } from "@/types/ask";
-import { dashboardData as d } from "./dashboard/_sample-data";
+import { askData, askSearch, askViewer } from "@/components/ask/askData";
 
-// Ask PM (demo): the PM answers from the same stories the dashboard shows. Nothing here talks to an API yet.
-const ref = (s: (typeof d.stories)[number]): StoryRef => ({
-  id: s.id,
-  title: s.title,
-  status: NEED_STATUS[s.need!],
-  detail: rowAction(s) || undefined,
-});
-const needs = d.stories.filter((s) => s.need);
-
-const data: AskData = {
-  project: d.project,
-  firstName: d.viewer.name.split(" ")[0],
-  needsYou: needs.filter((s) => s.waitingOn === "You").map(ref),
-  stuck: needs.filter((s) => s.need === "stuck").map(ref),
-  review: needs.filter((s) => s.need === "review").map(ref),
-  running: d.running.map((r) => ({
-    id: r.id,
-    title: r.title,
-    status: r.status === "In progress" ? "building" : "checking",
-    detail: r.updated || undefined,
-  })),
-  // The demo's week of merges (the dashboard's sample has only the count).
-  merged: [
-    { id: 5, title: "Home feed: upcoming events near you", status: "merged", detail: "Merged 2h ago" },
-    { id: 31, title: "Invite friends to an event by link", status: "merged", detail: "Merged yesterday" },
-    { id: 19, title: "Profile photo upload", status: "merged", detail: "Merged Tuesday" },
-    { id: 16, title: "RSVP with a guest count", status: "merged", detail: "Merged Monday" },
-  ],
-  nextStoryId: d.nextStoryId,
-};
-
-const search = d.stories.map(({ id, title, status }) => ({ id, title, status }));
+// Ask PM (demo): the PM answers from the same stories the dashboard shows and routes new work to the team.
 ---
 
-<AppLayout title="Ask PM · CraftHQ" viewer={d.viewer} search={search}>
-  <AskPM client:load data={data} />
+<AppLayout title="Ask PM · CraftHQ" viewer={askViewer} search={askSearch}>
+  <AskPM client:load data={askData} />
 </AppLayout>

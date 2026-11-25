@@ -347,3 +347,30 @@ function topicOf(q: string, verbs: string[]) {
   }
   return "";
 }
+
+// ---------- A bot's own chat: not on this branch ----------
+// himalay's per-bot chats (/ask/builder …) meet Shubham's rule here: you only talk to the PM (25 Nov). The bot pages
+// redirect to /ask?about=<bot>, so the PM answers everything. Each bot's quick asks stay, for its workbench.
+
+/** Each bot's quick asks, under its workbench. */
+export const BOT_ASKS: Record<Exclude<BotId, "pm">, string[]> = {
+  builder: ["What are you building?", "Show me the preview", "Build dark mode", "Fix the Android date bug"],
+  designer: ["What are you sketching?", "Show me your sketches", "Design a settings page", "Sketch the onboarding flow"],
+  checker: ["What are you testing?", "Check hq-43 again", "What failed this week?", "What’s ready to review?"],
+  fixer: ["What are you fixing?", "What’s broken?", "Why did hq-21 fail?", "What did you fix this week?"],
+};
+
+/** First-time quick asks, for a bot with nothing on yet (?state=new). */
+export const BOT_FIRST_ASKS: Record<Exclude<BotId, "pm">, string[]> = {
+  builder: ["What can you do?", "Build check-in reminders", "How do you work with the Checker?"],
+  designer: ["What can you do?", "Design a settings page", "Sketch an onboarding flow"],
+  checker: ["What can you do?", "What do you check?", "How do I review a story?"],
+  fixer: ["What can you do?", "What do you do when a build fails?", "How do I know something’s stuck?"],
+};
+
+/** Whose chat a question came from doesn't change who answers: the PM, who brings in whichever bot the work needs. */
+export function answerAs(bot: BotId, question: string, d: AskData, fresh = false): Turn[] {
+  void bot;
+  void fresh;
+  return answer(question, d);
+}

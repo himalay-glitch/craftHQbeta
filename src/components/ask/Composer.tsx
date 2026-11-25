@@ -44,6 +44,7 @@ export function Composer({
   onStop,
   busy,
   fieldRef,
+  placeholder = "Tell PM what you need…",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -51,6 +52,7 @@ export function Composer({
   onStop: () => void;
   busy: boolean;
   fieldRef: RefObject<HTMLTextAreaElement | null>;
+  placeholder?: string;
 }) {
   const [files, setFiles] = useState<Picked[]>([]);
   const [listening, setListening] = useState(false);
@@ -155,7 +157,7 @@ export function Composer({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKey}
-          placeholder={listening ? "Listening…" : "Tell PM what you need…"}
+          placeholder={listening ? "Listening…" : placeholder}
           className="block max-h-40 min-w-0 flex-1 resize-none bg-transparent text-[15px] leading-6 text-[var(--tx)] outline-none placeholder:text-[var(--tx2)]"
         />
       </div>

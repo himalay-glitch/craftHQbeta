@@ -81,14 +81,19 @@ function Item({ item, current }: { item: NavItem; current: boolean }) {
 
 /**
  * A bot under the links: its face (24 px), a green dot while it's working, its name and what it's on in the hover
- * label. It opens Ask PM, which asks what the bot is doing.
+ * label. It asks the PM what that bot is doing (/ask?about=builder): you only talk to the PM; the PM's is Ask PM.
  */
-function BotItem({ id }: { id: BotId }) {
+function BotItem({ id, current }: { id: BotId; current: boolean }) {
   const bot = TEAM[id];
   const working = !/^(free|listening|talking)/i.test(bot.now);
   return (
     <li className="relative">
-      <a href={`/ask?about=${id}`} aria-label={`${bot.name}, ${bot.now}`} className={`${ITEM} hover:bg-black/[0.04]`}>
+      <a
+        href={id === "pm" ? "/ask" : `/ask?about=${id}`}
+        aria-label={`${bot.name}, ${bot.now}`}
+        aria-current={current ? "page" : undefined}
+        className={`${ITEM} ${current ? "bg-black/[0.06] font-medium" : "hover:bg-black/[0.04]"}`}
+      >
         <span className="relative flex-none">
           <BotAvatar id={id} size={24} />
           {working && (
@@ -157,7 +162,7 @@ export function Sidebar({ current }: { current: string }) {
         </p>
         <ul aria-label="Bots" className="flex list-none flex-col gap-0.5">
           {TEAM_ORDER.map((id) => (
-            <BotItem key={id} id={id} />
+            <BotItem key={id} id={id} current={id !== "pm" && path === `/ask/${id}`} />
           ))}
         </ul>
       </div>

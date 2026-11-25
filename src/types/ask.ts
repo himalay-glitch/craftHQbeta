@@ -73,6 +73,8 @@ export interface SavedChat {
   messages: ChatMessage[];
   /** A removed chat's marker (keeps example chats from coming back). */
   deleted?: boolean;
+  /** Who the chat is with: the PM (Ask PM, the default) or one bot's own chat. */
+  bot?: BotId;
 }
 
 /** One message from the PM, after `delay` ms. */
