@@ -3,7 +3,7 @@ import { ArrowRight, Check } from "lucide-react";
 import type { AskCard, AskRefusal } from "@/types/stories";
 import { BTN_PRIMARY, BTN_SECONDARY } from "@/components/dashboard/classes";
 import chat from "./chat.module.css";
-import { Mascot } from "./Mascot";
+import { AgentAvatar } from "./AgentAvatar";
 import { Refusal } from "./TeammateBanner";
 
 /**
@@ -39,7 +39,10 @@ export function StoryDecision({ ask, refusal, onDismiss }: { ask: AskCard | null
         Read the chat first
       </button>
       <div className="flex items-start gap-3.5">
-        <Mascot size={40} className="flex-none" />
+        {/* The PM asks: it is the only bot you deal with. */}
+        <span className="flex-none">
+          <AgentAvatar size={40} />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4 text-[var(--tx2)] md:pr-32">
             <span className="inline-flex items-center gap-1.5">

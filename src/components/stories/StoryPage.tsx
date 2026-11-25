@@ -785,7 +785,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                     primary: { label: "Move to planning", onClick: act.plan },
                     secondary: { label: "Cancel story", onClick: act.cancel },
                   }
-                : { label: "Needs direction", title: "No step applies right now", meta: "Tell the agent what to do next.", secondary: { label: "Write to the agent", onClick: actions.write } };
+                : { label: "Needs direction", title: "No step applies right now", meta: "Tell PM what to do next.", secondary: { label: "Write to PM", onClick: actions.write } };
   // A refused button: the reason replaces the card's buttons, with a way to catch up.
   const askRefusal: AskRefusal | undefined = refusal ? { text: refusal, fix: { label: "See the change", onClick: catchUp } } : undefined;
 
@@ -882,7 +882,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   // The line above the message box: what a note does from here. A note is a conversation; a status is an instruction.
   const noteHint = (() => {
     if (job === "starting") return "Approved. A note written now may only reach the next build, so write notes before approving.";
-    if (job) return "The agent reads a note after this round. It won’t change the work under way.";
+    if (job) return "PM passes a note on after this round. It won’t change the work under way.";
     switch (state.status) {
       case "new":
       case "planning":
@@ -890,11 +890,11 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       case "approved":
         return state.need === "stuck" ? "A note gets a reply. To build again, choose Try again." : "A note gets a reply. The build starts when Builder picks it up.";
       case "in_progress":
-        return "The agent reads a note after this round. It won’t change the work under way.";
+        return "PM passes a note on after this round. It won’t change the work under way.";
       case "in_review":
         return busy ? "A note in review gets a reply and never changes the code." : undefined; // the Rebuild switch says it
       default:
-        return "This story is closed, so the agent won’t answer. To talk about it with your team, use Team.";
+        return "This story is closed, so PM won’t answer. To talk about it with your team, use Team.";
     }
   })();
 

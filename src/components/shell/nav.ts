@@ -9,7 +9,7 @@ export interface NavItem {
 }
 
 // Ask PM first: the one place to ask what's happening. Then the prototype's links; Feature pages and Docs
-// lead nowhere yet. The bots follow in the sidebar itself (Sidebar.tsx).
+// lead nowhere yet. No bots in the sidebar: the PM is the only one you talk to.
 export const NAV: NavItem[] = [
   { href: "/ask", label: "Ask PM", icon: MessageCircle },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },

@@ -103,7 +103,10 @@ function Actions({ text, always }: { text: string; always: boolean }) {
   );
 }
 
-/** A bot's message: its text streams in word by word; each card appears once the text before it is out. */
+/**
+ * The PM's message: its text streams in word by word; each card appears once the text before it is out.
+ * Older saved chats where other bots spoke show as the PM too: the PM is the only bot you see.
+ */
 export function BotMessage({
   message,
   stream,
@@ -117,7 +120,7 @@ export function BotMessage({
   actions: BlockActions;
   onTick: () => void;
 }) {
-  const bot = TEAM[message.from as BotId];
+  const bot = TEAM.pm;
   const total = message.blocks.reduce((n, b) => n + words(b), 0);
   const [shown, setShown] = useState(stream ? 0 : total);
   useEffect(() => {
@@ -177,24 +180,20 @@ const DOING: Record<BotId, string> = {
 };
 
 /**
- * Before the PM's next message: the PM, and who's working. While a bot has the job it says so ("Designer is
- * sketching…", with its face); otherwise the PM is thinking.
+ * Before the PM's next message: the PM, and in words who's working out of sight ("Designer is sketching…").
+ * Only the PM's face shows.
  */
 export function Thinking({ from, wait }: { from: BotId; wait?: BotId }): ReactNode {
   const who = wait ?? from;
   return (
     <div className={`flex items-center gap-3 ${styles.rise}`} role="status">
-      <BotAvatar id={from} size={30} />
+      <BotAvatar id="pm" size={30} />
       <span className="inline-flex h-8 items-center gap-2 rounded-full bg-[#F4F4F5] pr-3.5 pl-3 text-[13px] leading-[18px] text-[var(--tx2)]">
-        {wait ? (
-          <BotAvatar id={wait} size={18} className="-ml-1" />
-        ) : (
-          <span className="inline-flex gap-1" aria-hidden="true">
-            {[0, 1, 2].map((i) => (
-              <span key={i} className={`size-1.5 rounded-full bg-[var(--tx2)] ${styles.dot}`} />
-            ))}
-          </span>
-        )}
+        <span className="inline-flex gap-1" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className={`size-1.5 rounded-full bg-[var(--tx2)] ${styles.dot}`} />
+          ))}
+        </span>
         {TEAM[who].name} {DOING[who]}…
       </span>
     </div>

@@ -1,9 +1,6 @@
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { PanelLeft } from "lucide-react";
-import { BotAvatar } from "@/components/ask/BotAvatar";
-import { TEAM, TEAM_ORDER } from "@/components/ask/team";
 import { TOOLTIP } from "@/components/dashboard/classes";
-import type { BotId } from "@/types/ask";
 import { NAV, currentPath, type NavItem } from "./nav";
 
 // DESIGN.md §4.3: a 56 px rail of icons with their names on hover; `[` or the PanelLeft button opens it to the
@@ -79,36 +76,6 @@ function Item({ item, current }: { item: NavItem; current: boolean }) {
 }
 
 /**
- * A bot under the links: its face (24 px), a green dot while it's working, its name and what it's on in the hover
- * label. It opens Ask PM, which asks what the bot is doing.
- */
-function BotItem({ id }: { id: BotId }) {
-  const bot = TEAM[id];
-  const working = !/^(free|listening|talking)/i.test(bot.now);
-  return (
-    <li className="relative">
-      <a href={`/ask?about=${id}`} aria-label={`${bot.name}, ${bot.now}`} className={`${ITEM} hover:bg-black/[0.04]`}>
-        <span className="relative flex-none">
-          <BotAvatar id={id} size={24} />
-          {working && (
-            <span
-              aria-hidden="true"
-              className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-[#22A06B] ring-2 ring-[var(--bar)] motion-safe:animate-pulse"
-            />
-          )}
-        </span>
-        <span aria-hidden="true" className={LABEL}>
-          {bot.name}
-        </span>
-      </a>
-      <RailName>
-        {bot.name} <span className="opacity-70">· {bot.now}</span>
-      </RailName>
-    </li>
-  );
-}
-
-/**
  * The main links under the top bar, on its grey, from 1024 px (narrower screens keep the top bar's menu), then
  * the bots. A 56 px rail by default; 176 px with labels when opened. Settings and the toggle sit at the bottom.
  */
@@ -142,20 +109,8 @@ export function Sidebar({ current }: { current: string }) {
       className="sticky top-[var(--bar-h)] z-20 hidden h-[calc(100dvh-var(--bar-h))] w-[var(--sidebar-w)] flex-none flex-col justify-between self-start bg-[var(--bar)] px-2 py-3 transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none lg:flex"
     >
       <div className="flex min-h-0 flex-col">
+        {/* No bots here: you talk to the PM in Ask PM (the first link), and the team works out of sight. */}
         <ul className="flex list-none flex-col gap-0.5">{list(false)}</ul>
-        {/* The bots: a short rule in the rail; a "Bots" label when the sidebar is open. */}
-        <div aria-hidden="true" className="mx-auto my-3 h-px w-6 bg-black/10 [html[data-sidebar=expanded]_&]:hidden" />
-        <p
-          aria-hidden="true"
-          className="hidden px-2 pt-4 pb-1 text-[12px] leading-4 text-[var(--tx2)] [html[data-sidebar=expanded]_&]:block"
-        >
-          Bots
-        </p>
-        <ul aria-label="Bots" className="flex list-none flex-col gap-0.5">
-          {TEAM_ORDER.map((id) => (
-            <BotItem key={id} id={id} />
-          ))}
-        </ul>
       </div>
       <ul className="flex list-none flex-col gap-0.5">
         {list(true)}

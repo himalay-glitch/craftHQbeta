@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowDown, ArrowUpRight, History, SquarePen } from "lucide-react";
+import { ArrowDown, History, SquarePen } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
-import { StatusPill } from "@/components/ui/StatusPill";
-import type { Activity, AskData, BotId, ChatMessage, StoryRef, Turn } from "@/types/ask";
+import type { AskData, BotId, ChatMessage, Turn } from "@/types/ask";
 import { AskPanel, type ListedChat } from "./AskPanel";
 import type { BlockActions } from "./Blocks";
 import { answer, pickDesign, understands } from "./brain";
@@ -27,61 +26,18 @@ function useReducedMotion() {
   );
 }
 
-/** Where the team stands when you arrive (the dashboard's running stories). */
-function startingActivity(t: number): Record<BotId, Activity> {
-  return {
-    pm: { now: "Talking with you", working: false, since: t },
-    builder: { now: "Building hq-54", working: true, since: t - 4 * 60000 },
-    designer: { now: "Designing hq-23", working: true, since: t - 7 * 60000 },
-    checker: { now: "Checking hq-43", working: true, since: t - 60000 },
-    fixer: { now: "Retrying hq-21", working: true, since: t },
-  };
-}
-
-// Jobs you can give the PM, each showing who it goes to. The PM answers the first itself.
-const JOBS: { to: BotId; title: string; text: string; ask: string }[] = [
-  { to: "pm", title: "What’s happening?", text: "A quick read on every story, and what needs you", ask: "What’s happening right now?" },
-  { to: "designer", title: "Design a screen", text: "Three directions to pick from, in minutes", ask: "Design a settings page" },
-  { to: "builder", title: "Build something", text: "Turn an idea into a story and get it started", ask: "Build check-in reminders" },
+// Three things to start with. Everything goes to the PM; who does the work happens out of sight.
+const STARTERS: { title: string; text: string; ask: string }[] = [
+  { title: "What’s happening?", text: "A quick read on every story, and what needs you", ask: "What’s happening right now?" },
+  { title: "Design a screen", text: "Three directions to pick from, in minutes", ask: "Design a settings page" },
+  { title: "Build something", text: "Turn an idea into a story and get it started", ask: "Build check-in reminders" },
 ];
 const MORE = ["What merged this week?", "What’s stuck, and why?", "Who’s on the team?"];
 
-/** The welcome's "needs you" card: the stories waiting on you, most urgent first, each opening its page. */
-function NeedsYou({ items }: { items: StoryRef[] }) {
-  if (items.length === 0) return null;
-  return (
-    <section aria-label="Needs you" className="w-full max-w-[640px] overflow-hidden rounded-[18px] bg-white text-left shadow-[0_1px_2px_rgb(0_0_0/0.04),0_6px_20px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04]">
-      <h2 className="flex items-center gap-2 px-4 pt-3 pb-1.5 text-[13px] leading-[18px] font-medium text-[var(--tx)]">
-        <BotAvatar id="pm" size={20} />
-        {items.length === 1 ? "One thing needs you" : `${items.length} things need you`}
-      </h2>
-      <ul className="list-none divide-y divide-[var(--line)]">
-        {items.map((s) => (
-          <li key={s.id}>
-            <a href={`/stories/hq-${s.id}`} className="group flex min-h-12 items-center gap-3 px-4 py-2.5 transition-colors duration-[80ms] hover:bg-[var(--row-h)]">
-              <span className="w-12 flex-none text-[13px] text-[var(--tx2)] tabular-nums">hq-{s.id}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] leading-5 text-[var(--tx)]">{s.title}</span>
-                {s.detail && <span className="block truncate text-[12px] leading-4 text-[var(--tx2)]">{s.detail}</span>}
-              </span>
-              <StatusPill status={s.status} />
-              <ArrowUpRight aria-hidden="true" size={14} strokeWidth={1.75} className="flex-none text-[var(--tx2)] opacity-0 transition-opacity group-hover:opacity-100" />
-            </a>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/**
- * The empty state: the PM over a soft glow and a greeting, then what needs you, then jobs to hand the PM.
- * Each job shows who the PM gives it to, so it's clear you're asking the PM, not that bot.
- */
+/** The empty state, kept calm: the PM over a soft glow, a greeting, three things to start with. */
 function Welcome({ data, onAsk }: { data: AskData; onAsk: (q: string) => void }) {
-  const urgent = [...data.stuck, ...data.needsYou.filter((s) => s.status === "needs_input" && !data.stuck.some((x) => x.id === s.id))].slice(0, 3);
   return (
-    <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
       {/* The glow floats with the PM, inside one layer, so the poster's white melts into it (multiply). */}
       <div className={`relative ${styles.bob}`}>
         <span
@@ -89,40 +45,25 @@ function Welcome({ data, onAsk }: { data: AskData; onAsk: (q: string) => void })
           className="absolute inset-[-40%] rounded-full blur-2xl"
           style={{ background: `radial-gradient(circle, ${TEAM.pm.tint} 0%, rgb(253 226 212 / 0.6) 45%, transparent 70%)` }}
         />
-        <BotAvatar id="pm" size={112} bare animate className="overflow-visible!" />
+        <BotAvatar id="pm" size={124} bare animate className="overflow-visible!" />
       </div>
-      <h1 className="mt-4 text-[34px] leading-10 font-semibold tracking-[-0.025em] text-[var(--tx)]">Hi {data.firstName}, what’s up?</h1>
-      <p className="mt-2 text-[15px] leading-6 text-[var(--tx2)]">Tell me what you need on {data.project}. I’ll get the right bot on it.</p>
+      <h1 className="mt-5 text-[34px] leading-10 font-semibold tracking-[-0.025em] text-[var(--tx)]">Hi {data.firstName}, what’s up?</h1>
+      <p className="mt-2 text-[15px] leading-6 text-[var(--tx2)]">How can I help with {data.project} today?</p>
 
-      <div className="mt-7 flex w-full flex-col items-center gap-3">
-        <NeedsYou items={urgent} />
-        <div className="grid w-full max-w-[640px] grid-cols-1 gap-3 sm:grid-cols-3">
-          {JOBS.map((j) => (
-            <button
-              key={j.title}
-              type="button"
-              onClick={() => onAsk(j.ask)}
-              className="flex flex-col rounded-[18px] bg-white p-4 text-left shadow-[0_1px_2px_rgb(0_0_0/0.04),0_6px_20px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] transition-[transform,box-shadow] duration-[160ms] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgb(0_0_0/0.04),0_12px_28px_rgb(0_0_0/0.08)] motion-reduce:hover:translate-y-0"
-            >
-              <span className="text-[14px] leading-5 font-semibold text-[var(--tx)]">{j.title}</span>
-              <span className="mt-1 text-[13px] leading-[18px] text-pretty text-[var(--tx2)]">{j.text}</span>
-              <span className="mt-auto flex items-center gap-1.5 pt-3 text-[12px] leading-4 text-[var(--tx2)]">
-                <BotAvatar id="pm" size={18} />
-                {j.to === "pm" ? (
-                  "PM answers"
-                ) : (
-                  <>
-                    <span aria-hidden="true">→</span>
-                    <BotAvatar id={j.to} size={18} />
-                    PM hands it to {TEAM[j.to].name}
-                  </>
-                )}
-              </span>
-            </button>
-          ))}
-        </div>
+      <div className="mt-9 grid w-full max-w-[640px] grid-cols-1 gap-3 sm:grid-cols-3">
+        {STARTERS.map((s) => (
+          <button
+            key={s.title}
+            type="button"
+            onClick={() => onAsk(s.ask)}
+            className="flex flex-col rounded-[18px] bg-white p-4 text-left shadow-[0_1px_2px_rgb(0_0_0/0.04),0_6px_20px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] transition-[transform,box-shadow] duration-[160ms] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgb(0_0_0/0.04),0_12px_28px_rgb(0_0_0/0.08)] motion-reduce:hover:translate-y-0"
+          >
+            <span className="text-[14px] leading-5 font-semibold text-[var(--tx)]">{s.title}</span>
+            <span className="mt-1 text-[13px] leading-[18px] text-pretty text-[var(--tx2)]">{s.text}</span>
+          </button>
+        ))}
       </div>
-      <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+      <div className="mt-4 flex flex-wrap justify-center gap-1.5">
         {MORE.map((q) => (
           <button
             key={q}
@@ -152,9 +93,9 @@ function filesNote(files: Files): Turn {
 }
 
 /**
- * Ask PM (demo): the one place to ask what's happening and hand out work. You only talk to the PM: it answers,
- * gives each job to the right bot and brings back what that bot made. The panel beside the chat keeps every past
- * chat and shows the team at work.
+ * Ask PM (demo): the one place to ask what's happening and hand out work. You only talk to the PM, and it's the
+ * only bot you see: it answers, gives each job to the right bot out of sight, and tells you what came back. The
+ * panel beside the chat keeps every past chat.
  */
 export function AskPM({ data }: { data: AskData }) {
   const reduced = useReducedMotion();
@@ -166,8 +107,6 @@ export function AskPM({ data }: { data: AskData }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [announce, setAnnounce] = useState("");
-  const [handedOff, setHandedOff] = useState<Set<BotId>>(new Set());
-  const [activity, setActivity] = useState(() => startingActivity(Date.now()));
   const [atBottom, setAtBottom] = useState(true);
   const timers = useRef<number[]>([]);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -209,20 +148,7 @@ export function AskPM({ data }: { data: AskData }) {
             setThinking(null);
             setMessages((m) => [...m, { id, from: turn.from, blocks: turn.blocks, at: t }]);
             setLiveIds((l) => new Set(l).add(id));
-            // The work a bot was doing has come back: its handoff ticks.
-            if (turn.wait) setHandedOff((h) => new Set(h).add(turn.wait as BotId));
             setAnnounce(`${TEAM[turn.from].name}: ${plainText(turn.blocks)}`);
-            // The Team tab follows: whoever was handed work starts on it, and the PM's news says where each stands.
-            setActivity((a) => {
-              const next = { ...a };
-              for (const b of turn.blocks) if (b.kind === "handoff") next[b.to] = { now: b.task, working: true, since: t };
-              if (turn.status) {
-                const { bot, ...st } = turn.status;
-                const prev = next[bot]; // after any handoff above, so a new job's clock starts now
-                next[bot] = { ...st, since: st.working && prev.working ? prev.since : t };
-              }
-              return next;
-            });
             if (i === turns.length - 1) setBusy(false);
           }, at),
         );
@@ -273,7 +199,6 @@ export function AskPM({ data }: { data: AskData }) {
       setMessages((m) => [...m, { id: newMessageId(), from: "me", blocks: [{ kind: "text", text: `Let’s go with ${id}.` }], at: Date.now() }]);
       play(pickDesign(id, label, data));
     },
-    handedOff,
     data,
   };
 
@@ -303,7 +228,6 @@ export function AskPM({ data }: { data: AskData }) {
     setMessages([]);
     setChatId(null);
     setLiveIds(new Set());
-    setHandedOff(new Set());
     field.current?.focus();
   };
 
@@ -315,8 +239,6 @@ export function AskPM({ data }: { data: AskData }) {
     setMessages(chat.messages);
     setChatId(chat.id);
     setLiveIds(new Set());
-    // Everything handed out in a past chat has come back (and older chats where bots spoke for themselves).
-    setHandedOff(new Set(chat.messages.flatMap((m) => [...(m.from === "me" ? [] : [m.from]), ...m.blocks.flatMap((b) => (b.kind === "handoff" ? [b.to] : []))])));
   };
 
   const removeChat = (chat: ListedChat) => {
@@ -337,7 +259,8 @@ export function AskPM({ data }: { data: AskData }) {
           "radial-gradient(60% 55% at 0% 0%, #E9EEFA 0%, transparent 70%), radial-gradient(55% 60% at 100% 100%, #FBE3D6 0%, transparent 72%), #F4F4F6",
       }}
     >
-      <div className="mx-auto flex h-full max-w-[1440px] gap-4">
+      {/* Fills the screen at any desktop width; the conversation itself stays a readable column. */}
+      <div className="flex h-full gap-4">
         <section
           aria-label="Ask PM"
           className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[24px] bg-white/85 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] backdrop-blur-xl"
@@ -429,8 +352,6 @@ export function AskPM({ data }: { data: AskData }) {
           currentId={chatId}
           onOpenChat={openChat}
           onDeleteChat={removeChat}
-          activity={activity}
-          onAskAbout={(id) => ask(`What is ${TEAM[id].name} doing?`)}
           onNewChat={reset}
         />
       </div>
