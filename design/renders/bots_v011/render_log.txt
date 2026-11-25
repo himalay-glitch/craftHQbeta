@@ -24,3 +24,9 @@ eyes-snug still pm 118s
 PM_STILL_DONE 16:05
 loop pm_idle 2759s (48 frames)
 PM_LOOP_DONE 16:51
+new-eyes still pm 113s
+big-eyes still pm 104s
+lids still pm 93s
+PM_STILL_DONE 13:28
+new-eyes loop pm_idle 2655s (48 frames)
+PM_LOOP_DONE 14:13

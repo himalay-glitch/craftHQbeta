@@ -8,9 +8,13 @@ them. Each form means its job. (Replaces bots_v010, which the user rejected: shi
 thin glossy glasses, busy faces.)
 
   pm        A plush rounded rectangle (78 x 64 mm, 21 mm corners): an exact outline inflated into a pillow,
-            faces gently bulging, rim rounded over. Warm yellow. Sweet open glossy black bead eyes (3.1 mm,
-            a touch larger than the others'), each with one tiny soft highlight, a little below centre and
-            close together; the pile sits snug round them. A soft caramel felt cowboy hat, tilted, on top:
+            faces gently bulging, rim rounded over. Warm yellow. Big sweet eyes set into the plush: tall soft
+            ovals, 9 x 11.5 mm (about 8 x 10.5 showing), glossy black with a faint deep-brown gloss, centres
+            +/-13 mm, 3 mm below centre; a clear soft highlight at the upper left (35 % of the eye's width) and
+            a small one at the lower right. Each sits in a gentle 0.5 mm socket, the pile parting snugly round
+            it (cleared at the edge, tapering back over 1.6 mm), on a plush lid (coat-coloured matte velvet,
+            short pile at its rim) that shows only as a soft rim while open and becomes the closed eyelid in
+            the blink. A soft caramel felt cowboy hat, tilted, on top:
             pinched crown with the centre dent, wide brim curled up at the sides, thin dark brown band.
   builder   (Plush version, kept in out/ and the scene; the team's Builder is the original blue one from
             bots_v009, which the sheets show.) Rounded block (squircle), pillow-bulged. OpenDots blue. Small black bead eyes behind chunky matte
@@ -60,7 +64,8 @@ Files
   colors.json     calibrated coat inputs        calibrate.sh   BOTS="pm fixer" ./calibrate.sh
   final2.sh       the five finals -> out/, both team sheets, the saved scene
   finish2.py      a still -> out/<id>.png (transparent), out/<id>.webp + <id>_white.png (on white)
-  sheet2.html     the team sheet (append #black for the black version); sheet2.mjs screenshots both
+  sheet2.html     the team sheet (append #black for the black version); sheet2.mjs screenshots both:
+                  PLAYWRIGHT_CORE=<path to playwright-core> node sheet2.mjs
   strip.py        quick side-by-side previews        tests/, cal/, final/   working renders
   out/            pm, builder, designer, checker, fixer (.png transparent 512, .webp on white 512),
                   team_reference.png (white), team_reference_black.png (black)
@@ -82,8 +87,8 @@ grade (sheet_assets/builder_v009.png, made by builder_v009_asset.py). The new-Bu
 PM blink loop (transparent RGBA, 384 x 384, 192 adaptive samples, fixed seed, OIDN; 24 fps, seamless)
 -----------------------------------------------------------------------------------------------------
   loops/pm_idle/frame_0001-0048.png   2 s: a subtle breathe (1.2 %), and one sweet blink: the lids close over
-                                      frames 30-33 (the bead squashes to a soft dark line, a tiny cheek push
-                                      up, the highlight fading), reopen over 34-36. The hat stays rigid, a beat
+                                      frames 30-33 (the eye squashes to a soft dark line across its plush lid,
+                                      a tiny cheek push up, both highlights fading), reopen over 34-36. The hat stays rigid, a beat
                                       behind. Keyed from periodic functions: frame 1 equals the frame after 48.
   Re-render:  Blender -b --factory-startup --python team2.py -- loop pm "$PWD/loops/pm_idle" 384 192 blink
 

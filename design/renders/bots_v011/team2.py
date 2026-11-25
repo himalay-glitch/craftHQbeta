@@ -114,6 +114,7 @@ def materials():
     M = {}
     M["bead"], _ = principled("MAT_Bead_Black", (0.004, 0.004, 0.005), 0.16, spec=0.5)
     M["bead_soft"], _ = principled("MAT_Bead_Black_Soft", (0.004, 0.004, 0.005), 0.42, spec=0.35)
+    M["eye_gloss"], _ = principled("MAT_Eye_Gloss_BlackBrown", (0.010, 0.0062, 0.0042), 0.28, spec=0.5)
     m, b = principled("MAT_Eye_Highlight", (1, 1, 1), 0.6, spec=0.0)
     b.inputs["Emission Color"].default_value = (1, 1, 1, 1); b.inputs["Emission Strength"].default_value = 0.9
     M["highlight"] = m
@@ -495,17 +496,50 @@ def build(bot, M, offset=Vector((0, 0, 0))):
         face.append(o); return o
 
     if bot == "pm":
-        # Sweet open eyes: glossy black beads, a touch larger than the others', each with one tiny soft highlight.
+        # Sweet open eyes, sparkling and set into the plush: softly oval glossy black-brown beads,
+        # a clear highlight at the upper left and a smaller one at the lower right, each in a gentle socket.
+        RX, RY, RZ = 0.0045, 0.0026, 0.00575      # 9 x 11.5 mm tall soft ovals, about 8 x 10.5 mm showing above the pile
+        sockets = []
         for side, sx in (("L", -1), ("R", 1)):
-            e = bead(f"pm_Eye_{side}", sx * 0.0098, -0.0042, r=0.0031)
-            e.data.materials[0] = M["bead_soft"]
-            # Clear the pile against a smaller hidden stand-in, so the fur sits snug round the bead (and covers
-            # the spot when the eye closes in the blink loop).
-            face.remove(e)
-            proxy = sphere(f"pm_Eye_{side}_ClearProxy", 0.0019, c, None, root); proxy.location = e.location
-            proxy.hide_render = True; proxy.hide_viewport = True; face.append(proxy)
-            hl = sphere(f"pm_Eye_{side}_Highlight", 0.00058, c, M["highlight"], e)
-            hl.location = Vector((-0.38, -0.80, 0.46)).normalized() * 0.0031
+            loc, nor = front_hit(tree, sx * 0.0130, -0.0030)
+            e = sphere(f"pm_Eye_{side}", 1.0, c, M["eye_gloss"], root, scale=(RX, RY, RZ))
+            e.location = loc + nor * 0.0008                     # its front just clears the pile tips; the rest sits in
+            # The pile parts snugly round each eye: clear it against a slightly smaller hidden stand-in.
+            proxy = sphere(f"pm_Eye_{side}_ClearProxy", 1.0, c, None, root, scale=(RX, RY, RZ))
+            proxy.location = e.location; proxy.hide_render = True; face.append(proxy)   # render-hidden only, so it's evaluated in place
+            for nm, d, rr in (("Highlight", (-0.40, -0.80, 0.46), 0.00158), ("Highlight2", (0.42, -0.86, -0.32), 0.00062)):
+                dv = Vector(d).normalized()
+                k = 1.0 / math.sqrt((dv.x / RX) ** 2 + (dv.y / RY) ** 2 + (dv.z / RZ) ** 2)   # onto the eye's surface
+                hl = sphere(f"pm_Eye_{side}_{nm}", rr, c, M["highlight"], e, scale=(1.0, 0.45, 1.0))
+                hl.location = dv * k * 0.97
+            # A plush lid behind the eye: hidden while it's open (only a soft fuzzy rim shows round it), it's what you
+            # see when the eye closes in the blink, so the closed eye is a soft dark line on yellow plush, not a bare socket.
+            if side == "L":                                    # the lid reads as the coat: its rendered colour as plush velvet
+                lm, lb = principled("MAT_Lid_pm", (s2l(194), s2l(146), s2l(4)), 1.0, spec=0.02, sheen=0.22,
+                                    sheen_tint=(1.0, 0.72, 0.15), sheen_rough=0.55)
+                add_grain(lm, lb, scale=3200.0, strength=0.25)
+            lid = sphere(f"pm_Eye_{side}_Lid", 1.0, c, lm, root, scale=(RX * 1.10, RY * 0.70, RZ * 1.08))
+            lid.location = e.location
+            lid.data.materials.append(body.data.materials[1])
+            lvg = lid.vertex_groups.new(name="T2_LidFur")
+            for v in lid.data.vertices:
+                q = Vector((v.co.x / RX, v.co.y / RY, v.co.z / RZ)).length
+                lvg.add([v.index], max(0.0, min(1.0, (q - 1.0) / 0.12)), "REPLACE")
+            lps = body.particle_systems[0].settings.copy(); lps.name = P + f"PS_Lid_{side}"
+            lps.count = 220; lps.hair_length = 0.0011; lps.rendered_child_count = 30
+            lid.modifiers.new("LidFur", "PARTICLE_SYSTEM")
+            lid.particle_systems[-1].settings = lps
+            lid.particle_systems[-1].vertex_group_density = lvg.name; lid.particle_systems[-1].vertex_group_length = lvg.name
+            lid.modifiers.move(lid.modifiers.find("LidFur"), 0)
+            sockets.append(loc)
+        # Gentle sockets: dent the body 0.5 mm under each eye, fading out 2.2 mm beyond it, so the pile dips in.
+        for v in body.data.vertices:
+            if v.co.y > 0: continue
+            for l in sockets:
+                rr2 = ((v.co.x - l.x) / (RX + 0.0022)) ** 2 + ((v.co.z - l.z) / (RZ + 0.0022)) ** 2
+                if rr2 < 1.0:
+                    v.co -= v.normal * 0.0005 * (1.0 - rr2) ** 2
+        body.data.update()
         zt = top_z(tree, 0.0035, 0.0)
         h = anchor("pm_Hat", c, (0.0030, 0.0008, zt - 0.0005), (math.radians(-5), math.radians(8), 0), root)
         h.scale = (1.14, 1.14, 1.14)
@@ -618,7 +652,7 @@ def build(bot, M, offset=Vector((0, 0, 0))):
         parts.append(strip)
 
     clear_fur_near(body, vg, parts, near=0.0004, far=0.0028)
-    clear_fur_near(body, vg, face, near=0.0001, far=0.0014)
+    clear_fur_near(body, vg, face, near=(0.0002 if bot == "pm" else 0.0001), far=(0.0016 if bot == "pm" else 0.0014))   # the PM's pile tapers into its eye sockets
     return c, body
 
 # ---------- Studio: soft, matte light, no hot specular ----------
@@ -754,6 +788,7 @@ elif mode == "loop":
     zmin = min(v.co.z for v in body.data.vertices)          # the bottom stays on the ground while it squashes
     hat_loc, hat_rot = hat.location.copy(), hat.rotation_euler.copy()
     N = {"idle": 60, "work": 48, "blink": 48}[kind]
+    HL_SCALE = {}
     # The PM's blink: closes smoothly over 4 frames (30-33), reopens over 3 (34-36).
     CLOSE = {30: 0.30, 31: 0.65, 32: 0.92, 33: 1.0, 34: 0.70, 35: 0.35, 36: 0.10}
 
@@ -795,15 +830,16 @@ elif mode == "loop":
             blink = {35: 0.55, 36: 0.12, 37: 0.12, 38: 0.12, 39: 0.55}.get(f, 1.0)
         elif kind == "blink":
             cl = CLOSE.get(f, 0.0)
-            blink, widen, push = 1.0 - 0.85 * cl, 1.0 + 0.12 * cl, 0.00035 * cl   # to a soft line, a tiny cheek push
+            blink, widen, push = 1.0 - 0.90 * cl, 1.0 + 0.10 * cl, 0.00045 * cl   # to a soft line, a tiny cheek push
         for e, l0 in zip(eyes, eye_loc):
             e.scale = (widen, 1.0, blink); e.location = (l0.x, l0.y, l0.z + push)
             e.keyframe_insert("scale", frame=f); e.keyframe_insert("location", frame=f)
-            hl = bpy.data.objects.get(e.name + "_Highlight")
-            if hl:                                               # the highlight fades out as the lid closes
-                k = max(0.0, 1.0 - 1.7 * (CLOSE.get(f, 0.0) if kind == "blink" else 0.0))
-                hl.scale = (k, k, k); hl.keyframe_insert("scale", frame=f)
-    for o in [root, hat] + eyes + [h for h in (bpy.data.objects.get(e.name + "_Highlight") for e in eyes) if h]:
+            for hl in [bpy.data.objects.get(e.name + n) for n in ("_Highlight", "_Highlight2")]:
+                if hl:                                           # the highlights fade out as the lids close
+                    s0 = HL_SCALE.setdefault(hl.name, hl.scale.copy())
+                    k = max(0.0, 1.0 - 1.7 * (CLOSE.get(f, 0.0) if kind == "blink" else 0.0))
+                    hl.scale = (s0.x * k, s0.y * k, s0.z * k); hl.keyframe_insert("scale", frame=f)
+    for o in [root, hat] + eyes + [h for h in (bpy.data.objects.get(e.name + n) for e in eyes for n in ("_Highlight", "_Highlight2")) if h]:
         for fc in o.animation_data.action.fcurves:
             for kp in fc.keyframe_points: kp.interpolation = "LINEAR"
     sc.frame_start, sc.frame_end, sc.render.fps = 1, N, 24
