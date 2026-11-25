@@ -65,6 +65,7 @@ export function AskPanel({
   activity,
   onAskAbout,
   onNewChat,
+  currentBot = "pm",
 }: {
   chats: ListedChat[];
   currentId: string | null;
@@ -73,6 +74,8 @@ export function AskPanel({
   activity: Record<BotId, Activity>;
   onAskAbout: (id: BotId) => void;
   onNewChat: () => void;
+  /** Whose chat is open, so its row in Bots reads as the current one. */
+  currentBot?: BotId;
 }) {
   const [tab, setTab] = useState<"chats" | "bots">("chats");
   const [query, setQuery] = useState("");
@@ -174,7 +177,7 @@ export function AskPanel({
             );
           })}
           {shownChats.length === 0 && (
-            <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">{q ? `No chat matches “${query}”.` : "Your chats will show up here."}</li>
+            <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">{q ? `No chat matches “${query}”.` : `Your chats${currentBot === "pm" ? "" : ` with the ${TEAM[currentBot].name}`} will show up here.`}</li>
           )}
         </ul>
       ) : (
@@ -187,7 +190,9 @@ export function AskPanel({
                 <button
                   type="button"
                   onClick={() => onAskAbout(id)}
-                  className="flex w-full gap-3 rounded-[16px] px-2.5 py-2.5 text-left transition-colors duration-[120ms] hover:bg-[#F6F6F7]"
+                  aria-current={id === currentBot ? "page" : undefined}
+                  aria-label={`${bot.name}: open its chat`}
+                  className={`flex w-full gap-3 rounded-[16px] px-2.5 py-2.5 text-left transition-colors duration-[120ms] ${id === currentBot ? "bg-[#F1F1F3]" : "hover:bg-[#F6F6F7]"}`}
                 >
                   <BotAvatar id={id} size={40} />
                   <span className="min-w-0 flex-1">

@@ -1,4 +1,5 @@
 import type { AskData, Block, BotId, StoryRef, Turn } from "@/types/ask";
+import { TEAM } from "./team";
 
 // The demo's team: no model behind it yet. What you asked is matched to a scripted answer built from the
 // project's own stories. The bot it concerns answers in its own voice: name a bot (or click it) and that bot
@@ -308,4 +309,120 @@ function topicOf(q: string, verbs: string[]) {
     if (t) return t.length <= 60 && !/^(it|this|that)\b/i.test(t) ? t : "";
   }
   return "";
+}
+
+// ---------- A bot's own chat (/ask/builder …): it answers you directly ----------
+
+/** Each bot's quick asks, under its workbench. */
+export const BOT_ASKS: Record<Exclude<BotId, "pm">, string[]> = {
+  builder: ["What are you building?", "Show me the preview", "Build dark mode", "Fix the Android date bug"],
+  designer: ["What are you sketching?", "Show me your sketches", "Design a settings page", "Sketch the onboarding flow"],
+  checker: ["What are you testing?", "Check hq-43 again", "What failed this week?", "What’s ready to review?"],
+  fixer: ["What are you fixing?", "What’s broken?", "Why did hq-21 fail?", "What did you fix this week?"],
+};
+
+const ASKING_STATUS = /\b(what are you|doing|working on|up to|how are you|busy)\b/i;
+
+/**
+ * In a bot's own chat, that bot answers. Anything outside its job, it says whose it is, and that bot answers in the
+ * same thread. Naming another bot (@Designer …) goes straight to it.
+ */
+export function answerAs(bot: BotId, question: string, d: AskData): Turn[] {
+  if (bot === "pm") return answer(question, d);
+  const q = question.trim();
+  const other = addressee(q);
+  if (other && other !== bot) return answer(q, d);
+  if (ASKING_STATUS.test(q)) return status(bot);
+  const rest = q.replace(new RegExp(`@?\\b${bot}\\b`, "gi"), "");
+  switch (bot) {
+    case "builder":
+      if (FIX.test(rest)) return fix(d, true);
+      if (/\bpreview\b/i.test(rest)) return builderPreview();
+      if (BUILD.test(rest)) return build(d, rest, true);
+      if (MERGED.test(rest)) return merged(d);
+      break;
+    case "designer":
+      if (/\b(sketches|drawings|drawing board|board)\b/i.test(rest)) return designerSketches();
+      if (DESIGN.test(rest)) return design(d, rest, true);
+      break;
+    case "checker":
+      if (CHECK.test(rest)) return check(d);
+      if (REVIEW.test(rest)) return review(d);
+      if (STUCK.test(rest)) return checkerFailures(d);
+      break;
+    case "fixer":
+      if (/\b(fixed|this week)\b/i.test(rest)) return fixerFixed();
+      if (STUCK.test(rest) || FIX.test(rest)) return stuck(d);
+      break;
+  }
+  if (!understands(q)) return botFallback(bot);
+  const turns = answer(q, d);
+  const first = turns[0]?.from;
+  if (first && first !== bot) {
+    const owner = first === "pm" ? "PM" : `the ${TEAM[first].name}`;
+    return [say(bot, [{ kind: "text", text: `That one’s for ${owner}; I’ve passed it on.` }], 600), ...turns];
+  }
+  return turns;
+}
+
+function botFallback(bot: Exclude<BotId, "pm">): Turn[] {
+  const what: Record<typeof bot, string> = {
+    builder: "I write the code: ask what I’m building, see a preview, or give me something new to build.",
+    designer: "I sketch screens and flows: ask what’s on my board, or give me something to design.",
+    checker: "I test every change: ask what I’m checking, what failed, or what’s ready for you.",
+    fixer: "I pick up whatever failed: ask what’s broken, or why something failed.",
+  };
+  return [say(bot, [{ kind: "text", text: what[bot] }, { kind: "suggest", items: BOT_ASKS[bot] }])];
+}
+
+function builderPreview(): Turn[] {
+  return [
+    say("builder", [
+      { kind: "text", text: "hq-54’s preview is up from my last good build, about two hours ago. Today’s changes land in it when the tests pass." },
+      { kind: "stories", items: [{ id: 54, title: "Your calendar: see your upcoming plans", status: "building", detail: "Preview ready · last build 2h ago" }] },
+      { kind: "suggest", items: ["What are you building?", "Build dark mode"] },
+    ]),
+  ];
+}
+
+function designerSketches(): Turn[] {
+  return [
+    say("designer", [
+      { kind: "text", text: `Here’s my board for hq-23, the onboarding value slider and language switch. Pick one and I’ll write it up for the Builder.` },
+      {
+        kind: "designs",
+        options: [
+          { id: "A", label: "Slider", layout: "cards" },
+          { id: "B", label: "One list", layout: "list" },
+          { id: "C", label: "Split view", layout: "split" },
+        ],
+      },
+    ]),
+  ];
+}
+
+function checkerFailures(d: AskData): Turn[] {
+  return [
+    say("checker", [
+      { kind: "text", text: `${plural(d.stuck.length, "story", "stories")} failed this week, both before reaching my checks: a preview that wouldn’t start, and a full check waiting on an admin. The Fixer has them.` },
+      { kind: "stories", items: d.stuck },
+      { kind: "suggest", items: ["What’s ready to review?", "@Fixer what are you fixing?"] },
+    ]),
+  ];
+}
+
+function fixerFixed(): Turn[] {
+  return [
+    say("fixer", [
+      { kind: "text", text: "Three fixes this week: two previews that ran out of memory and a flaky sign-in test. Each went back through the Checker." },
+      {
+        kind: "stories",
+        items: [
+          { id: 26, title: "Home feed states: loading, empty, error, offline", status: "merged", detail: "Preview restarted · Tuesday" },
+          { id: 24, title: "Invite-only gate and waitlist form", status: "merged", detail: "Flaky test fixed · Monday" },
+          { id: 25, title: "Phone sign-up and verification code", status: "merged", detail: "Preview restarted · Monday" },
+        ],
+      },
+    ]),
+  ];
 }

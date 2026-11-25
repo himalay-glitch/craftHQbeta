@@ -48,6 +48,7 @@ export function Composer({
   onStop,
   busy,
   fieldRef,
+  placeholder = "Ask PM anything, or @mention a bot…",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -55,6 +56,7 @@ export function Composer({
   onStop: () => void;
   busy: boolean;
   fieldRef: RefObject<HTMLTextAreaElement | null>;
+  placeholder?: string;
 }) {
   const [files, setFiles] = useState<Picked[]>([]);
   const [mention, setMention] = useState<string | null>(null);
@@ -242,7 +244,7 @@ export function Composer({
       <div className="flex items-start gap-2 px-1">
         <Sparkles aria-hidden="true" size={16} strokeWidth={1.75} className="mt-[5px] flex-none text-[var(--tx2)]" />
         <label htmlFor="ask-input" className="sr-only">
-          Ask PM
+          Message
         </label>
         <textarea
           id="ask-input"
@@ -260,7 +262,7 @@ export function Composer({
           aria-expanded={open}
           aria-controls={open ? "ask-mentions" : undefined}
           aria-activedescendant={open ? `ask-mention-${options[active]}` : undefined}
-          placeholder={listening ? "Listening…" : "Ask PM anything, or @mention a bot…"}
+          placeholder={listening ? "Listening…" : placeholder}
           className="block max-h-40 min-w-0 flex-1 resize-none bg-transparent text-[15px] leading-6 text-[var(--tx)] outline-none placeholder:text-[var(--tx2)]"
         />
       </div>

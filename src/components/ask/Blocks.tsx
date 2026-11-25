@@ -72,7 +72,7 @@ function Handoff({ to, task, done }: { to: BotId; task: string; done: boolean })
 }
 
 /** A tiny wireframe per direction, in the Designer's violet. */
-function Wireframe({ layout, colour }: { layout: "list" | "cards" | "split"; colour: string }) {
+export function Wireframe({ layout, colour }: { layout: "list" | "cards" | "split"; colour: string }) {
   const soft = `color-mix(in oklab, ${colour} 18%, white)`;
   const mid = `color-mix(in oklab, ${colour} 45%, white)`;
   return (

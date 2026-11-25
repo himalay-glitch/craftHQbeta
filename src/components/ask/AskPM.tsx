@@ -5,7 +5,8 @@ import { MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
 import type { Activity, AskData, BotId, ChatMessage, Turn } from "@/types/ask";
 import { AskPanel, type ListedChat } from "./AskPanel";
 import type { BlockActions } from "./Blocks";
-import { answer, pickDesign, understands } from "./brain";
+import { answerAs, pickDesign, understands } from "./brain";
+import { BotWelcome } from "./BotWelcome";
 import { BotAvatar } from "./BotAvatar";
 import { Composer } from "./Composer";
 import { deleteChat, newChatId, newMessageId, saveChat, seedChats, titleOf, useSavedChats } from "./history";
@@ -108,7 +109,7 @@ function filesNote(files: Files): Turn {
  * Ask PM (demo): the one place to ask what's happening. The bots answer for themselves, the PM routes new work,
  * and the panel beside the chat keeps every past chat and shows the bots at work.
  */
-export function AskPM({ data }: { data: AskData }) {
+export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this is: the PM's (Ask PM) or one bot's. */ bot?: BotId }) {
   const reduced = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // The open chat's id (made when its first message is sent), and the messages that arrived live, which stream in.
@@ -195,11 +196,11 @@ export function AskPM({ data }: { data: AskData }) {
       ]);
       setInput("");
       // With files, a note the script doesn't follow just gets the PM's acknowledgement, not its generic reply.
-      const turns = text && (!files.length || understands(text)) ? answer(text, data) : [];
+      const turns = text && (!files.length || understands(text)) ? answerAs(bot, text, data) : [];
       play(files.length ? [filesNote(files), ...turns] : turns);
       field.current?.focus();
     },
-    [busy, chatId, data, play],
+    [bot, busy, chatId, data, play],
   );
   const ask = useCallback((q: string) => send(q), [send]);
 
@@ -230,12 +231,16 @@ export function AskPM({ data }: { data: AskData }) {
   // Every change to the open chat is saved, so New chat never loses it. Just reopening one doesn't count as a change.
   useEffect(() => {
     if (!chatId || messages.length === 0 || messages === loaded.current) return;
-    saveChat({ id: chatId, title: titleOf(messages), updatedAt: Date.now(), messages });
-  }, [chatId, messages]);
+    saveChat({ id: chatId, title: titleOf(messages), updatedAt: Date.now(), messages, bot });
+  }, [bot, chatId, messages]);
 
   const saved = useSavedChats();
   const seeds = useMemo(() => seedChats(data), [data]);
-  const chats: ListedChat[] = [...saved.filter((c) => !c.deleted), ...seeds.filter((s) => !saved.some((c) => c.id === s.id))];
+  // Each chat lists its own history: the PM's (with the examples) or this bot's.
+  const chats: ListedChat[] = [
+    ...saved.filter((c) => !c.deleted && (c.bot ?? "pm") === bot),
+    ...(bot === "pm" ? seeds.filter((s) => !saved.some((c) => c.id === s.id)) : []),
+  ];
 
   /** Stops the bots mid-answer: nothing more arrives for this question. */
   const stop = () => {
@@ -333,7 +338,11 @@ export function AskPM({ data }: { data: AskData }) {
             <div ref={scroller} onScroll={onScroll} className="h-full overflow-y-auto">
               <div className="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-6">
                 {messages.length === 0 ? (
-                  <Welcome data={data} onAsk={ask} />
+                  bot === "pm" ? (
+                    <Welcome data={data} onAsk={ask} />
+                  ) : (
+                    <BotWelcome bot={bot} activity={activity[bot]} onAsk={ask} />
+                  )
                 ) : (
                   <div className="space-y-7 pt-3 pb-6">
                     {messages.map((m) =>
@@ -368,8 +377,18 @@ export function AskPM({ data }: { data: AskData }) {
           </div>
 
           <div className="px-4 pt-2 pb-4 sm:px-6">
-            <Composer value={input} onChange={setInput} onSend={send} onStop={stop} busy={busy} fieldRef={field} />
-            <p className="mt-2 text-center text-[12px] leading-4 text-[var(--tx2)]">The bots answer from {data.project}’s stories · demo</p>
+            <Composer
+              value={input}
+              onChange={setInput}
+              onSend={send}
+              onStop={stop}
+              busy={busy}
+              fieldRef={field}
+              placeholder={bot === "pm" ? undefined : `Message ${TEAM[bot].name}…`}
+            />
+            <p className="mt-2 text-center text-[12px] leading-4 text-[var(--tx2)]">
+              {bot === "pm" ? "The bots answer" : `The ${TEAM[bot].name} answers`} from {data.project}’s stories · demo
+            </p>
           </div>
         </section>
 
@@ -379,7 +398,8 @@ export function AskPM({ data }: { data: AskData }) {
           onOpenChat={openChat}
           onDeleteChat={removeChat}
           activity={activity}
-          onAskAbout={(id) => ask(`What is ${TEAM[id].name} doing?`)}
+          onAskAbout={(id) => window.location.assign(id === "pm" ? "/ask" : `/ask/${id}`)}
+          currentBot={bot}
           onNewChat={reset}
         />
       </div>

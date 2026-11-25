@@ -1,0 +1,18 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import { AskPM } from "@/components/ask/AskPM";
+import { askData, askSearch, askViewer } from "@/components/ask/askData";
+import { TEAM } from "@/components/ask/team";
+import type { BotId } from "@/types/ask";
+
+// A chat with one bot (demo): /ask/builder, /ask/designer, /ask/checker, /ask/fixer. The PM's own chat is /ask.
+export function getStaticPaths() {
+  return (["builder", "designer", "checker", "fixer"] as BotId[]).map((bot) => ({ params: { bot } }));
+}
+
+const bot = Astro.params.bot as BotId;
+---
+
+<AppLayout title={`${TEAM[bot].name} · CraftHQ`} viewer={askViewer} search={askSearch}>
+  <AskPM client:load data={askData} bot={bot} />
+</AppLayout>
