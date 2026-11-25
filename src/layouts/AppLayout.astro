@@ -1,0 +1,43 @@
+---
+// The signed-in app shell: the top bar, the sidebar and the page beside it. Owned by the dashboard owner
+// (CLAUDE.md). The look follows the Asana reference: a full-width top bar with search and the account, and
+// a sidebar with the main links (docs/design/dashboard-plan.md, §3).
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { Sidebar } from "@/components/shell/Sidebar";
+import { TopBar } from "@/components/shell/TopBar";
+import tokens from "@/components/dashboard/tokens.module.css";
+import type { SearchItem, Viewer } from "@/types/dashboard";
+
+interface Props {
+  title?: string;
+  viewer: Viewer;
+  search: SearchItem[];
+}
+
+const { title, viewer, search } = Astro.props;
+---
+
+<BaseLayout title={title}>
+  {/* Before the shell paints: restore the opened sidebar if that's what this person chose (Sidebar.tsx). */}
+  <script is:inline>
+    try {
+      if (localStorage.getItem("crafthq.sidebar") === "expanded") document.documentElement.dataset.sidebar = "expanded";
+    } catch {}
+  </script>
+  <div class:list={[tokens.tokens, tokens.page, "min-h-dvh"]}>
+    <a
+      href="#main"
+      class="sr-only z-50 rounded-full bg-white px-4 py-2 text-[14px] font-medium shadow-[var(--shadow-menu)] focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+    >
+      Skip to content
+    </a>
+    <TopBar client:load viewer={viewer} search={search} current={Astro.url.pathname} />
+    <div class="flex">
+      {/* Plain links in the HTML; it hydrates when idle for its tooltips and the `[` toggle. */}
+      <Sidebar client:idle current={Astro.url.pathname} />
+      <div class="min-w-0 flex-1">
+        <slot />
+      </div>
+    </div>
+  </div>
+</BaseLayout>
