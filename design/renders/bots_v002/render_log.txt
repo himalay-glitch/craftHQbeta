@@ -1,7 +1,0 @@
-builder idle 377.3s
-builder work 286.0s
-checker idle 310.6s
-checker work 257.4s
-asker idle 327.8s
-asker work 267.7s
-DONE
