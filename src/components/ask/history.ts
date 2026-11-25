@@ -13,6 +13,18 @@ const MAX = 30;
 let cachedRaw: string | null | undefined;
 let cached: SavedChat[] = EMPTY;
 
+// Chats saved before the agents were renamed (Builder → Developer, Checker → Tester, Fixer → Debugger) still
+// carry the old ids and names; read them with the new ones.
+const FORMER: [RegExp, string][] = [
+  [/"builder"/g, '"developer"'],
+  [/"checker"/g, '"tester"'],
+  [/"fixer"/g, '"debugger"'],
+  [/\bBuilder\b/g, "Developer"],
+  [/\bChecker\b/g, "Tester"],
+  [/\bFixer\b/g, "Debugger"],
+];
+const renamed = (raw: string) => FORMER.reduce((s, [from, to]) => s.replace(from, to), raw);
+
 function read(): SavedChat[] {
   let raw: string | null = null;
   try {
@@ -23,7 +35,7 @@ function read(): SavedChat[] {
   if (raw !== cachedRaw) {
     cachedRaw = raw;
     try {
-      cached = raw ? (JSON.parse(raw) as SavedChat[]) : EMPTY;
+      cached = raw ? (JSON.parse(renamed(raw)) as SavedChat[]) : EMPTY;
     } catch {
       cached = EMPTY;
     }

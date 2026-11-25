@@ -31,10 +31,10 @@ function useReducedMotion() {
 function startingActivity(t: number): Record<BotId, Activity> {
   return {
     pm: { now: "Talking with you", working: false, since: t },
-    builder: { now: "Building hq-54", working: true, since: t - 4 * 60000 },
+    developer: { now: "Building hq-54", working: true, since: t - 4 * 60000 },
     designer: { now: "Designing hq-23", working: true, since: t - 7 * 60000 },
-    checker: { now: "Checking hq-43", working: true, since: t - 60000 },
-    fixer: { now: "Retrying hq-21", working: true, since: t },
+    tester: { now: "Checking hq-43", working: true, since: t - 60000 },
+    debugger: { now: "Retrying hq-21", working: true, since: t },
   };
 }
 
@@ -42,7 +42,7 @@ function startingActivity(t: number): Record<BotId, Activity> {
 const STARTERS: { bot: BotId; title: string; text: string; ask: string }[] = [
   { bot: "pm", title: "What’s happening?", text: "A quick read on every story, and what needs you", ask: "What’s happening right now?" },
   { bot: "designer", title: "Design a screen", text: "Three directions to pick from, in minutes", ask: "Design a settings page" },
-  { bot: "builder", title: "Build something", text: "Turn an idea into a story and get it started", ask: "Build check-in reminders" },
+  { bot: "developer", title: "Build something", text: "Turn an idea into a story and get it started", ask: "Build check-in reminders" },
 ];
 const MORE = ["What merged this week?", "What’s stuck, and why?", "Who’s on the team?"];
 
@@ -235,7 +235,7 @@ export function AskPM({
   );
   const ask = useCallback((q: string) => send(q), [send]);
 
-  // Arriving from a bot in the sidebar (/ask?about=builder): ask it what it's doing, once, and tidy the URL.
+  // Arriving from a bot in the sidebar (/ask?about=developer): ask it what it's doing, once, and tidy the URL.
   const arrived = useRef(false);
   useEffect(() => {
     if (arrived.current) return;
@@ -420,7 +420,7 @@ export function AskPM({
               placeholder={bot === "pm" ? undefined : `Message ${TEAM[bot].name}…`}
             />
             <p className="mt-2 text-center text-[12px] leading-4 text-[var(--tx2)]">
-              {bot === "pm" ? "The bots answer" : `The ${TEAM[bot].name} answers`} from {data.project}’s stories · demo
+              {bot === "pm" ? "The agents answer" : `The ${TEAM[bot].name} answers`} from {data.project}’s stories · demo
             </p>
           </div>
         </section>

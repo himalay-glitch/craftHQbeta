@@ -5,12 +5,16 @@ import { askData, askSearch, askViewer } from "@/components/ask/askData";
 import { TEAM } from "@/components/ask/team";
 import type { BotId } from "@/types/ask";
 
-// A chat with one bot (demo): /ask/builder, /ask/designer, /ask/checker, /ask/fixer. The PM's own chat is /ask.
+// A chat with one agent (demo): /ask/developer, /ask/designer, /ask/tester, /ask/debugger. The PM's own chat is /ask.
 // Rendered on request so `?state=new` (the first-time view: nothing on yet) is known before the page paints.
 export const prerender = false;
 
-const BOTS: BotId[] = ["builder", "designer", "checker", "fixer"];
-const bot = Astro.params.bot as BotId;
+const BOTS: BotId[] = ["developer", "designer", "tester", "debugger"];
+// The agents' first names, so old links (/ask/builder …) land on the renamed page.
+const FORMER: Record<string, BotId> = { builder: "developer", checker: "tester", fixer: "debugger" };
+const asked = Astro.params.bot ?? "";
+if (FORMER[asked]) return Astro.redirect(`/ask/${FORMER[asked]}${Astro.url.search}`, 301);
+const bot = asked as BotId;
 if (!BOTS.includes(bot)) return Astro.redirect("/ask");
 const fresh = Astro.url.searchParams.get("state") === "new";
 ---

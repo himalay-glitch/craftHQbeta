@@ -31,14 +31,14 @@ const recognitionCtor = (): RecognitionCtor | undefined => {
 };
 const noSubscribe = () => () => {};
 
-const MENTIONABLE: BotId[] = ["builder", "designer", "checker", "fixer", "pm"];
+const MENTIONABLE: BotId[] = ["developer", "designer", "tester", "debugger", "pm"];
 
 const PILL =
   "inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] " +
   "text-[var(--tx)] transition-colors duration-[120ms] hover:bg-[#F6F6F7]";
 
 /**
- * The composer (after the reference): a prompt line, then Attach, Mention a bot, voice and Send. Typing @ opens the
+ * The composer (after the reference): a prompt line, then Attach, Mention an agent, voice and Send. Typing @ opens the
  * bots inline (↑/↓, Enter or Tab, Esc). Send becomes Stop while the bots are answering; Esc stops too.
  */
 export function Composer({
@@ -48,7 +48,7 @@ export function Composer({
   onStop,
   busy,
   fieldRef,
-  placeholder = "Ask PM anything, or @mention a bot…",
+  placeholder = "Ask PM anything, or @mention an agent…",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -195,7 +195,7 @@ export function Composer({
         <ul
           id="ask-mentions"
           role="listbox"
-          aria-label="Bots"
+          aria-label="Agents"
           className="absolute bottom-full left-3 z-20 mb-2 w-60 list-none rounded-[12px] bg-white py-1 shadow-[0_8px_24px_rgb(0_0_0/0.12),0_0_0_1px_#e3e3e3]"
         >
           {options.map((id, i) => (
@@ -286,7 +286,7 @@ export function Composer({
         </button>
         <button type="button" onClick={startMention} className={PILL}>
           <AtSign aria-hidden="true" size={14} strokeWidth={1.75} className="text-[var(--tx2)]" />
-          Mention a bot
+          Mention an agent
         </button>
         <span className="flex-1" />
         <button

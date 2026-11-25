@@ -100,7 +100,7 @@ export function AskPanel({
   const TAB = "h-8 flex-1 rounded-full px-3 text-[13px] leading-[18px] font-medium transition-colors duration-[120ms]";
   return (
     <aside
-      aria-label="Chats and bots"
+      aria-label="Chats and agents"
       className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] lg:flex"
     >
       <div className="px-4 pt-4">
@@ -114,17 +114,17 @@ export function AskPanel({
               onClick={() => setTab(t)}
               className={`${TAB} ${tab === t ? "bg-white text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-[var(--tx2)] hover:text-[var(--tx)]"}`}
             >
-              {t === "chats" ? "Chats" : "Bots"}
+              {t === "chats" ? "Chats" : "Agents"}
             </button>
           ))}
         </div>
         <label className="mt-3 flex h-9 items-center gap-2 rounded-full border border-[var(--card-line)] px-3 transition-colors focus-within:border-[var(--ctl)]">
           <Search aria-hidden="true" size={14} strokeWidth={1.75} className="flex-none text-[var(--tx2)]" />
-          <span className="sr-only">{tab === "chats" ? "Search chats" : "Search the bots"}</span>
+          <span className="sr-only">{tab === "chats" ? "Search chats" : "Search the agents"}</span>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={tab === "chats" ? "Search chats…" : "Search bots…"}
+            placeholder={tab === "chats" ? "Search chats…" : "Search agents…"}
             className="min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] text-[var(--tx)] outline-none placeholder:text-[var(--tx2)]"
           />
         </label>
@@ -181,7 +181,7 @@ export function AskPanel({
           )}
         </ul>
       ) : (
-        <ul role="tabpanel" aria-label="Bots" className="mt-3 flex-1 list-none space-y-1 overflow-y-auto px-3 pb-3">
+        <ul role="tabpanel" aria-label="Agents" className="mt-3 flex-1 list-none space-y-1 overflow-y-auto px-3 pb-3">
           {shownBots.map((id) => {
             const bot = TEAM[id];
             const a = activity[id];
@@ -221,7 +221,7 @@ export function AskPanel({
               </li>
             );
           })}
-          {shownBots.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">No bot matches “{query}”.</li>}
+          {shownBots.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">No agent matches “{query}”.</li>}
         </ul>
       )}
 

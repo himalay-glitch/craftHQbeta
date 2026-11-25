@@ -159,7 +159,7 @@ function Designs({
 }
 
 /**
- * The Builder's steps, ticking over while you watch (each ~1.6 s). When the last one is done the story moves on to
+ * The Developer's steps, ticking over while you watch (each ~1.6 s). When the last one is done the story moves on to
  * review: every step is ticked, the bar is full and the pill says In review.
  */
 function Steps({ story, steps }: { story: { id: number; title: string }; steps: string[] }) {
@@ -186,7 +186,7 @@ function Steps({ story, steps }: { story: { id: number; title: string }; steps: 
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-[#F0F0F2]">
         <div
           className={`h-full rounded-full transition-[width] duration-700 ease-out ${done ? "" : styles.sheen}`}
-          style={{ width: `${done ? 100 : ((at + 0.5) / steps.length) * 100}%`, backgroundColor: done ? "var(--success)" : TEAM.builder.colour }}
+          style={{ width: `${done ? 100 : ((at + 0.5) / steps.length) * 100}%`, backgroundColor: done ? "var(--success)" : TEAM.developer.colour }}
         />
       </div>
       <ol className="mt-3 list-none space-y-1.5">

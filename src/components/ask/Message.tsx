@@ -167,10 +167,10 @@ export function BotMessage({
 
 const DOING: Record<BotId, string> = {
   pm: "is thinking",
-  builder: "is on it",
+  developer: "is on it",
   designer: "is sketching",
-  checker: "is checking",
-  fixer: "is looking into it",
+  tester: "is checking",
+  debugger: "is looking into it",
 };
 
 /** Before a reply: the bot, and what it's doing, with three dots taking turns. */

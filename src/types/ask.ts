@@ -1,7 +1,7 @@
 // The Ask PM demo: one place to ask what's happening, where the PM answers and brings in the right bot.
 import type { TicketStatus } from "@/types/status";
 
-export type BotId = "pm" | "builder" | "designer" | "checker" | "fixer";
+export type BotId = "pm" | "developer" | "designer" | "tester" | "debugger";
 
 export interface Bot {
   id: BotId;

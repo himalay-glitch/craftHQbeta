@@ -80,7 +80,7 @@ function Item({ item, current }: { item: NavItem; current: boolean }) {
 
 /**
  * A bot under the links: its face (24 px), a green dot while it's working, its name and what it's on in the hover
- * label. It opens that bot's own chat (/ask/builder …); the PM's is Ask PM.
+ * label. It opens that bot's own chat (/ask/developer …); the PM's is Ask PM.
  */
 function BotItem({ id, current }: { id: BotId; current: boolean }) {
   const bot = TEAM[id];
@@ -154,9 +154,9 @@ export function Sidebar({ current }: { current: string }) {
           aria-hidden="true"
           className="hidden px-2 pt-4 pb-1 text-[12px] leading-4 text-[var(--tx2)] [html[data-sidebar=expanded]_&]:block"
         >
-          Bots
+          Agents
         </p>
-        <ul aria-label="Bots" className="flex list-none flex-col gap-0.5">
+        <ul aria-label="Agents" className="flex list-none flex-col gap-0.5">
           {TEAM_ORDER.map((id) => (
             <BotItem key={id} id={id} current={id !== "pm" && path === `/ask/${id}`} />
           ))}

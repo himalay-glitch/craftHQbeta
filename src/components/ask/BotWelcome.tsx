@@ -56,7 +56,7 @@ const Doing = ({ children, colour }: { children: ReactNode; colour: string }) =>
 function nowFor(bot: Worker, checks: number): Now {
   const c = TEAM[bot].colour;
   switch (bot) {
-    case "builder":
+    case "developer":
       return {
         id: 54,
         title: "Your calendar: see your upcoming plans",
@@ -80,7 +80,7 @@ function nowFor(bot: Worker, checks: number): Now {
           </>
         ),
       };
-    case "checker":
+    case "tester":
       return {
         id: 43,
         title: "Creation flow revision",
@@ -92,7 +92,7 @@ function nowFor(bot: Worker, checks: number): Now {
           </>
         ),
       };
-    case "fixer":
+    case "debugger":
       return {
         id: 21,
         title: "Test story",
@@ -109,10 +109,10 @@ function nowFor(bot: Worker, checks: number): Now {
 
 // First time, nothing on yet (?state=new): what the empty strip says, in the bot's own words.
 const FIRST: Record<Worker, { title: string; text: string }> = {
-  builder: { title: "Nothing on the bench yet", text: "Give me a story and I’ll write the change, run the tests and open the pull request." },
+  developer: { title: "Nothing on the bench yet", text: "Give me a story and I’ll write the change, run the tests and open the pull request." },
   designer: { title: "The drawing board is empty", text: "Ask me to sketch a screen or a flow, and I’ll come back with a few directions to pick from." },
-  checker: { title: "Nothing to test yet", text: "When the Builder finishes a change, I test it on web and phones against what the story asked for." },
-  fixer: { title: "Nothing’s broken", text: "If a build or a check fails, I pick it up, retry it and tell you what I found." },
+  tester: { title: "Nothing to test yet", text: "When the Developer finishes a change, I test it on web and phones against what the story asked for." },
+  debugger: { title: "Nothing’s broken", text: "If a build or a check fails, I pick it up, retry it and tell you what I found." },
 };
 
 /**
@@ -135,10 +135,10 @@ export function BotWelcome({
   const clock = useClock();
   const elapsed = clock === null ? "" : since(clock - activity.since);
 
-  // The Checker's count creeps up while you watch (demo), then starts over.
+  // The Tester's count creeps up while you watch (demo), then starts over.
   const [checks, setChecks] = useState(17);
   useEffect(() => {
-    if (bot !== "checker") return;
+    if (bot !== "tester") return;
     const id = window.setInterval(() => setChecks((n) => (n >= 22 ? 17 : n + 1)), 1800);
     return () => window.clearInterval(id);
   }, [bot]);
