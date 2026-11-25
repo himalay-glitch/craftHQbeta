@@ -1,9 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type RefObject } from "react";
-import { ArrowUp, AtSign, FileText, Mic, Paperclip, Sparkles, Square, X } from "lucide-react";
-import type { BotId } from "@/types/ask";
-import { BotAvatar } from "./BotAvatar";
+import { ArrowUp, FileText, Mic, Paperclip, Sparkles, Square, X } from "lucide-react";
 import { formatSize } from "./Message";
-import { TEAM } from "./team";
 import styles from "./ask.module.css";
 
 type Picked = { name: string; size: number };
@@ -31,15 +28,14 @@ const recognitionCtor = (): RecognitionCtor | undefined => {
 };
 const noSubscribe = () => () => {};
 
-const MENTIONABLE: BotId[] = ["builder", "designer", "checker", "fixer", "pm"];
-
 const PILL =
   "inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] " +
   "text-[var(--tx)] transition-colors duration-[120ms] hover:bg-[#F6F6F7]";
 
 /**
- * The composer (after the reference): a prompt line, then Attach, Mention a bot, voice and Send. Typing @ opens the
- * bots inline (↑/↓, Enter or Tab, Esc). Send becomes Stop while the bots are answering; Esc stops too.
+ * The composer (after the reference): a prompt line, then Attach, voice and Send. Everything here goes to the PM,
+ * so there's no way to address another bot: name one in your words ("have Designer…") and the PM takes it as a
+ * hint. Send becomes Stop while the PM is answering; Esc stops too.
  */
 export function Composer({
   value,
@@ -57,15 +53,10 @@ export function Composer({
   fieldRef: RefObject<HTMLTextAreaElement | null>;
 }) {
   const [files, setFiles] = useState<Picked[]>([]);
-  const [mention, setMention] = useState<string | null>(null);
-  const [active, setActive] = useState(0);
   const [listening, setListening] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const recognition = useRef<Recognition | null>(null);
   const canDictate = useSyncExternalStore(noSubscribe, () => !!recognitionCtor(), () => false);
-
-  const options = mention === null ? [] : MENTIONABLE.filter((id) => TEAM[id].name.toLowerCase().startsWith(mention.toLowerCase()));
-  const open = options.length > 0;
 
   // The textarea grows with what you type, up to about six lines.
   useLayoutEffect(() => {
@@ -77,70 +68,14 @@ export function Composer({
 
   useEffect(() => () => recognition.current?.stop(), []);
 
-  /** Is the caret right after "@something"? Then that's the bot being typed. */
-  const readMention = (el: HTMLTextAreaElement) => {
-    const before = el.value.slice(0, el.selectionStart ?? el.value.length);
-    const m = before.match(/(?:^|\s)@(\w*)$/);
-    setMention(m ? m[1] : null);
-    setActive(0);
-  };
-
-  const placeCaret = (pos: number) =>
-    window.setTimeout(() => {
-      const el = fieldRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(pos, pos);
-    }, 0);
-
-  const choose = (id: BotId) => {
-    const el = fieldRef.current;
-    if (!el) return;
-    const caret = el.selectionStart ?? value.length;
-    const before = value.slice(0, caret).replace(/@(\w*)$/, `@${TEAM[id].name} `);
-    onChange(before + value.slice(caret));
-    setMention(null);
-    placeCaret(before.length);
-  };
-
-  /** The Mention button types the @ for you, which opens the list. */
-  const startMention = () => {
-    const el = fieldRef.current;
-    const caret = el?.selectionStart ?? value.length;
-    const needsSpace = caret > 0 && !/\s$/.test(value.slice(0, caret));
-    const next = `${value.slice(0, caret)}${needsSpace ? " " : ""}@${value.slice(caret)}`;
-    onChange(next);
-    setMention("");
-    setActive(0);
-    placeCaret(caret + (needsSpace ? 2 : 1));
-  };
-
   const send = () => {
     if (busy || (!value.trim() && files.length === 0)) return;
     recognition.current?.stop();
     onSend(value, files);
     setFiles([]);
-    setMention(null);
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (open) {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        setActive((a) => (a + (e.key === "ArrowDown" ? 1 : -1) + options.length) % options.length);
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        e.preventDefault();
-        choose(options[active]);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setMention(null);
-        return;
-      }
-    }
     if (e.key === "Escape" && busy) {
       e.preventDefault();
       onStop();
@@ -188,37 +123,6 @@ export function Composer({
       }}
       className="relative mx-auto max-w-[720px] rounded-[20px] border border-[var(--card-line)] bg-white p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_rgb(0_0_0/0.05)] transition-[border-color,box-shadow] focus-within:border-[var(--ctl)] focus-within:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.08)]"
     >
-      {/* The bots, while you type @ */}
-      {open && (
-        <ul
-          id="ask-mentions"
-          role="listbox"
-          aria-label="Bots"
-          className="absolute bottom-full left-3 z-20 mb-2 w-60 list-none rounded-[12px] bg-white py-1 shadow-[0_8px_24px_rgb(0_0_0/0.12),0_0_0_1px_#e3e3e3]"
-        >
-          {options.map((id, i) => (
-            <li
-              key={id}
-              id={`ask-mention-${id}`}
-              role="option"
-              aria-selected={i === active}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                choose(id);
-              }}
-              onMouseEnter={() => setActive(i)}
-              className={`mx-1 flex h-11 cursor-pointer items-center gap-2.5 rounded-[8px] px-2.5 ${i === active ? "bg-[#F4F4F5]" : ""}`}
-            >
-              <BotAvatar id={id} size={26} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] leading-5 text-[var(--tx)]">{TEAM[id].name}</span>
-                <span className="block truncate text-[12px] leading-4 text-[var(--tx2)]">{TEAM[id].role}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
       {files.length > 0 && (
         <ul className="mb-2.5 flex list-none flex-wrap gap-1.5 px-1">
           {files.map((f) => (
@@ -242,25 +146,16 @@ export function Composer({
       <div className="flex items-start gap-2 px-1">
         <Sparkles aria-hidden="true" size={16} strokeWidth={1.75} className="mt-[5px] flex-none text-[var(--tx2)]" />
         <label htmlFor="ask-input" className="sr-only">
-          Ask PM
+          Tell PM
         </label>
         <textarea
           id="ask-input"
           ref={fieldRef}
           rows={1}
           value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            readMention(e.target);
-          }}
-          onSelect={(e) => readMention(e.currentTarget)}
-          onBlur={() => setMention(null)}
+          onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKey}
-          aria-autocomplete="list"
-          aria-expanded={open}
-          aria-controls={open ? "ask-mentions" : undefined}
-          aria-activedescendant={open ? `ask-mention-${options[active]}` : undefined}
-          placeholder={listening ? "Listening…" : "Ask PM anything, or @mention a bot…"}
+          placeholder={listening ? "Listening…" : "Tell PM what you need…"}
           className="block max-h-40 min-w-0 flex-1 resize-none bg-transparent text-[15px] leading-6 text-[var(--tx)] outline-none placeholder:text-[var(--tx2)]"
         />
       </div>
@@ -281,10 +176,6 @@ export function Composer({
         <button type="button" onClick={() => fileInput.current?.click()} className={PILL}>
           <Paperclip aria-hidden="true" size={14} strokeWidth={1.75} className="text-[var(--tx2)]" />
           Attach
-        </button>
-        <button type="button" onClick={startMention} className={PILL}>
-          <AtSign aria-hidden="true" size={14} strokeWidth={1.75} className="text-[var(--tx2)]" />
-          Mention a bot
         </button>
         <span className="flex-1" />
         <button

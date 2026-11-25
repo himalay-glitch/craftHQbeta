@@ -22,7 +22,7 @@ function ago(ms: number) {
   return h < 48 ? "Yesterday" : `${Math.floor(h / 24)} days ago`;
 }
 
-/** The last thing a bot said in a chat, for the line under its title. */
+/** The last thing the PM said in a chat, for the line under its title. */
 function lastLine(messages: ChatMessage[]) {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
@@ -33,12 +33,22 @@ function lastLine(messages: ChatMessage[]) {
   return "";
 }
 
-/** The bots who spoke in a chat, in the order they first did. */
-function botsIn(messages: ChatMessage[]): BotId[] {
+/** The bots the PM brought into a chat, in the order it did (older chats: whoever spoke). The PM isn't listed. */
+function broughtIn(messages: ChatMessage[]): BotId[] {
   const seen: BotId[] = [];
-  for (const m of messages) if (m.from !== "me" && !seen.includes(m.from)) seen.push(m.from);
+  const add = (id: BotId) => id !== "pm" && !seen.includes(id) && seen.push(id);
+  for (const m of messages) {
+    if (m.from !== "me") add(m.from);
+    for (const b of m.blocks) if (b.kind === "handoff") add(b.to);
+  }
   return seen;
 }
+
+/** The story a bot is on ("Building hq-54" → 54), for its Watch link. */
+const storyIn = (now: string) => {
+  const m = now.match(/hq-(\d+)/);
+  return m ? Number(m[1]) : undefined;
+};
 
 export type ListedChat = SavedChat & { agoMinutes?: number };
 
@@ -54,8 +64,9 @@ function dayGroup(t: number, now: number) {
 
 /**
  * The panel beside the chat (after the reference's chat-history panel), with two tabs. Chats: every past chat,
- * newest first, with who took part and when; click one to open it and carry on. Bots: each bot at work, live as
- * the chat hands out work; click one to ask it what it's doing. New chat sits at the bottom of both.
+ * newest first, with the PM and the bots it brought in, and when; click one to open it and carry on. Team: each
+ * bot at work, live as the PM hands out work. It's view only: clicking a bot asks the PM what it's doing, and
+ * Watch opens the story it's on. New chat sits at the bottom of both.
  */
 export function AskPanel({
   chats,
@@ -74,7 +85,7 @@ export function AskPanel({
   onAskAbout: (id: BotId) => void;
   onNewChat: () => void;
 }) {
-  const [tab, setTab] = useState<"chats" | "bots">("chats");
+  const [tab, setTab] = useState<"chats" | "team">("chats");
   const [query, setQuery] = useState("");
   // Times only once mounted (the server's clock isn't the browser's), then every 30 s.
   const [now, setNow] = useState<number | null>(null);
@@ -97,12 +108,12 @@ export function AskPanel({
   const TAB = "h-8 flex-1 rounded-full px-3 text-[13px] leading-[18px] font-medium transition-colors duration-[120ms]";
   return (
     <aside
-      aria-label="Chats and bots"
+      aria-label="Chats and team"
       className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] lg:flex"
     >
       <div className="px-4 pt-4">
         <div role="tablist" aria-label="Show" className="flex rounded-full bg-[#F4F4F5] p-1">
-          {(["chats", "bots"] as const).map((t) => (
+          {(["chats", "team"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -111,17 +122,17 @@ export function AskPanel({
               onClick={() => setTab(t)}
               className={`${TAB} ${tab === t ? "bg-white text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-[var(--tx2)] hover:text-[var(--tx)]"}`}
             >
-              {t === "chats" ? "Chats" : "Bots"}
+              {t === "chats" ? "Chats" : "Team"}
             </button>
           ))}
         </div>
         <label className="mt-3 flex h-9 items-center gap-2 rounded-full border border-[var(--card-line)] px-3 transition-colors focus-within:border-[var(--ctl)]">
           <Search aria-hidden="true" size={14} strokeWidth={1.75} className="flex-none text-[var(--tx2)]" />
-          <span className="sr-only">{tab === "chats" ? "Search chats" : "Search the bots"}</span>
+          <span className="sr-only">{tab === "chats" ? "Search chats" : "Search the team"}</span>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={tab === "chats" ? "Search chats…" : "Search bots…"}
+            placeholder={tab === "chats" ? "Search chats…" : "Search the team…"}
             className="min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] text-[var(--tx)] outline-none placeholder:text-[var(--tx2)]"
           />
         </label>
@@ -130,7 +141,7 @@ export function AskPanel({
       {tab === "chats" ? (
         <ul role="tabpanel" aria-label="Chats" className="mt-3 flex-1 list-none space-y-0.5 overflow-y-auto px-2 pb-3">
           {shownChats.map((c, i) => {
-            const bots = botsIn(c.messages).slice(0, 3);
+            const bots = broughtIn(c.messages).slice(0, 3);
             const t = now === null ? 0 : touched(c, now);
             const group = now === null ? "" : dayGroup(t, now);
             const prevGroup = i === 0 || now === null ? "" : dayGroup(touched(shownChats[i - 1], now), now);
@@ -152,10 +163,14 @@ export function AskPanel({
                     <span className="block truncate pr-6 text-[14px] leading-5 font-medium text-[var(--tx)]">{c.title}</span>
                     <span className="mt-0.5 block truncate text-[12px] leading-4 text-[var(--tx2)]">{lastLine(c.messages)}</span>
                     <span className="mt-2 flex items-center justify-between">
-                      <span className="flex -space-x-1.5">
-                        {bots.map((id) => (
-                          <BotAvatar key={id} id={id} size={22} className="ring-2 ring-white" />
-                        ))}
+                      {/* The PM first; the bots it brought in, smaller, behind it. */}
+                      <span className="flex items-center">
+                        <BotAvatar id="pm" size={22} className="relative z-10 ring-2 ring-white" />
+                        <span className="-ml-1 flex -space-x-1">
+                          {bots.map((id) => (
+                            <BotAvatar key={id} id={id} size={18} className="ring-2 ring-white" />
+                          ))}
+                        </span>
                       </span>
                       <span className="text-[11px] leading-4 text-[var(--tx2)] tabular-nums">{now === null ? "" : ago(now - t)}</span>
                     </span>
@@ -178,46 +193,71 @@ export function AskPanel({
           )}
         </ul>
       ) : (
-        <ul role="tabpanel" aria-label="Bots" className="mt-3 flex-1 list-none space-y-1 overflow-y-auto px-3 pb-3">
-          {shownBots.map((id) => {
-            const bot = TEAM[id];
-            const a = activity[id];
-            return (
-              <li key={id}>
-                <button
-                  type="button"
-                  onClick={() => onAskAbout(id)}
-                  className="flex w-full gap-3 rounded-[16px] px-2.5 py-2.5 text-left transition-colors duration-[120ms] hover:bg-[#F6F6F7]"
-                >
-                  <BotAvatar id={id} size={40} />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-[14px] leading-5 font-medium text-[var(--tx)]">{bot.name}</span>
-                      {a.working && now !== null && (
-                        <span className="flex-none text-[11px] leading-4 text-[var(--tx2)] tabular-nums">{since(now - a.since)}</span>
-                      )}
+        <div role="tabpanel" aria-label="Team" className="mt-3 flex min-h-0 flex-1 flex-col">
+          <p className="px-5 pb-2 text-[12px] leading-4 text-pretty text-[var(--tx2)]">You talk to the PM. It hands the work to the team, and you can see what each one is on.</p>
+          <ul className="flex-1 list-none space-y-1 overflow-y-auto px-3 pb-3">
+            {shownBots.map((id) => {
+              const bot = TEAM[id];
+              const a = activity[id];
+              const story = storyIn(a.now);
+              return (
+                <li key={id} className="group/bot relative">
+                  <button
+                    type="button"
+                    onClick={() => onAskAbout(id)}
+                    title={id === "pm" ? undefined : `Ask PM what ${bot.name} is doing`}
+                    className="flex w-full gap-3 rounded-[16px] px-2.5 py-2.5 text-left transition-colors duration-[120ms] hover:bg-[#F6F6F7]"
+                  >
+                    {/* Working: a ring in the bot's colour; idle: a grey dot. */}
+                    <span className="relative size-10 flex-none self-start">
+                      <BotAvatar id={id} size={40} />
+                      <span
+                        aria-hidden="true"
+                        className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full ring-2 ring-white"
+                        style={{ backgroundColor: a.working ? bot.colour : "var(--ctl)" }}
+                      />
                     </span>
-                    <span className="block truncate text-[12px] leading-4 text-[var(--tx2)]">{bot.role}</span>
-                    <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-[var(--tx)]">
-                      {a.working ? (
-                        <LoaderCircle aria-hidden="true" size={12} strokeWidth={2.25} className="flex-none motion-safe:animate-spin" style={{ color: bot.colour }} />
-                      ) : (
-                        <span aria-hidden="true" className="mx-[3px] size-1.5 flex-none rounded-full bg-[var(--ctl)]" />
-                      )}
-                      <span className="truncate">{a.now}</span>
-                    </span>
-                    {a.working && (
-                      <span aria-hidden="true" className="mt-2 block h-1 overflow-hidden rounded-full bg-[#F0F0F2]">
-                        <span className={`block h-full w-2/3 rounded-full ${styles.sheen}`} style={{ backgroundColor: bot.colour }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2 pr-12">
+                        <span className="truncate text-[14px] leading-5 font-medium text-[var(--tx)]">
+                          {bot.name}
+                          <span className="font-normal text-[var(--tx2)]"> · {bot.role}</span>
+                        </span>
                       </span>
-                    )}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-          {shownBots.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">No bot matches “{query}”.</li>}
-        </ul>
+                      <span className="mt-1 flex items-center gap-1.5 text-[12px] leading-4 text-[var(--tx)]">
+                        {a.working ? (
+                          <LoaderCircle aria-hidden="true" size={12} strokeWidth={2.25} className="flex-none motion-safe:animate-spin" style={{ color: bot.colour }} />
+                        ) : (
+                          <span aria-hidden="true" className="mx-[3px] size-1.5 flex-none rounded-full bg-[var(--ctl)]" />
+                        )}
+                        <span className="truncate">{a.now}</span>
+                        {a.working && now !== null && <span className="flex-none text-[11px] text-[var(--tx2)] tabular-nums">· {since(now - a.since)}</span>}
+                      </span>
+                      {a.working && (
+                        <span aria-hidden="true" className="mt-2 block h-1 overflow-hidden rounded-full bg-[#F0F0F2]">
+                          <span className={`block h-full w-2/3 rounded-full ${styles.sheen}`} style={{ backgroundColor: bot.colour }} />
+                        </span>
+                      )}
+                      <span className="mt-1.5 block text-[12px] leading-4 text-pretty text-[var(--tx2)]">{bot.does}</span>
+                      <span className="mt-1 block text-[12px] leading-4 text-pretty text-[var(--tx2)]">
+                        <span className="font-medium">Never:</span> {bot.never.charAt(0).toLowerCase() + bot.never.slice(1)}
+                      </span>
+                    </span>
+                  </button>
+                  {story !== undefined && (
+                    <a
+                      href={`/stories/hq-${story}`}
+                      className="absolute top-2.5 right-2.5 rounded-full px-2 py-0.5 text-[12px] leading-4 font-medium text-[var(--cta)] transition-colors hover:bg-[var(--row-h)]"
+                    >
+                      Watch
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+            {shownBots.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">No one on the team matches “{query}”.</li>}
+          </ul>
+        </div>
       )}
 
       <div className="px-4 pt-1 pb-4">

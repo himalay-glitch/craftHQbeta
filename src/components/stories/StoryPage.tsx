@@ -795,9 +795,12 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     add({ kind: "message", id: nextId("me"), at: "Just now", author: me, text: text.length ? text : undefined, files: attached });
     // A closed story keeps the note, but the agent doesn't answer it (statuses guide §6).
     if (state.status === "done" || state.status === "cancelled") return;
+    // You only talk to the PM: it passes your note to the robot holding the story, and says so.
+    const holder = state.status === "new" || state.status === "planning" ? "Asker" : "Builder";
     // While the agent holds a build, a note is read after the round; it never redirects the work (§4).
     if (job) {
       notesDuringJob.current += 1;
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `PM passes your note to ${holder} when this round ends` });
       return;
     }
     // A note, then Approved: refused if a teammate moved the story first (the note itself stays).
@@ -806,6 +809,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       setDismissed(null);
       return;
     }
+    add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `PM passed your note to ${holder}` });
     // A note, then Approved: the change request (§5).
     if (andRebuild) {
       setRebuild(false);

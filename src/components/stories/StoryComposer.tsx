@@ -224,7 +224,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
             <Plus aria-hidden="true" size={18} strokeWidth={1.75} />
           </button>
           <label htmlFor={COMPOSER_INPUT_ID} className="sr-only">
-            Message the agent
+            Tell PM about {storyRef(storyId)}
           </label>
           <textarea
             id={COMPOSER_INPUT_ID}
@@ -240,7 +240,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
                 addFiles(e.clipboardData.files);
               }
             }}
-            placeholder="Message the agent"
+            placeholder={`Tell PM about ${storyRef(storyId)}`}
             aria-describedby={described ? `${COMPOSER_INPUT_ID}-hint` : undefined}
             className="field-sizing-content block max-h-40 min-h-9 w-full flex-1 resize-none bg-transparent py-2 text-[14px] leading-5 tracking-[-0.15px] text-[var(--tx)] placeholder:text-[var(--tx2)] focus:outline-none"
           />

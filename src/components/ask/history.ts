@@ -89,7 +89,7 @@ export function seedChats(data: AskData): (SavedChat & { agoMinutes: number })[]
   };
   return [
     make("seed-stuck", "What’s stuck, and why?", 3 * 60),
-    make("seed-design", "@Designer sketch the event invite card", 26 * 60),
+    make("seed-design", "Design the event invite card", 26 * 60),
     make("seed-merged", "What merged this week?", 2 * 24 * 60),
   ];
 }

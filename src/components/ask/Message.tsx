@@ -176,18 +176,26 @@ const DOING: Record<BotId, string> = {
   fixer: "is looking into it",
 };
 
-/** Before a reply: the bot, and what it's doing, with three dots taking turns. */
-export function Thinking({ from }: { from: BotId }): ReactNode {
+/**
+ * Before the PM's next message: the PM, and who's working. While a bot has the job it says so ("Designer is
+ * sketching…", with its face); otherwise the PM is thinking.
+ */
+export function Thinking({ from, wait }: { from: BotId; wait?: BotId }): ReactNode {
+  const who = wait ?? from;
   return (
     <div className={`flex items-center gap-3 ${styles.rise}`} role="status">
       <BotAvatar id={from} size={30} />
       <span className="inline-flex h-8 items-center gap-2 rounded-full bg-[#F4F4F5] pr-3.5 pl-3 text-[13px] leading-[18px] text-[var(--tx2)]">
-        <span className="inline-flex gap-1" aria-hidden="true">
-          {[0, 1, 2].map((i) => (
-            <span key={i} className={`size-1.5 rounded-full bg-[var(--tx2)] ${styles.dot}`} />
-          ))}
-        </span>
-        {TEAM[from].name} {DOING[from]}…
+        {wait ? (
+          <BotAvatar id={wait} size={18} className="-ml-1" />
+        ) : (
+          <span className="inline-flex gap-1" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className={`size-1.5 rounded-full bg-[var(--tx2)] ${styles.dot}`} />
+            ))}
+          </span>
+        )}
+        {TEAM[who].name} {DOING[who]}…
       </span>
     </div>
   );
