@@ -136,12 +136,17 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
     const el = scroller.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
   }, []);
+  // Only a scroll UP is you leaving the bottom. Our own jumps only ever go down, and the thread can grow again before
+  // a jump's scroll event arrives, so "not at the bottom" alone would wrongly switch following off.
+  const lastTop = useRef(0);
   const onScroll = () => {
     const el = scroller.current;
     if (!el) return;
-    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
-    stick.current = bottom;
-    setAtBottom(bottom);
+    const up = el.scrollTop < lastTop.current - 2;
+    lastTop.current = el.scrollTop;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 48) stick.current = true;
+    else if (up) stick.current = false;
+    setAtBottom(stick.current);
   };
   const hasThread = messages.length > 0;
   useEffect(() => {
@@ -268,6 +273,7 @@ export function AskPM({ data, bot = "pm" }: { data: AskData; /** Whose chat this
     stop();
     loaded.current = null;
     stick.current = true;
+    lastTop.current = 0;
     scroller.current?.scrollTo({ top: 0 });
     setMessages([]);
     setChatId(null);
