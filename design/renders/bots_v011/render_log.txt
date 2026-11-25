@@ -1,0 +1,26 @@
+still pm 85s
+still builder 80s
+still designer 78s
+still checker 56s
+still fixer 56s
+FINAL_DONE 14:56
+still builder 82s
+still designer 72s
+still fixer 56s
+FINAL_DONE 15:02
+still pm 80s
+still builder 70s
+still designer 54s
+still checker 40s
+still fixer 45s
+FINAL_DONE 15:19
+touch-up still pm 88s
+touch-up still fixer 52s
+TOUCHUP_DONE 15:42
+tail fix still pm 87s
+loop builder_idle 247s (5 frames)
+rect still pm 93s
+eyes-snug still pm 118s
+PM_STILL_DONE 16:05
+loop pm_idle 2759s (48 frames)
+PM_LOOP_DONE 16:51
