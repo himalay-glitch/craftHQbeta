@@ -14,11 +14,12 @@ const CARD =
 // in the table (DESIGN.md §7.12). Robots at work are CraftHQ blue and turn (green means merged); waiting is grey;
 // a person's turn is amber; stuck is red, with a soft ring pulsing out. At 0 the indicator goes grey and still,
 // so colour only shows where there's something to look at.
+// The tints are a step deeper than the pills' so the indicators read at a glance; every icon stays above 4.5:1 on its tint.
 const TONE = {
-  active: "bg-[#E9F0FE] text-[var(--cta)]",
-  neutral: "bg-[#F0F0F2] text-[var(--tx2)]",
-  attention: "bg-warning-tint text-warning",
-  negative: "bg-danger-tint text-danger-ink",
+  active: "bg-[#D5E3FD] text-[#1F57C3]",
+  neutral: "bg-[#E6E6E9] text-[#55565A]",
+  attention: "bg-[#FCE3BF] text-[#A34A06]",
+  negative: "bg-[#FAD2D2] text-[#B3261E]",
 } as const;
 type Tone = keyof typeof TONE;
 
@@ -28,7 +29,7 @@ function Indicator({ icon: Icon, tone, on, spin, ring }: { icon: LucideIcon; ton
       aria-hidden="true"
       className={`inline-flex size-6 flex-none items-center justify-center rounded-full ${TONE[on ? tone : "neutral"]} ${on && ring ? styles.alertIcon : ""}`}
     >
-      <Icon size={14} strokeWidth={2} className={on && spin ? "motion-safe:animate-spin" : ""} />
+      <Icon size={14} strokeWidth={2.25} className={on && spin ? "motion-safe:animate-spin" : ""} />
     </span>
   );
 }
