@@ -53,10 +53,14 @@ if not os.path.exists(os.path.join(raw, 'hero.png')):
     sys.exit(0)
 
 hero = read(os.path.join(raw, 'hero.png'))[:, :, :3]
-# level the paper: the lit floor renders a little under 1.0; scale so the far,
-# untouched paper (top band, away from the logo) reaches white, then clip.
-top = hero[: hero.shape[0] // 8].mean(axis=2)
-white = np.percentile(top, 35)
+# level the paper: the lit paper beside and in front of the mark renders a little under 1.0;
+# scale so it reaches white, then clip. (The far paper at the top of this frame is
+# darker still, outside the overhead light; it is flattened separately below.)
+lum0 = hero.mean(axis=2)
+top0 = int(np.argmax((lum0 < 0.5).any(axis=1)))
+paper = np.concatenate([lum0[top0:top0 + 300, :150].ravel(), lum0[top0:top0 + 300, -150:].ravel(),
+                        lum0[-80:].ravel()])
+white = np.percentile(paper, 20)         # paper beside and in front of the mark
 gain = 1.0 / max(white, 0.5)
 print('hero paper level %.4f -> gain %.4f' % (white, gain))
 hero = np.clip(hero * gain, 0, 1)
@@ -65,9 +69,13 @@ hero = np.clip(hero * gain, 0, 1)
 # gap) is plain paper, so its blurred brightness is the paper's own falloff.
 lum = hero.mean(axis=2)
 logo_top = int(np.argmax((lum < 0.5).any(axis=1)))
-R = max(logo_top - 60, 0)
+R = max(logo_top - 4, 0)
 if R > 20:
-    band = cv2.GaussianBlur(lum[:R].astype(np.float32), (0, 0), sigmaX=24, sigmaY=2, borderType=cv2.BORDER_REFLECT)
+    # paper level by normalised blur: average only paper pixels (dark letter edges excluded)
+    L = lum[:R].astype(np.float32)
+    w = (L > 0.6).astype(np.float32)
+    blur = lambda a: cv2.GaussianBlur(a, (0, 0), sigmaX=30, sigmaY=5, borderType=cv2.BORDER_REFLECT)
+    band = blur(L * w) / np.maximum(blur(w), 1e-3)
     g = np.clip(1.0 / np.maximum(band, 0.4), 1.0, 2.0)
     hero[:R] = np.clip(hero[:R] * g[:, :, None], 0, 1)
     print('hero paper falloff flattened in rows 0..%d (max gain %.3f)' % (R, g.max()))
