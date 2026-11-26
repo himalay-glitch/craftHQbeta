@@ -114,13 +114,13 @@ interface NeedsDeckProps {
 }
 
 const ICON_BTN =
-  "inline-flex size-9 items-center justify-center rounded-full border border-[var(--card-line)] bg-white text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl-h)] disabled:opacity-40 disabled:hover:border-[var(--card-line)]";
+  "inline-flex size-9 items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.04] hover:text-[var(--tx)]";
 
 /**
  * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the card says what
  * happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
  * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same, and 1–3 answer.
- * Under the deck, who's next, and All, to jump to any decision.
+ * Under the deck, See all, to jump to any decision.
  */
 export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
   const reduced = useReducedMotion();
@@ -288,59 +288,43 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
         </AnimatePresence>
       </div>
 
-      {/* Under the deck: back and later, who's next, and All. */}
-      <div className="flex items-center gap-3">
-        <div className="flex flex-none gap-1.5">
-          <button type="button" onClick={back} disabled={order.length < 2} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
+      {/* Under the deck: back, every decision, later. Nothing else; the numbers on the answers are their keys. */}
+      {order.length > 1 && (
+        <div className="flex items-center justify-center gap-1">
+          <button type="button" onClick={back} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
             <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.75} />
           </button>
-          <button type="button" onClick={later} disabled={order.length < 2} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
+
+          <DropdownMenu.Root modal={false}>
+            <DropdownMenu.Trigger className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.04] data-[state=open]:bg-black/[0.06]">
+              See all
+              <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="center" sideOffset={6} className={`${MENU_CONTENT} max-h-[420px] w-[340px] overflow-y-auto`}>
+                {groups.map((g, gi) => (
+                  <DropdownMenu.Group key={g.kind}>
+                    {gi > 0 && <DropdownMenu.Separator className={MENU_SEPARATOR} />}
+                    <DropdownMenu.Label className="px-4 pt-2 pb-1 text-[12px] leading-4 text-[var(--tx2)]">
+                      {g.label} · {g.items.length}
+                    </DropdownMenu.Label>
+                    {g.items.map((s) => (
+                      <DropdownMenu.Item key={s.id} onSelect={() => jumpTo(s.id)} className={`${MENU_ITEM} ${s.id === topId ? "font-medium" : ""}`}>
+                        <span className="w-11 flex-none text-[12px] text-[var(--tx2)] tabular-nums">{storyRef(s.id)}</span>
+                        <span className="truncate">{s.title}</span>
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Group>
+                ))}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+
+          <button type="button" onClick={later} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
             <ChevronRight aria-hidden="true" size={18} strokeWidth={1.75} />
           </button>
         </div>
-
-        {next.length > 0 ? (
-          <button
-            type="button"
-            onClick={later}
-            className="group flex min-w-0 flex-1 items-center gap-2.5 text-left text-[13px] leading-[18px] text-[var(--tx2)]"
-          >
-            <span className="min-w-0 truncate">
-              Next: <span className="text-[var(--tx)] group-hover:underline">{next[0].title}</span>
-            </span>
-          </button>
-        ) : (
-          <span className="flex-1 text-[13px] leading-[18px] text-[var(--tx2)]">The last one</span>
-        )}
-
-        <DropdownMenu.Root modal={false}>
-          <DropdownMenu.Trigger className="inline-flex h-9 flex-none items-center gap-1 rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.04] data-[state=open]:bg-black/[0.06]">
-            All {order.length}
-            <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content align="end" sideOffset={6} className={`${MENU_CONTENT} max-h-[420px] w-[340px] overflow-y-auto`}>
-              {groups.map((g, gi) => (
-                <DropdownMenu.Group key={g.kind}>
-                  {gi > 0 && <DropdownMenu.Separator className={MENU_SEPARATOR} />}
-                  <DropdownMenu.Label className="px-4 pt-2 pb-1 text-[12px] leading-4 text-[var(--tx2)]">
-                    {g.label} · {g.items.length}
-                  </DropdownMenu.Label>
-                  {g.items.map((s) => (
-                    <DropdownMenu.Item key={s.id} onSelect={() => jumpTo(s.id)} className={`${MENU_ITEM} ${s.id === topId ? "font-medium" : ""}`}>
-                      <span className="w-11 flex-none text-[12px] text-[var(--tx2)] tabular-nums">{storyRef(s.id)}</span>
-                      <span className="truncate">{s.title}</span>
-                    </DropdownMenu.Item>
-                  ))}
-                </DropdownMenu.Group>
-              ))}
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
-      </div>
-      <p aria-hidden="true" className="mt-3 hidden text-center text-[12px] leading-4 text-[var(--tx2)] [@media(pointer:fine)]:block">
-        Swipe or use ← → to browse · 1–{decision.options.length} to answer · {decision.options.length + 1} to write your own
-      </p>
+      )}
     </section>
   );
 }

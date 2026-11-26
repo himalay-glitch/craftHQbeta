@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Tooltip } from "radix-ui";
-import { CircleExclamationPoint, CircleX, Clock, GitPullRequest, LoaderCircle, Plus } from "lucide-react";
+import { CircleX, Clock, GitPullRequest, LoaderCircle, Plus, X } from "lucide-react";
 import { ConnectAccountsModal } from "@/components/connect-accounts";
 import type { DashboardData, DashboardStateOverride, NeedKind, Story, StoryStatus } from "@/types/dashboard";
 import { BTN_SECONDARY } from "./classes";
@@ -17,7 +17,6 @@ import { SetupBanner } from "./SetupBanner";
 import { useConnectionSetup } from "./setup";
 import { ShippedRibbon } from "./ShippedRibbon";
 import { StoryPanel, type StoryAction } from "./StoryPanel";
-import { Indicator } from "./Indicator";
 import { StatPanel } from "./StatPanel";
 import { Toast, type ToastMessage } from "./Toast";
 
@@ -108,7 +107,6 @@ export function Dashboard({ data }: { data: DashboardData }) {
     needing.filter((s) => s.waitingOn === "You" || s.need === "stuck"),
     "group",
   );
-  const othersWaiting = needing.filter((s) => s.need !== "stuck" && s.waitingOn !== "You").length;
   const reviewCount = mine.filter((s) => s.need === "review").length;
   const stuck = mine.filter((s) => s.need === "stuck");
   const stuckCount = stuck.length;
@@ -327,23 +325,21 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 middle, what's running and queued. The side cards stretch to the deck's height. */}
             <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
               <section aria-labelledby="needs-title" className="min-w-0 lg:order-2">
-                <header className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <Indicator icon={CircleExclamationPoint} tone="attention" on={mine.length > 0} />
+                <header className="flex h-6 items-center gap-2">
                   <h2 id="needs-title" className="text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
                     Needs you
                   </h2>
-                  <span className="rounded-full bg-[#FCEFD6] px-2 py-px text-[13px] leading-[18px] font-medium text-[#7A4A00] tabular-nums">
-                    {visible.length}
-                  </span>
                   {need === "all" ? (
-                    othersWaiting > 0 && <span className="text-[13px] leading-[18px] text-[var(--tx2)]">· {othersWaiting} more waiting on others</span>
+                    <span className="text-[15px] leading-[22px] text-[var(--tx2)] tabular-nums">{visible.length}</span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setNeed("all")}
-                      className="text-[13px] leading-[18px] text-[var(--tx2)] underline-offset-2 hover:text-[var(--tx)] hover:underline"
+                      aria-label={`Showing ${need === "review" ? "Ready to review" : "Stuck"} only. Show all ${mine.length}`}
+                      className="inline-flex h-6 items-center gap-1 rounded-full bg-[#EEF4FF] pr-1.5 pl-2.5 text-[12px] leading-4 font-medium text-[#1F57C3] transition-colors duration-[120ms] hover:bg-[#E3ECFD]"
                     >
-                      · {need === "review" ? "Ready to review" : "Stuck"} only · Show all {mine.length}
+                      {need === "review" ? "Ready to review" : "Stuck"} · {visible.length}
+                      <X aria-hidden="true" size={13} strokeWidth={2} />
                     </button>
                   )}
                 </header>
@@ -373,21 +369,20 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 </div>
               </section>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:order-1 lg:flex lg:flex-col">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:order-1 lg:flex lg:flex-col lg:gap-6">
                 <StatPanel
                   label="Ready to review"
                   value={reviewCount}
                   sub="waiting on you"
                   icon={GitPullRequest}
                   tone="attention"
-                  items={mine.filter((s) => s.need === "review").map((s) => ({ id: s.id, title: s.title, meta: s.updated }))}
-                  max={5}
+                  items={mine.filter((s) => s.need === "review")}
                   onItem={pick}
                   onOpen={() => setNeed((n) => (n === "review" ? "all" : "review"))}
+                  openLabel={need === "review" ? "Show everything in the deck" : "Show only these in the deck"}
                   pressed={need === "review"}
-                  action={need === "review" ? "Show everything" : "Review them one by one"}
                   empty="Nothing to review."
-                  className="lg:flex-[3]"
+                  className="lg:flex-1"
                 />
                 <StatPanel
                   label="Stuck"
@@ -396,18 +391,17 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   icon={CircleX}
                   tone="negative"
                   ring
-                  items={stuck.map((s) => ({ id: s.id, title: s.title }))}
-                  max={3}
+                  items={stuck}
                   onItem={pick}
                   onOpen={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
+                  openLabel={need === "stuck" ? "Show everything in the deck" : "Show only these in the deck"}
                   pressed={need === "stuck"}
-                  action={need === "stuck" ? "Show everything" : "Unstick them one by one"}
                   empty="Nothing is stuck."
-                  className="lg:flex-[2]"
+                  className="lg:flex-1"
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:order-3 lg:flex lg:flex-col">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:order-3 lg:flex lg:flex-col lg:gap-6">
                 <StatPanel
                   label="Running"
                   value={data.running.length}
@@ -415,15 +409,12 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   icon={LoaderCircle}
                   tone="active"
                   spin
-                  items={[...data.running]
-                    .sort((a, b) => Number(b.status === "In progress") - Number(a.status === "In progress"))
-                    .map((r) => ({ id: r.id, title: r.title, meta: r.status === "In progress" ? "Building" : "Checking" }))}
-                  max={6}
+                  items={[...data.running].sort((a, b) => Number(b.status === "In progress") - Number(a.status === "In progress"))}
                   onItem={open}
                   onOpen={() => openLocal({ kind: "details", tab: "agent" })}
-                  action="See what the agents are doing"
+                  openLabel="See what the agents are doing"
                   empty="The agents are idle."
-                  className="lg:flex-[3]"
+                  className="lg:flex-1"
                 />
                 <StatPanel
                   label="Queued"
@@ -432,12 +423,11 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   icon={Clock}
                   tone="neutral"
                   items={[]}
-                  max={3}
                   onItem={open}
                   onOpen={() => openLocal({ kind: "details", tab: "agent" })}
-                  action="Open the queue"
-                  empty="Nothing is waiting to start. New work starts as soon as it’s approved."
-                  className="lg:flex-[2]"
+                  openLabel="Open the queue"
+                  empty="New work starts as soon as it’s approved."
+                  className="lg:flex-1"
                 />
               </div>
             </div>

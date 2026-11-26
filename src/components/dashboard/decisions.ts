@@ -23,8 +23,6 @@ export interface DecisionReply {
 export interface Evidence {
   text: string;
   tone: "positive" | "negative" | "neutral";
-  /** Checks: passed of total, drawn as a bar. */
-  bar?: { value: number; total: number };
 }
 
 export interface Decision {
@@ -49,7 +47,7 @@ export function decisionFor(story: Story): Decision {
         question: "It passed its checks, but main has moved on since it was built. Rebuild it before it merges?",
         evidence: [
           ...(c
-            ? [{ text: `${c.passed} of ${c.total} checks`, tone: (c.passed === c.total ? "positive" : "negative") as Evidence["tone"], bar: { value: c.passed, total: c.total } }]
+            ? [{ text: `${c.passed} of ${c.total} checks passed`, tone: (c.passed === c.total ? "positive" : "negative") as Evidence["tone"] }]
             : []),
           { text: "Preview ready", tone: "neutral" },
         ],
