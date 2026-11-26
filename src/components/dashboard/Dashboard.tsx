@@ -348,9 +348,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                       exit={{ opacity: 0, transition: { duration: 0.15, ease: [0.4, 0, 1, 1] } }}
                     >
                       {allClear ? (
-                        <div className="pt-8">
-                          <AllClear answered={answered} />
-                        </div>
+                        <AllClear answered={answered} />
                       ) : (
                         <NeedsDeck stories={visible} onDecide={decide} onOpen={open} onAsking={setAsking} />
                       )}
