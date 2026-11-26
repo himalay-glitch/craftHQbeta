@@ -4,9 +4,11 @@ import { Plug } from "lucide-react";
  * Shown after someone skips the connect-accounts modal: one quiet line under the heading saying what's missing,
  * with the way back to the modal. It never outweighs the decisions below it.
  */
+const NAMES: Record<string, string> = { github: "GitHub", claude: "Claude" };
+
 export function SetupBanner({ missing, onConnect }: { missing: string[]; onConnect: () => void }) {
   if (missing.length === 0) return null;
-  const names = missing.join(" and ");
+  const names = missing.map((m) => NAMES[m.toLowerCase()] ?? m).join(" and ");
 
   return (
     <div role="status" className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-[18px] text-[var(--tx2)]">

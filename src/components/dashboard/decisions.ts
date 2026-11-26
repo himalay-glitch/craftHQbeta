@@ -79,10 +79,7 @@ export function decisionFor(story: Story): Decision {
       return {
         agent: "debugger",
         question: `It’s stuck: ${lower(why.replace(/\.$/, ""))}. Want me to try again?`,
-        evidence: [
-          { text: "Not being picked up", tone: "negative" },
-          ...(story.action && rest(story.action) ? [{ text: rest(story.action), tone: "neutral" as const }] : []),
-        ],
+        evidence: story.action && rest(story.action) ? [{ text: rest(story.action), tone: "neutral" }] : [],
         options: [
           {
             label: "Try again",

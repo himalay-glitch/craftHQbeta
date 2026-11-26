@@ -14,6 +14,9 @@ const BTN = "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px]
 const PRIMARY = `${BTN} bg-[var(--cta)] text-white hover:bg-[var(--cta-h)] active:translate-y-px`;
 const SECONDARY = `${BTN} border border-[var(--ctl)] bg-white text-[var(--tx)] hover:border-[var(--ctl-h)] hover:bg-[var(--ctl-bg-h)] active:translate-y-px`;
 
+/** Evidence longer than this is a sentence, not a fact, so it isn't put in a chip. */
+const CHIP_MAX = 28;
+
 function EvidenceChip({ e }: { e: Evidence }) {
   const tone =
     e.tone === "positive" ? "bg-[#EDF7F1] text-[#1F6B4F]" : e.tone === "negative" ? "bg-[#FDECEC] text-[#B3261E]" : "bg-[#F4F4F5] text-[var(--tx2)]";
@@ -82,15 +85,25 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
         {story.owner && <PersonAvatar initials={story.owner} />}
         <ArrowUpRight aria-hidden="true" size={14} strokeWidth={1.75} className="flex-none opacity-60 group-hover:opacity-100" />
       </button>
-      <ul className="mt-3 flex list-none flex-wrap items-center gap-1.5">
+      {/* Short facts as chips; a sentence of context reads as plain text after them. */}
+      <ul className="mt-3 flex list-none flex-wrap items-center gap-x-1.5 gap-y-2">
         {story.need && (
           <li>
             <StatusPill status={NEED_STATUS[story.need]} />
           </li>
         )}
-        {decision.evidence.map((e) => (
-          <EvidenceChip key={e.text} e={e} />
-        ))}
+        {decision.evidence
+          .filter((e) => e.text.length <= CHIP_MAX)
+          .map((e) => (
+            <EvidenceChip key={e.text} e={e} />
+          ))}
+        {decision.evidence
+          .filter((e) => e.text.length > CHIP_MAX)
+          .map((e) => (
+            <li key={e.text} className="pl-1 text-[13px] leading-[18px] text-[var(--tx2)]">
+              {e.text}
+            </li>
+          ))}
       </ul>
 
       {/* The answers. */}
