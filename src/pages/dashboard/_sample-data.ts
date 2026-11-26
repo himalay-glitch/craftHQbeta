@@ -38,6 +38,13 @@ export const dashboardData: DashboardData = {
     { id: 57, title: "Test Story-add sample demo text on login page", status: "In progress", updated: "" },
     { id: 54, title: "Your calendar: see your upcoming plans", status: "In progress", updated: "1m ago" },
   ],
+  // This week's merges (the same four Ask PM talks about).
+  shipped: [
+    { id: 5, title: "Home feed: upcoming events near you", when: "2h ago" },
+    { id: 31, title: "Invite friends to an event by link", when: "yesterday" },
+    { id: 19, title: "Profile photo upload", when: "Tuesday" },
+    { id: 16, title: "RSVP with a guest count", when: "Monday" },
+  ],
   activity: [
     { id: "a1", title: "Agent run started", detail: "reply: Check in at the door", storyId: 34, updated: "just now" },
     { id: "a2", title: "Agent run started", detail: "reply: Tell the host when you’ll arrive", storyId: 35, updated: "just now" },
@@ -71,6 +78,7 @@ export const dashboardData: DashboardData = {
       action: "Move the story back to Approved to have the merge, checks and preview restart run.",
       updated: "just now",
       updatedMinutes: 0,
+      checks: { passed: 24, total: 24 },
     },
     {
       id: 33,
@@ -82,6 +90,7 @@ export const dashboardData: DashboardData = {
       action: "Move the story back to Approved to get main merged, checks re-run, and the preview rebuilt with the seed data.",
       updated: "just now",
       updatedMinutes: 0,
+      checks: { passed: 18, total: 18 },
     },
     {
       id: 52,
@@ -93,6 +102,7 @@ export const dashboardData: DashboardData = {
       action: SAME_REVIEW,
       updated: "2m ago",
       updatedMinutes: 2,
+      checks: { passed: 31, total: 31 },
     },
     {
       id: 53,
@@ -104,6 +114,7 @@ export const dashboardData: DashboardData = {
       action: SAME_REVIEW,
       updated: "3m ago",
       updatedMinutes: 3,
+      checks: { passed: 12, total: 12 },
     },
     {
       id: 44,
@@ -115,6 +126,7 @@ export const dashboardData: DashboardData = {
       action: SAME_REVIEW,
       updated: "3m ago",
       updatedMinutes: 3,
+      checks: { passed: 20, total: 20 },
     },
 
     // Decision
@@ -129,6 +141,7 @@ export const dashboardData: DashboardData = {
       meta: "1 open question",
       updated: "8d ago",
       updatedMinutes: 8 * 1440,
+      question: { text: "How many people can join one crew?", fallback: "Up to 8, the host included" },
     },
     {
       id: 7,
@@ -140,6 +153,7 @@ export const dashboardData: DashboardData = {
       meta: "3 open questions",
       updated: "8d ago",
       updatedMinutes: 8 * 1440,
+      question: { text: "How long can an event title be?", fallback: "60 characters" },
     },
     {
       id: 20,
@@ -151,6 +165,7 @@ export const dashboardData: DashboardData = {
       meta: "1 open question",
       updated: "10d ago",
       updatedMinutes: 10 * 1440,
+      question: { text: "Should the welcome greet people by name?", fallback: "Yes, by first name" },
     },
 
     // Planning
