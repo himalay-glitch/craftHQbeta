@@ -2,13 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "framer-motion";
 import { DropdownMenu } from "radix-ui";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { BotAvatar } from "@/components/ask/BotAvatar";
-import { TEAM, TEAM_ORDER } from "@/components/ask/team";
-import type { BotId } from "@/types/ask";
 import type { Story } from "@/types/dashboard";
 import { MENU_CONTENT, MENU_ITEM, MENU_SEPARATOR } from "./classes";
 import { DecisionCard } from "./DecisionCard";
-import { decisionFor, type DecisionOption, type DecisionReply } from "./decisions";
+import { decisionFor, KINDS, type DecisionOption, type DecisionReply } from "./decisions";
 import { storyRef } from "./format";
 
 type KeyLike = Pick<globalThis.KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "preventDefault"> & {
@@ -27,7 +24,7 @@ const BEHIND = [
 ];
 const SWIPE = 110; // px dragged, or …
 const FLICK = 500; // … px/s flicked, to count as a swipe
-const SAY_MS = 900; // how long the agent's reply shows before the card leaves
+const SAY_MS = 700; // how long the card says what happened before it leaves
 
 const variants = {
   enter: (m: Move) => (m === "back" ? { opacity: 0, x: -56, y: 0, scale: 1 } : { opacity: 0, x: 0, y: BEHIND[0].y, scale: BEHIND[0].scale }),
@@ -112,20 +109,18 @@ interface NeedsDeckProps {
   stories: Story[];
   onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
   onOpen: (id: number) => void;
-  /** Which agent the top card is from, so the team strip can show who's asking. */
-  onAsking: (agent: BotId | null) => void;
 }
 
 const ICON_BTN =
   "inline-flex size-9 items-center justify-center rounded-full border border-[var(--card-line)] bg-white text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl-h)] disabled:opacity-40 disabled:hover:border-[var(--card-line)]";
 
 /**
- * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the agent replies on
- * the card, which lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
+ * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the card says what
+ * happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
  * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same, and 1–3 answer.
  * Under the deck, who's next, and All, to jump to any decision.
  */
-export function NeedsDeck({ stories, onDecide, onOpen, onAsking }: NeedsDeckProps) {
+export function NeedsDeck({ stories, onDecide, onOpen }: NeedsDeckProps) {
   const reduced = useReducedMotion();
   const [seq, setSeq] = useState<number[]>([]);
   const [move, setMove] = useState<Move>("answered");
@@ -142,9 +137,6 @@ export function NeedsDeck({ stories, onDecide, onOpen, onAsking }: NeedsDeckProp
   const decision = top ? decisionFor(top) : null;
   const next = order.slice(1).map((id) => byId.get(id)!);
   const topId = top?.id ?? null;
-  const asking = decision?.agent ?? null;
-
-  useEffect(() => onAsking(asking), [asking, onAsking]);
 
   // If the keyboard was on the card that left, it moves to the new one.
   useEffect(() => {
@@ -228,10 +220,8 @@ export function NeedsDeck({ stories, onDecide, onOpen, onAsking }: NeedsDeckProp
 
   if (!top || !decision) return null;
 
-  // All, grouped by who's asking, in the team's order.
-  const groups = TEAM_ORDER.map((agent) => ({ agent, items: order.map((id) => byId.get(id)!).filter((s) => decisionFor(s).agent === agent) })).filter(
-    (g) => g.items.length > 0,
-  );
+  // All, grouped by kind of need, in the queue's order.
+  const groups = KINDS.map((k) => ({ ...k, items: order.map((id) => byId.get(id)!).filter((s) => s.need === k.kind) })).filter((g) => g.items.length > 0);
 
   return (
     <section
@@ -244,8 +234,8 @@ export function NeedsDeck({ stories, onDecide, onOpen, onAsking }: NeedsDeckProp
       }}
       className="min-w-0"
     >
-      {/* The deck: the top card on the next two. Room above for the agent's face, below for the cards behind. */}
-      <div className="relative pt-8 pb-8">
+      {/* The deck: the top card on the next two, with room below for the cards behind. */}
+      <div className="relative pb-8">
         {BEHIND.slice(0, Math.min(next.length, BEHIND.length))
           .map((b, i) => (
             <motion.div
@@ -255,7 +245,7 @@ export function NeedsDeck({ stories, onDecide, onOpen, onAsking }: NeedsDeckProp
               animate={reduced ? { opacity: b.opacity } : b}
               transition={{ duration: 0.24, ease: EASE_OUT }}
               style={{ zIndex: 2 - i }}
-              className="absolute inset-x-0 top-8 bottom-8 origin-bottom rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.12)]"
+              className="absolute inset-x-0 top-0 bottom-8 origin-bottom rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.12)]"
             />
           ))
           .reverse()}
@@ -298,13 +288,6 @@ export function NeedsDeck({ stories, onDecide, onOpen, onAsking }: NeedsDeckProp
             onClick={later}
             className="group flex min-w-0 flex-1 items-center gap-2.5 text-left text-[13px] leading-[18px] text-[var(--tx2)]"
           >
-            <span aria-hidden="true" className="flex flex-none -space-x-2">
-              {next.slice(0, 3).map((s) => (
-                <span key={s.id} className="rounded-full ring-2 ring-white">
-                  <BotAvatar id={decisionFor(s).agent} size={22} />
-                </span>
-              ))}
-            </span>
             <span className="truncate">
               Next: <span className="text-[var(--tx)] group-hover:underline">{next[0].title}</span>
             </span>
@@ -321,11 +304,10 @@ export function NeedsDeck({ stories, onDecide, onOpen, onAsking }: NeedsDeckProp
           <DropdownMenu.Portal>
             <DropdownMenu.Content align="end" sideOffset={6} className={`${MENU_CONTENT} max-h-[420px] w-[340px] overflow-y-auto`}>
               {groups.map((g, gi) => (
-                <DropdownMenu.Group key={g.agent}>
+                <DropdownMenu.Group key={g.kind}>
                   {gi > 0 && <DropdownMenu.Separator className={MENU_SEPARATOR} />}
-                  <DropdownMenu.Label className="flex items-center gap-2 px-4 pt-2 pb-1 text-[12px] leading-4 text-[var(--tx2)]">
-                    <BotAvatar id={g.agent} size={18} />
-                    {TEAM[g.agent].name} · {g.items.length}
+                  <DropdownMenu.Label className="px-4 pt-2 pb-1 text-[12px] leading-4 text-[var(--tx2)]">
+                    {g.label} · {g.items.length}
                   </DropdownMenu.Label>
                   {g.items.map((s) => (
                     <DropdownMenu.Item key={s.id} onSelect={() => jumpTo(s.id)} className={`${MENU_ITEM} ${s.id === topId ? "font-medium" : ""}`}>

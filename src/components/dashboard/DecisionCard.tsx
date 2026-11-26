@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUp, ArrowUpRight, Check, CircleAlert } from "lucide-react";
-import { BotAvatar } from "@/components/ask/BotAvatar";
-import { TEAM } from "@/components/ask/team";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { Story } from "@/types/dashboard";
 import type { Decision, DecisionOption, Evidence } from "./decisions";
@@ -39,7 +37,7 @@ function EvidenceChip({ e }: { e: Evidence }) {
 interface DecisionCardProps {
   story: Story;
   decision: Decision;
-  /** The agent's reply, shown on the card as it leaves. */
+  /** What happened, said on the card as it leaves. */
   sent: string | null;
   onChoose: (option: DecisionOption) => void;
   onReply: (text: string) => void;
@@ -47,13 +45,11 @@ interface DecisionCardProps {
 }
 
 /**
- * One decision, as a message from the agent whose question it is: its face sits on the card's top edge, its
- * question is the headline, and the story it's about is the context under it, with the evidence (DESIGN.md §2.2).
- * Then the recommended answer as the one solid button, the others quieter, what each does said underneath, and a
- * reply box for anything else. Agent hues stay on the face (DESIGN.md §3.1).
+ * One decision: its status and when it changed, the question as the headline, and the story it's about under it,
+ * with the evidence (DESIGN.md §2.2). Then the recommended answer as the one solid button, the others quieter, what
+ * each does said underneath, and a note box for anything else.
  */
 export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen }: DecisionCardProps) {
-  const agent = TEAM[decision.agent];
   const [hint, setHint] = useState(0);
   const [text, setText] = useState("");
   const qId = `deck-q-${story.id}`;
@@ -61,16 +57,12 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
 
   return (
     <article aria-labelledby={qId} className="relative">
-      {/* The agent, sitting on the card's top edge. */}
-      <span className="absolute -top-[58px] left-0 z-20 rounded-full bg-white p-1 shadow-[0_2px_8px_rgb(0_0_0/0.08)] ring-1 ring-black/[0.04]">
-        <BotAvatar id={decision.agent} size={52} />
-      </span>
-      <p className="flex min-w-0 items-baseline gap-1.5 pl-[72px] text-[14px] leading-5">
-        <span className="font-semibold text-[var(--tx)]">{agent.name}</span>
-        <span className="truncate text-[var(--tx2)]">{story.updated ? `· ${story.updated}` : "· asks you"}</span>
+      <p className="flex min-w-0 items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
+        {story.need && <StatusPill status={NEED_STATUS[story.need]} />}
+        {story.updated && <span className="truncate">{story.updated}</span>}
       </p>
 
-      <h3 id={qId} className="mt-5 text-[20px] leading-7 font-semibold tracking-[-0.012em] text-pretty text-[var(--tx)]">
+      <h3 id={qId} className="mt-4 text-[20px] leading-7 font-semibold tracking-[-0.012em] text-pretty text-[var(--tx)]">
         {decision.question}
       </h3>
 
@@ -87,11 +79,6 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
       </button>
       {/* Short facts as chips; a sentence of context reads as plain text after them. */}
       <ul className="mt-3 flex list-none flex-wrap items-center gap-x-1.5 gap-y-2">
-        {story.need && (
-          <li>
-            <StatusPill status={NEED_STATUS[story.need]} />
-          </li>
-        )}
         {decision.evidence
           .filter((e) => e.text.length <= CHIP_MAX)
           .map((e) => (
@@ -128,7 +115,7 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
         {decision.options[hint]?.detail}
       </p>
 
-      {/* Anything else: a reply to the agent. */}
+      {/* Anything else: a note on the story. */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -147,7 +134,7 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
             }
           }}
           placeholder={decision.reply.placeholder}
-          aria-label={`Reply to the ${agent.name}`}
+          aria-label="Add a note"
           className="h-11 min-w-0 flex-1 text-[14px] leading-5 text-[var(--tx)] outline-none"
         />
         <button
@@ -160,19 +147,19 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
         </button>
       </form>
 
-      {/* The agent's reply, as the card leaves. */}
+      {/* What happened, as the card leaves. */}
       {sent !== null && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.15 }}
-          className="absolute -inset-7 z-10 flex flex-col items-start justify-center rounded-[24px] bg-white px-7 pl-[100px]"
+          className="absolute -inset-7 z-10 flex flex-col items-center justify-center rounded-[24px] bg-white px-7 text-center"
         >
-          <p className="relative max-w-[90%] rounded-[18px] rounded-tl-[6px] bg-[#F2F2F4] px-4 py-3 text-[16px] leading-6 text-[var(--tx)]">
-            {sent}
-          </p>
-          <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] leading-[18px] text-[#1F6B4F]">
-            <Check aria-hidden="true" size={14} strokeWidth={2.5} />
+          <span className="inline-flex size-11 items-center justify-center rounded-full bg-[#16A34A] text-white">
+            <Check aria-hidden="true" size={22} strokeWidth={2.5} />
+          </span>
+          <p className="mt-3 text-[17px] leading-6 font-semibold text-[var(--tx)]">{sent}</p>
+          <p className="mt-0.5 max-w-[80%] truncate text-[13px] leading-[18px] text-[var(--tx2)]">
             {storyRef(story.id)} · {story.title}
           </p>
         </motion.div>

@@ -1,9 +1,8 @@
-import type { BotId } from "@/types/ask";
 import type { NeedKind, Story } from "@/types/dashboard";
 import type { StoryAction } from "./StoryPanel";
 
-// Each story that needs a person, as a message from the agent whose question it is: the question in its own
-// words, the evidence, one recommended answer, quieter alternatives, and a reply box for anything else.
+// Each story that needs a person, as one decision: the question, the evidence, one recommended answer, quieter
+// alternatives, and a note box for anything else.
 
 export interface DecisionOption {
   label: string;
@@ -11,7 +10,7 @@ export interface DecisionOption {
   detail: string;
   /** A story action, or opening the story to read it first. */
   choice: { kind: "act"; action: StoryAction } | { kind: "open" };
-  /** The agent's reply as the card leaves ("On it. Rebuilding now."). */
+  /** Said on the card as it leaves ("Rebuilding on the latest code."). */
   says: string;
 }
 
@@ -29,9 +28,7 @@ export interface Evidence {
 }
 
 export interface Decision {
-  /** The agent whose question it is. */
-  agent: BotId;
-  /** The question, in the agent's words: the card's headline. */
+  /** The question: the card's headline. */
   question: string;
   evidence: Evidence[];
   /** The recommended answer first. */
@@ -49,8 +46,7 @@ export function decisionFor(story: Story): Decision {
     case "review": {
       const c = story.checks;
       return {
-        agent: "tester",
-        question: "It passed my checks, but main has moved on since it was built. Rebuild it before it merges?",
+        question: "It passed its checks, but main has moved on since it was built. Rebuild it before it merges?",
         evidence: [
           ...(c
             ? [{ text: `${c.passed} of ${c.total} checks`, tone: (c.passed === c.total ? "positive" : "negative") as Evidence["tone"], bar: { value: c.passed, total: c.total } }]
@@ -62,30 +58,29 @@ export function decisionFor(story: Story): Decision {
             label: "Rebuild it",
             detail: "Merges main in, runs the checks again and refreshes the preview.",
             choice: { kind: "act", action: { type: "approve" } },
-            says: "On it. Rebuilding on the latest code.",
+            says: "Rebuilding on the latest code.",
           },
           {
             label: "Accept as it is",
             detail: "Marks it done now, without a rebuild.",
             choice: { kind: "act", action: { type: "accept" } },
-            says: "Done. It’s accepted.",
+            says: "Accepted.",
           },
         ],
-        reply: { placeholder: "Ask for changes…", intent: "changes", says: "Got it. I’ve passed that to the Developer." },
+        reply: { placeholder: "Ask for changes…", intent: "changes", says: "Changes sent." },
       };
     }
     case "stuck": {
       const why = story.action ? firstSentence(story.action) : "It isn’t being picked up.";
       return {
-        agent: "debugger",
-        question: `It’s stuck: ${lower(why.replace(/\.$/, ""))}. Want me to try again?`,
+        question: `It’s stuck: ${lower(why.replace(/\.$/, ""))}. Try again?`,
         evidence: story.action && rest(story.action) ? [{ text: rest(story.action), tone: "neutral" }] : [],
         options: [
           {
             label: "Try again",
-            detail: "Restarts it; I’ll watch the run.",
+            detail: "Restarts it and watches the run.",
             choice: { kind: "act", action: { type: "restart" } },
-            says: "Restarting it now. I’ll keep an eye on it.",
+            says: "Restarting it.",
           },
           {
             label: "Back to planning",
@@ -100,13 +95,12 @@ export function decisionFor(story: Story): Decision {
             says: "Cancelled. You can undo.",
           },
         ],
-        reply: { placeholder: "Tell the Debugger something…", intent: "note", says: "Noted. I’ll look into it." },
+        reply: { placeholder: "Add a note…", intent: "note", says: "Note sent." },
       };
     }
     case "decision": {
       const q = story.question;
       return {
-        agent: "pm",
         question: q ? q.text : `${story.meta ?? "There’s an open question"} before the build can start. Keep the defaults?`,
         evidence: [
           ...(q ? [{ text: `If you don’t answer: ${q.fallback}`, tone: "neutral" as const }] : []),
@@ -117,40 +111,38 @@ export function decisionFor(story: Story): Decision {
             label: q ? "Keep the default" : "Keep the defaults",
             detail: q ? `Goes with “${q.fallback}” and approves the plan.` : "Approves the plan with the defaults.",
             choice: { kind: "act", action: { type: "defaults" } },
-            says: "Going with the default. The plan’s approved.",
+            says: "Default kept. The plan is approved.",
           },
           { label: "Read the plan", detail: "Opens the story with the whole plan.", choice: { kind: "open" }, says: "" },
         ],
-        reply: { placeholder: "Answer the PM…", intent: "note", says: "Thanks. I’ll update the plan." },
+        reply: { placeholder: "Write your answer…", intent: "note", says: "Answer sent. The plan gets updated." },
       };
     }
     case "planning":
       return {
-        agent: "pm",
-        question: "The plan is ready. Shall the Developer start building?",
+        question: "The plan is ready. Start building?",
         evidence: story.action ? [{ text: firstSentence(story.action), tone: "neutral" }] : [],
         options: [
           {
             label: "Approve the plan",
-            detail: "The Developer starts within a minute.",
+            detail: "Building starts within a minute.",
             choice: { kind: "act", action: { type: "approve" } },
-            says: "Approved. The Developer starts within a minute.",
+            says: "Approved. Building starts within a minute.",
           },
           { label: "Read the plan", detail: "Opens the story with the whole plan.", choice: { kind: "open" }, says: "" },
         ],
-        reply: { placeholder: "Ask the PM a question…", intent: "question", says: "Good question. I’ll answer on the story." },
+        reply: { placeholder: "Ask a question…", intent: "question", says: "Question sent. The answer comes on the story." },
       };
     case "triage":
       return {
-        agent: "pm",
-        question: "This one’s new and not planned yet. Is it worth planning?",
+        question: "This one is new and not planned yet. Is it worth planning?",
         evidence: [{ text: "New", tone: "neutral" }],
         options: [
           {
             label: "Plan it",
-            detail: "I’ll draft a plan for you to approve.",
+            detail: "A plan is drafted for you to approve.",
             choice: { kind: "act", action: { type: "plan" } },
-            says: "I’ll draft a plan.",
+            says: "Moved to planning.",
           },
           {
             label: "Close it",
@@ -159,23 +151,32 @@ export function decisionFor(story: Story): Decision {
             says: "Closed. You can undo.",
           },
         ],
-        reply: { placeholder: "Tell the PM something…", intent: "note", says: "Noted." },
+        reply: { placeholder: "Add a note…", intent: "note", says: "Note sent." },
       };
     case "next":
       return {
-        agent: "pm",
         question: "No step applies to this one. What should happen next?",
         evidence: story.meta ? [{ text: story.meta, tone: "neutral" }] : [],
         options: [
           {
             label: "Move it to planning",
-            detail: "I’ll pick it up again.",
+            detail: "It’s picked up again.",
             choice: { kind: "act", action: { type: "plan" } },
-            says: "Picking it up again.",
+            says: "Moved to planning.",
           },
           { label: "Open the story", detail: "See where it stopped.", choice: { kind: "open" }, says: "" },
         ],
-        reply: { placeholder: "Tell the PM what you want…", intent: "note", says: "Noted." },
+        reply: { placeholder: "Say what you want next…", intent: "note", says: "Note sent." },
       };
   }
 }
+
+/** The kinds of need, in the queue's order, as the All menu names them. */
+export const KINDS: { kind: NeedKind; label: string }[] = [
+  { kind: "stuck", label: "Stuck" },
+  { kind: "review", label: "Ready to review" },
+  { kind: "decision", label: "Decisions" },
+  { kind: "planning", label: "Plans to approve" },
+  { kind: "triage", label: "New stories" },
+  { kind: "next", label: "What next" },
+];

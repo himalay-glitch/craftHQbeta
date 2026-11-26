@@ -1,28 +1,27 @@
+import styles from "./tokens.module.css";
 import { SKELETON } from "./classes";
 
-/** Loading: the team, the deck and the week's line in their final shape, so nothing jumps when data arrives. */
+const CARD = "flex flex-col rounded-[12px] border border-[var(--card-line)] bg-white px-4 py-3";
+
+/** Loading: the five stats and the deck in their final shape, so nothing jumps when data arrives. */
 export function DashboardSkeleton() {
   return (
     <div aria-hidden="true">
-      <div className="mt-8 flex items-center justify-between">
-        <span className={`${SKELETON} block h-4 w-20`} />
-        <span className={`${SKELETON} block h-4 w-40`} />
-      </div>
-      <div className="mt-3 grid grid-cols-5 gap-1">
+      <div className={`${styles.cards} mt-6`}>
         {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className="flex flex-col items-center pt-3 pb-2.5">
-            <span className={`${SKELETON} size-16 rounded-full`} />
-            <span className={`${SKELETON} mt-2 block h-3.5 w-16`} />
-            <span className={`${SKELETON} mt-1.5 block h-3 w-20`} />
+          <div key={i} className={CARD}>
+            <span className={`${SKELETON} h-[18px] w-24`} />
+            <span className={`${SKELETON} mt-3 h-9 w-14`} />
+            <span className={`${SKELETON} mt-3 h-[18px] w-32`} />
           </div>
         ))}
       </div>
-      <div className="relative mt-8 pt-8 pb-8">
-        <div className="absolute inset-x-0 top-8 bottom-8 translate-y-8 scale-[0.91] rounded-[24px] border border-black/[0.06] bg-white" />
-        <div className="absolute inset-x-0 top-8 bottom-8 translate-y-4 scale-[0.955] rounded-[24px] border border-black/[0.06] bg-white" />
+      <div className="relative mx-auto mt-10 w-full max-w-[760px] pb-8">
+        <div className="absolute inset-x-0 top-0 bottom-8 translate-y-8 scale-[0.91] rounded-[24px] border border-black/[0.06] bg-white" />
+        <div className="absolute inset-x-0 top-0 bottom-8 translate-y-4 scale-[0.955] rounded-[24px] border border-black/[0.06] bg-white" />
         <div className="relative rounded-[24px] border border-black/[0.06] bg-white p-7">
-          <span className={`${SKELETON} block h-4 w-32`} />
-          <span className={`${SKELETON} mt-5 block h-6 w-11/12`} />
+          <span className={`${SKELETON} block h-5 w-36 rounded-full`} />
+          <span className={`${SKELETON} mt-4 block h-6 w-11/12`} />
           <span className={`${SKELETON} mt-2 block h-6 w-2/3`} />
           <span className={`${SKELETON} mt-4 block h-4 w-1/2`} />
           <div className="mt-6 flex gap-2">
