@@ -161,7 +161,8 @@ export function ImportFrom({ onUse, onOpenStory, replaces }: ImportFromProps) {
           {tool.name}
         </button>
         <p className="m-0 mt-3 flex items-center gap-2 text-xs text-[var(--tx2)]">
-          <img src={tool.logo} alt={tool.name} width={20} height={20} className="size-5 flex-none" />
+          <LogoMark src={tool.logo} name={tool.name} />
+          <span className="sr-only">{tool.name}</span>
           <span>
             <span className="font-mono">{t.key}</span> · {t.kind} · {t.status} · {t.updated}
           </span>
@@ -250,9 +251,26 @@ export function ImportFrom({ onUse, onOpenStory, replaces }: ImportFromProps) {
 export function ToolLogo({ tool, size = 20 }: { tool: Pick<TicketTool, "logo" | "name">; size?: 20 | 24 }) {
   return (
     <span aria-hidden="true" className={`flex flex-none items-center justify-center rounded-[8px] bg-white ring-1 ring-black/[0.08] ${size === 24 ? "size-10" : "size-8"}`}>
-      <img src={tool.logo} alt="" width={size} height={size} className={size === 24 ? "size-6" : "size-5"} />
+      <LogoMark src={tool.logo} name={tool.name} size={size} />
     </span>
   );
+}
+
+/**
+ * A tool's mark, or its first letter when the file isn't there. The brand files stay on Shubham's computer, not on
+ * GitHub (26 Nov: other companies' trademarks, kept local like the Claude mark), so everyone else sees the letter.
+ */
+export function LogoMark({ src, name, size = 20 }: { src?: string; name: string; size?: 20 | 24 }) {
+  const [missing, setMissing] = useState(false);
+  const box = size === 24 ? "size-6" : "size-5";
+  if (!src || missing) {
+    return (
+      <span aria-hidden="true" className={`flex flex-none items-center justify-center rounded-[5px] bg-field text-xs font-semibold text-[var(--tx2)] ${box}`}>
+        {name.charAt(0)}
+      </span>
+    );
+  }
+  return <img src={src} alt="" width={size} height={size} onError={() => setMissing(true)} className={`flex-none ${box}`} />;
 }
 
 /** A ticket in the list: its key, kind and status, then its title. */

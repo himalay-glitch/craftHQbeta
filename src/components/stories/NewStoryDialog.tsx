@@ -5,7 +5,7 @@ import type { NewStoryInput } from "@/types/stories";
 import { BTN_PRIMARY, BTN_SECONDARY, ICON_BTN } from "@/components/dashboard/classes";
 import { AttachedFiles, type Attachment } from "./AttachedFiles";
 import { clearDraft, setDraft, useDraft, type StoryDraft } from "./draft";
-import { ImportFrom } from "./ImportFrom";
+import { ImportFrom, LogoMark } from "./ImportFrom";
 import { detailOf, TOOLS, type Ticket, type TicketTool } from "./imports";
 
 export interface NewStoryDialogProps {
@@ -274,7 +274,7 @@ export function NewStoryDialog({ open, onClose, people, viewerId, onCreate, onDi
               {(() => {
                 const logo = TOOLS.find((t) => t.name === draft.source?.tool)?.logo;
                 return logo ? (
-                  <img src={logo} alt="" width={20} height={20} className="size-5 flex-none" />
+                  <LogoMark src={logo} name={draft.source?.tool ?? ""} />
                 ) : (
                   <Link2 aria-hidden="true" size={14} strokeWidth={2} className="flex-none" />
                 );
