@@ -21,7 +21,7 @@ function Side({ rows }: { rows: [number, number] }) {
 /** Loading: the three columns in their final shape, so nothing jumps when data arrives. */
 export function DashboardSkeleton() {
   return (
-    <div aria-hidden="true" className="mt-6 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
+    <div aria-hidden="true" className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
       <div className="lg:order-2">
         <span className={`${SKELETON} block h-6 w-40`} />
         <div className="relative mt-4 pb-8">

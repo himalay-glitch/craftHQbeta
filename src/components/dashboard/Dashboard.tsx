@@ -325,7 +325,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
           <>
             {/* Three columns that fill the width: what to review and what's stuck, Needs you with its deck in the
                 middle, what's running and queued. The side cards stretch to the deck's height. */}
-            <div className="mt-6 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
+            <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
               <section aria-labelledby="needs-title" className="min-w-0 lg:order-2">
                 <header className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Indicator icon={CircleExclamationPoint} tone="attention" on={mine.length > 0} />
