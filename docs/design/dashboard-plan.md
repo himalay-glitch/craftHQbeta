@@ -22,35 +22,30 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
 │ CHQ                              ( ⌕ Search            )                            (J) │ 48 top bar #F9F9F9
 ├────┬─────────────────────────────────────────────────────────────────────────────────────┤
-│ ▦  │            WePop                                           ( + New story )          │ one 760 px column
-│ ☰  │            14 decisions are waiting for you                                         │ 24/32: counts down
-│    │            The agents are on 9 stories · 4 shipped this week                        │
-│    │            ⚡ GitHub isn't connected, so the agents can't start work. Connect GitHub │ quiet setup line
-│    │                                                                                     │
-│    │            The team                                  ◌ 9 running  ◷ 0 queued ›      │
-│    │             (PM)      (Dev)◜     (Des)      (Tes)◜     (Dbg)◜                       │ rings turn while working
-│    │              PM      Developer  Designer   Tester     Debugger                      │
-│    │           12 for you  Building    Free    Checking 7  2 stuck  [Asking you]         │
-│    │                                                                                     │
-│    │             (Dbg)                                                                   │ the agent's face on
-│    │            ┌──┴─────────────────────────────────────────────┐                       │ the card's top edge
-│    │            │      Debugger · asks you                        │                      │
-│    │            │ It's stuck: preview could not start. Want me    │                      │ the question: 20/28
-│    │            │ to try again?                                   │                      │
-│    │            │ Test story  hq-21 ↗     (Failed) Start its …    │                      │ story and evidence
-│    │            │ ( Try again )  ( Back to planning ) ( Cancel )  │                      │ one solid answer
-│    │            │ Restarts it; I'll watch the run.                │                      │ what it does
-│    │            │ [ Tell the Debugger something…              ↑ ] │                      │ reply box
-│    │            └─────────────────────────────────────────────────┘                      │
-│    │             └───────────────────────────────────────────────┘  ← two cards under it │
-│    │            (‹)(›)  (faces) Next: Android: change the greeting…       All 14 ⌄       │
-│ ⚙  │            ─────────────────────────────────────────────────────────────            │
-│ ◫  │            Shipped this week                                    6 done in all       │
-│    │            ●──────────●──────────●──────────●──────→                                │ the week's merges
+│ ▦  │ WePop                                                              ( + New story )  │
+│ ☰  │ 14 decisions are waiting for you                                                    │ 24/32: counts down
+│    │ ⚡ GitHub isn't connected, so the agents can't start work. Connect GitHub            │ quiet setup line
+│    │ ┌ ◌ Running ┐ ┌ ◷ Queued ┐ ┌ ! Needs you ┐ ┌ ⇅ Ready to review ┐ ┌ ✕ Stuck ┐          │ the five stats
+│    │ │ 9         │ │ 0        │ │ 12          │ │ 5                 │ │ 2       │          │
+│    │ └───────────┘ └──────────┘ └─────────────┘ └───────────────────┘ └─────────┘          │
+│    │             ┌─────────────────────────────────────────────────┐                     │ the deck, centred,
+│    │             │ (Failed)                                        │                     │ 760 px
+│    │             │ It's stuck: preview could not start. Try again? │                     │ the question: 20/28
+│    │             │ Test story  hq-21 ↗                             │                     │
+│    │             │ Start its preview again, then add a note.       │                     │ evidence
+│    │             │ ( Try again )  ( Back to planning ) ( Cancel it )│                    │ one solid answer
+│    │             │ Restarts it and watches the run.                │                     │
+│    │             │ [ Add a note…                               ↑ ] │                     │ note box
+│    │             └─────────────────────────────────────────────────┘                     │
+│    │              └───────────────────────────────────────────────┘ ← two cards under it │
+│ ⚙  │             (‹)(›)  Next: Android: change the greeting…        All 14 ⌄            │
+│ ◫  │ ───────────────────────────────────────────────────────────────────────────────     │
+│    │ Shipped this week                                                 6 done in all     │
+│    │ ●───────────────●───────────────●───────────────●──────→                            │ the week's merges
 └────┴─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**When nothing needs you,** the stage cross-fades (150 ms out, 200 ms in) to the all clear, and the headline reads "You're all caught up". The team and the week stay where they are.
+The agents live in the sidebar, so the dashboard doesn't repeat them. **When nothing needs you,** the deck cross-fades (150 ms out, 200 ms in) to the all clear, and the headline reads "You're all caught up".
 
 ## 3. Parts
 
@@ -64,21 +59,21 @@ What the dashboard is, where its look and content come from, and how it behaves.
 - **Account menu** (Radix): name, email, the workspace line from the prototype, Settings, Sign out (goes to `/login` until there's a sign-out endpoint).
 
 ### The headline
-The project's name (14 px, grey) is the page's `h1`; under it the one number that matters, as a sentence: "14 decisions are waiting for you" (24/32, `DESIGN.md` §3.2 Display). It counts down as you answer, so the progress is the headline and the count isn't repeated anywhere else. Then one grey line: what's moving and what shipped. **New story** is a secondary button: the page's one solid button is the recommended answer on the deck.
+The project's name (14 px, grey) is the page's `h1`; under it, "14 decisions are waiting for you" (24/32, `DESIGN.md` §3.2 Display), which counts down as you answer. **New story** is a secondary button: the page's one solid button is the recommended answer on the deck.
 
-### The team (`TeamStrip`)
-What's moving, as the team itself: five faces (52 px renders in a 64 px ring) in the sidebar's order, each with its name and what it's on ("Building hq-54", "Checking 7", "2 stories stuck", "12 questions for you", "Free"). While an agent works, an arc of its ring turns once every 1.6 s in its own hue (`DESIGN.md` §3.1 allows agent hues on the working ring; §8.5); idle, the ring is a grey hairline; with reduced motion the arc stands still. The agent whose question is on top of the deck gets a soft grey tile and an **Asking you** tag, so the deck and the team read as one. Running and Queued keep their numbers and solid indicators in the header, which opens the Details panel. Each face opens that agent's chat. Under 640 px the strip scrolls sideways.
+### Stats (`SummaryCards`)
+Five cards, the agents' two first, each with its solid indicator (`Indicator`): **Running** (green, turning; "2 in progress, 7 in review"), **Queued** (grey; "Agent checked just now"), both opening the Details panel; then **Needs you** (amber; stories waiting on you, "3 more waiting on others"), **Ready to review** (amber) and **Stuck** (red, with the Stuck alert ring), which filter the deck. Needs you shows the whole deck again and has a blue edge while it's showing; Ready to review and Stuck have it while their filter is on. A filter with nothing left shows "No stories match this filter" with Show everything. At 0 an indicator goes grey and still.
 
 ### The stage: Needs you (`NeedsDeck`, `DecisionCard`, `decisions.ts`)
 One decision at a time: the stories waiting on you, plus Stuck, in the prototype's group order (Stuck first).
 
-- **A card is a message from an agent:** its face (52 px, in a white ring) sits on the card's top edge, its name beside it. Its question is the headline (20/28 semibold), in its own words ("It passed my checks, but main has moved on since it was built. Rebuild it before it merges?"). Under it, the story it's about (title, ID, owner; opens the story panel) and the evidence: the status pill, short facts as chips (a checks bar, "Preview ready", the question's default), a sentence of context as plain text.
-- **Answers:** the recommended one is the page's one solid button (40 px); the others are quiet outlines; what the focused or hovered one does is said under them. A reply box ("Ask for changes…", "Answer the PM…", "Tell the Debugger something…") takes anything else; Enter sends it as a note with the right intent.
-- **Who asks what** (`decisionFor`): Review → the Tester (Rebuild it · Accept as it is); Stuck → the Debugger (Try again · Back to planning · Cancel it); Decision → the PM (Keep the default · Read the plan ↗); Planning → the PM (Approve the plan · Read the plan ↗); Triage → the PM (Plan it · Close it). They map to the story panel's actions.
-- **Answering:** reversible, so it acts at once (`DESIGN.md` §6.11). The agent replies on the card in its own words ("On it. Rebuilding on the latest code.", with a green tick and the story) for 0.9 s; the card lifts 28 px and fades (180 ms); the next rises from the pile (240 ms). The toast offers **Undo**, which puts the card back on top.
+- **The card:** the status pill and when it last changed; the question as the headline (20/28 semibold: "It passed its checks, but main has moved on since it was built. Rebuild it before it merges?"); the story it's about (title, ID, owner; opens the story panel); and the evidence: short facts as chips (a checks bar, "Preview ready", the question's default), a sentence of context as plain text. No agent is named on the card: the agents are in the sidebar.
+- **Answers:** the recommended one is the page's one solid button (40 px); the others are quiet outlines; what the focused or hovered one does is said under them. A note box ("Ask for changes…", "Write your answer…", "Ask a question…", "Add a note…") takes anything else; Enter sends it as a note with the right intent.
+- **The answers by kind** (`decisionFor`): Review → Rebuild it · Accept as it is; Stuck → Try again · Back to planning · Cancel it; Decision → Keep the default · Read the plan ↗; Planning → Approve the plan · Read the plan ↗; Triage → Plan it · Close it. They map to the story panel's actions.
+- **Answering:** reversible, so it acts at once (`DESIGN.md` §6.11). The card says what happened (a green tick, "Rebuilding on the latest code.", the story) for 0.7 s; it lifts 28 px and fades (180 ms); the next rises from the pile (240 ms). The toast offers **Undo**, which puts the card back on top.
 - **The pile:** two cards under the top one, 16 and 32 px lower and a little smaller, so it reads as a deck. No rotation, ever (`DESIGN.md` §6.12).
 - **Browsing:** swiping only browses, so a stray swipe never approves anything: left sends the card to the back, right brings the last one back, with a "Later ›" or "‹ Back" tag fading in as you drag; the card lifts to 1.02 while held. ← → and the round arrow buttons do the same; 1–3 answer; the keys work in the deck, or anywhere while nothing else has the keyboard and no panel or menu is open. The hint line shows only with a mouse or trackpad.
-- **Under the deck:** who's next (the next three agents' faces and the next title; it's also Later) and **All 14 ⌄**, a menu of every decision grouped by who's asking, to jump to any one.
+- **Under the deck:** the next title (it's also Later) and **All 14 ⌄**, a menu of every decision grouped by kind (Stuck, Ready to review, Decisions, Plans to approve, New stories), to jump to any one.
 
 ### All clear (`AllClear`)
 `DESIGN.md` §6.7: the PM (64 px, blinking), "Nothing needs you", "The agents will ask here when they need you.", centred, at most 360 px wide, no action; plus "You answered 14 decisions" when you cleared it yourself.
@@ -87,7 +82,7 @@ One decision at a time: the stories waiting on you, plus Stuck, in the prototype
 What shipped, as one line: the week's merges as points, oldest on the left, each with its title, when and ID; the line runs on past the newest to now. The project's done count sits on the right of the heading. It scrolls sideways on phones.
 
 ### Indicators (`Indicator`)
-A white icon in a solid circle, in the status pills' tones (`DESIGN.md` §7.12): agents at work green `#16A34A` (turning), waiting grey `#8E8F94`; grey and still at 0. Used for Running and Queued.
+A white icon in a solid circle, in the status pills' tones (`DESIGN.md` §7.12): agents at work green `#16A34A` (turning), waiting grey `#8E8F94`, a person's turn amber `#D97706`, stuck red `#DC2626`; grey and still at 0. Every fill keeps the icon above 3:1. Values are never coloured.
 
 ### Panels (`SidePanel`, `StoryPanel`, `ActivityPanel`, `NewStoryPanel`)
 - 480 px from the right, under the top bar. On screens 1024 px and wider it floats over the page with its shadow, with no scrim: the page keeps its full width underneath and stays clickable. Below that it covers the page with a scrim. Slides in over 200 ms; fades with reduced motion.
@@ -102,10 +97,10 @@ A white icon in a solid circle, in the status pills' tones (`DESIGN.md` §7.12):
 - The mock connections start as not connected. The GitHub step only completes under `npm run dev`, because closing its window counts as approved only there.
 
 ### After an action
-On the deck, the agent replies on the card and it lifts away; everywhere, the headline and the team update and a dark toast at the bottom says what happened, with **Undo** for 6 seconds (paused on hover). Clearing the last card switches the page to its all-clear arrangement, which says how many decisions you answered.
+On the deck, the card says what happened and lifts away; everywhere, the headline and the stats update and a dark toast at the bottom says what happened, with **Undo** for 6 seconds (paused on hover). Clearing the last card switches the page to its all-clear arrangement, which says how many decisions you answered.
 
 ### States
-`?state=loading` (the team and the deck in skeleton), `?state=empty` (the all clear), `?state=error` ("Couldn't load your stories" with Try again, on the stage).
+`?state=loading` (the stats and the deck in skeleton), `?state=empty` (the all clear), `?state=error` ("Couldn't load your stories" with Try again, on the stage).
 
 ## 4. Interaction details
 
@@ -118,7 +113,7 @@ On the deck, the agent replies on the card and it lifts away; everywhere, the he
 | Other answers | white, `#CBCBCB` edge | `#B5B5B5` edge, `#F9F9F9` fill | 120 ms |
 | Reply box | `#FAFAFA`, `#E3E3E3` edge | focus: white, blue edge | 120 ms |
 | Deck card | white, soft shadow | grab cursor; held: scale 1.02 | drag follows the pointer |
-| Team face | transparent | `#F8F8F8` tile; asking: `#F3F3F4` with the tag | 120 ms |
+| Stat card | `#E3E3E3`, faint shadow | `#D9D9D9`, larger shadow, lifts 2 px, chevron appears | 160 ms |
 
 Focus always shows a 2 px blue outline. Every animation has a reduced-motion version. Menus and tooltips are Radix (keyboard, focus and dismissal handled).
 
