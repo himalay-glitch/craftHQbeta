@@ -19,33 +19,30 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ## 2. Layout at 1440 px
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────┐
-│ CHQ                              ( ⌕ Search            )                            (J) │ 48 top bar #F9F9F9
-├────┬─────────────────────────────────────────────────────────────────────────────────────┤
-│ ▦  │ WePop                                                              ( + New story )  │
-│ ☰  │ 14 decisions are waiting for you                                                    │ 24/32: counts down
-│    │ ⚡ GitHub isn't connected, so the agents can't start work. Connect GitHub            │ quiet setup line
-│    │ ┌ ◌ Running ┐ ┌ ◷ Queued ┐ ┌ ! Needs you ┐ ┌ ⇅ Ready to review ┐ ┌ ✕ Stuck ┐          │ the five stats
-│    │ │ 9         │ │ 0        │ │ 12          │ │ 5                 │ │ 2       │          │
-│    │ └───────────┘ └──────────┘ └─────────────┘ └───────────────────┘ └─────────┘          │
-│    │             ┌─────────────────────────────────────────────────┐                     │ the deck, centred,
-│    │             │ (Failed)                                        │                     │ 760 px
-│    │             │ It's stuck: preview could not start. Try again? │                     │ the question: 20/28
-│    │             │ Test story  hq-21 ↗                             │                     │
-│    │             │ Start its preview again, then add a note.       │                     │ evidence
-│    │             │ ( Try again )  ( Back to planning ) ( Cancel it )│                    │ one solid answer
-│    │             │ Restarts it and watches the run.                │                     │
-│    │             │ [ Add a note…                               ↑ ] │                     │ note box
-│    │             └─────────────────────────────────────────────────┘                     │
-│    │              └───────────────────────────────────────────────┘ ← two cards under it │
-│ ⚙  │             (‹)(›)  Next: Android: change the greeting…        All 14 ⌄            │
-│ ◫  │ ───────────────────────────────────────────────────────────────────────────────     │
-│    │ Shipped this week                                                 6 done in all     │
-│    │ ●───────────────●───────────────●───────────────●──────→                            │ the week's merges
-└────┴─────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│ CHQ                                 ( ⌕ Search            )                              (J) │
+├────┬─────────────────────────────────────────────────────────────────────────────────────────┤
+│ ▦  │ WePop                                                                  ( + New story )  │
+│ ☰  │ ⚡ GitHub isn't connected, so the agents can't start work. Connect GitHub                 │
+│    │ ┌ ⇅ Ready to review ─┐   (!) Needs you 14 · 3 more waiting…   ┌ ◌ Running ─────────┐    │
+│    │ │ 5 waiting on you    │  ┌──────────────────────────────┐    │ 9 2 building, 7 …   │    │
+│    │ │ hq-43 Creation…     │  │ (Failed)                     │    │ hq-57 Test Story… B │    │
+│    │ │ hq-33 Event Disc…   │  │ It's stuck: preview could    │    │ hq-54 Your calen… B │    │
+│    │ │ …                   │  │ not start. Try again?        │    │ hq-35 Tell the h… C │    │
+│    │ │ Review them one by… │  │ Test story hq-21 ↗           │    │ See what the agents │    │
+│    │ ├ ✕ Stuck ────────────┤  │ [1 Try again   Recommended]  │    ├ ◷ Queued ───────────┤    │
+│    │ │ 2 not being picked… │  │ [2 Back to planning       ]  │    │ 0 checked just now  │    │
+│    │ │ hq-21 Test story    │  │ [3 Cancel it              ]  │    │ Nothing is waiting… │    │
+│    │ │ hq-2 Android: …     │  │ [4 Other: add a note…    ↑]  │    │                     │    │
+│    │ │ Unstick them one by…│  └──────────────────────────────┘    │ Open the queue      │    │
+│    │ └─────────────────────┘   (‹)(›) Next: Android…   All 14 ⌄   └─────────────────────┘    │
+│ ⚙  │ ─────────────────────────────────────────────────────────────────────────────────────── │
+│ ◫  │ Shipped this week                                                       6 done in all   │
+│    │ ●──────────────────●──────────────────●──────────────────●──────→                       │
+└────┴─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The agents live in the sidebar, so the dashboard doesn't repeat them. **When nothing needs you,** the deck cross-fades (150 ms out, 200 ms in) to the all clear, and the headline reads "You're all caught up".
+Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 px apart. The side cards stretch to the deck's height (3 : 2 in each column), so nothing beside the deck is blank. Under 1024 px Needs you comes first, then the side cards two by two (one by one on phones). The agents live in the sidebar, so the dashboard doesn't repeat them. **When nothing needs you,** the deck cross-fades (150 ms out, 200 ms in) to the all clear.
 
 ## 3. Parts
 
@@ -58,11 +55,20 @@ The agents live in the sidebar, so the dashboard doesn't repeat them. **When not
 - **Search:** a 32 px pill field. `/` focuses it. It searches every story by title or ID, and choosing one opens its panel on the dashboard through the URL (`?story=hq-43`). Below 1024 px it collapses to an icon.
 - **Account menu** (Radix): name, email, the workspace line from the prototype, Settings, Sign out (goes to `/login` until there's a sign-out endpoint).
 
-### The headline
-The project's name (14 px, grey) is the page's `h1`; under it, "14 decisions are waiting for you" (24/32, `DESIGN.md` §3.2 Display), which counts down as you answer. **New story** is a secondary button: the page's one solid button is the recommended answer on the deck.
+### Heading
+The project's name (21/28) and **New story**, a secondary button: the page's one solid answer is the recommended one on the deck.
 
-### Stats (`SummaryCards`)
-Five cards, the agents' two first, each with its solid indicator (`Indicator`): **Running** (green, turning; "2 in progress, 7 in review"), **Queued** (grey; "Agent checked just now"), both opening the Details panel; then **Needs you** (amber; stories waiting on you, "3 more waiting on others"), **Ready to review** (amber) and **Stuck** (red, with the Stuck alert ring), which filter the deck. Needs you shows the whole deck again and has a blue edge while it's showing; Ready to review and Stuck have it while their filter is on. A filter with nothing left shows "No stories match this filter" with Show everything. At 0 an indicator goes grey and still.
+### Stats beside the deck (`StatPanel`)
+Each stat keeps its solid indicator (`Indicator`), label and number, then lists the stories behind the number and ends in its action:
+
+| Card | Side | Number, line | Stories | Action |
+|---|---|---|---|---|
+| Ready to review | left | review stories waiting on you, "waiting on you" | up to 5, with when; picking one brings its card to the top of the deck | filters the deck ("Review them one by one"; on: "Show everything") |
+| Stuck | left | stuck stories, "not being picked up"; red with the alert ring | up to 3; picking one brings its card to the top | filters the deck |
+| Running | right | stories the agents are on, "2 building, 7 checking"; green, turning | up to 6, Building first, then Checking; each opens the story panel | the Details panel |
+| Queued | right | waiting to start, "checked just now"; grey | the queue, or "Nothing is waiting to start" | the Details panel |
+
+**Needs you** heads the middle column: its amber indicator, the deck's count and "3 more waiting on others"; with a filter on, "Ready to review only · Show all 14".
 
 ### The stage: Needs you (`NeedsDeck`, `DecisionCard`, `decisions.ts`)
 One decision at a time: the stories waiting on you, plus Stuck, in the prototype's group order (Stuck first).
@@ -100,7 +106,7 @@ A white icon in a solid circle, in the status pills' tones (`DESIGN.md` §7.12):
 On the deck, the card says what happened and lifts away; everywhere, the headline and the stats update and a dark toast at the bottom says what happened, with **Undo** for 6 seconds (paused on hover). Clearing the last card switches the page to its all-clear arrangement, which says how many decisions you answered.
 
 ### States
-`?state=loading` (the stats and the deck in skeleton), `?state=empty` (the all clear), `?state=error` ("Couldn't load your stories" with Try again, on the stage).
+`?state=loading` (the three columns in skeleton), `?state=empty` (the all clear), `?state=error` ("Couldn't load your stories" with Try again, on the stage).
 
 ## 4. Interaction details
 
