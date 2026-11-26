@@ -166,7 +166,7 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.15 }}
-          className="absolute -inset-7 z-10 flex flex-col items-start justify-center rounded-[24px] bg-white/95 px-7"
+          className="absolute -inset-7 z-10 flex flex-col items-start justify-center rounded-[24px] bg-white px-7 pl-[100px]"
         >
           <p className="relative max-w-[90%] rounded-[18px] rounded-tl-[6px] bg-[#F2F2F4] px-4 py-3 text-[16px] leading-6 text-[var(--tx)]">
             {sent}
