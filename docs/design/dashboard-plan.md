@@ -1,6 +1,6 @@
 # Dashboard
 
-Version 5 · 26 Nov 2026 · branch `himalay/dashboard-deck` · route `/dashboard`
+Version 6 · 26 Nov 2026 · branch `himalay/dashboard-deck` · route `/dashboard`
 
 What the dashboard is, where its look and content come from, and how it behaves. It describes the code in `src/pages/dashboard/`, `src/components/dashboard/`, `src/components/shell/` and `src/layouts/AppLayout.astro`.
 
@@ -24,25 +24,27 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ├────┬─────────────────────────────────────────────────────────────────────────────────────────┤
 │ ▦  │ WePop                                                                  ( + New story )  │
 │ ☰  │ ⚡ GitHub isn't connected, so the agents can't start work. Connect GitHub                 │
-│    │ ┌ ⇅ Ready to review ─┐   (!) Needs you 14 · 3 more waiting…   ┌ ◌ Running ─────────┐    │
-│    │ │ 5 waiting on you    │  ┌──────────────────────────────┐    │ 9 2 building, 7 …   │    │
-│    │ │ hq-43 Creation…     │  │ (Failed)                     │    │ hq-57 Test Story… B │    │
-│    │ │ hq-33 Event Disc…   │  │ It's stuck: preview could    │    │ hq-54 Your calen… B │    │
-│    │ │ …                   │  │ not start. Try again?        │    │ hq-35 Tell the h… C │    │
-│    │ │ Review them one by… │  │ Test story hq-21 ↗           │    │ See what the agents │    │
-│    │ ├ ✕ Stuck ────────────┤  │ [1 Try again   Recommended]  │    ├ ◷ Queued ───────────┤    │
-│    │ │ 2 not being picked… │  │ [2 Back to planning       ]  │    │ 0 checked just now  │    │
-│    │ │ hq-21 Test story    │  │ [3 Cancel it              ]  │    │ Nothing is waiting… │    │
-│    │ │ hq-2 Android: …     │  │ [4 Other: add a note…    ↑]  │    │                     │    │
-│    │ │ Unstick them one by…│  └──────────────────────────────┘    │ Open the queue      │    │
-│    │ └─────────────────────┘   (‹)(›) Next: Android…   All 14 ⌄   └─────────────────────┘    │
+│    │ ┌ ⇅ Ready to review ─┐   Needs you 14                         ┌ ◌ Running ─────────┐    │
+│    │ │ 5                   │  ┌──────────────────────────────┐    │ 9                   │    │
+│    │ │ waiting on you      │  │ (Failed)                     │    │ 2 building, 7 check │    │
+│    │ │                     │  │ It's stuck: preview could    │    │                     │    │
+│    │ │ Creation flow rev…  │  │ not start. Try again?        │    │ Test Story-add sam… │    │
+│    │ │ Event Discuss tab…  │  │ Test story hq-21 · Start its…│    │ Your calendar: see… │    │
+│    │ │ + 2 more            │  │ ┌──────────────────────────┐ │    │ + 6 more            │    │
+│    │ ├ ✕ Stuck ────────────┤  │ │1 Try again   Recommended │ │    ├ ◷ Queued ───────────┤    │
+│    │ │ 2                   │  │ │2 Back to planning        │ │    │ 0                   │    │
+│    │ │ not being picked up │  │ │3 Cancel it               │ │    │ checked just now    │    │
+│    │ │ Test story          │  │ │4 Other: add a note…      │ │    │ New work starts as… │    │
+│    │ │ Android: change t…  │  │ └──────────────────────────┘ │    │                     │    │
+│    │ └─────────────────────┘  └──────────────────────────────┘    └─────────────────────┘    │
+│    │                               ‹   See all ⌄   ›                                         │
 │ ⚙  │ ─────────────────────────────────────────────────────────────────────────────────────── │
 │ ◫  │ Shipped this week                                                       6 done in all   │
 │    │ ●──────────────────●──────────────────●──────────────────●──────→                       │
 └────┴─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 px apart. The side cards stretch to the deck's height (3 : 2 in each column), so nothing beside the deck is blank. Under 1024 px Needs you comes first, then the side cards two by two (one by one on phones). The agents live in the sidebar, so the dashboard doesn't repeat them. **When nothing needs you,** the deck cross-fades (150 ms out, 200 ms in) to the all clear.
+Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 px apart. The side tiles stretch to the deck's height (3 : 2 in each column), so nothing beside the deck is blank. Version 6 is the calm pass: nothing on the page says the same thing twice, there are no ids or times beside the deck, and the answers sit in one list instead of four boxes. Under 1024 px Needs you comes first, then the side cards two by two (one by one on phones). The agents live in the sidebar, so the dashboard doesn't repeat them. **When nothing needs you,** the deck cross-fades (150 ms out, 200 ms in) to the all clear.
 
 ## 3. Parts
 
@@ -59,27 +61,29 @@ Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 p
 The project's name (21/28) and **New story**, a secondary button: the page's one solid answer is the recommended one on the deck.
 
 ### Stats beside the deck (`StatPanel`)
-Each stat keeps its solid indicator (`Indicator`), label and number, then lists the stories behind the number and ends in its action:
+Each is a KPI tile (`DESIGN.md` §5.6): its solid indicator (`Indicator`, 20 px) and label, the number (30/36 medium), one line, then up to three story titles (no ids, no times) and "+ n more". A hairline border and no shadow; no dividers and no footer rows. The label and number are one button, the tile's action; each title is its own button. Every tile reads the same way down; what's left of its height stays at its foot.
 
-| Card | Side | Number, line | Stories | Action |
+| Tile | Side | Number, line | Titles | Action (label and number) |
 |---|---|---|---|---|
-| Ready to review | left | review stories waiting on you, "waiting on you" | up to 5, with when; picking one brings its card to the top of the deck | filters the deck ("Review them one by one"; on: "Show everything") |
-| Stuck | left | stuck stories, "not being picked up"; red with the alert ring | up to 3; picking one brings its card to the top | filters the deck |
-| Running | right | stories the agents are on, "2 building, 7 checking"; green, turning | up to 6, Building first, then Checking; each opens the story panel | the Details panel |
-| Queued | right | waiting to start, "checked just now"; grey | the queue, or "Nothing is waiting to start" | the Details panel |
+| Ready to review | left | review stories waiting on you, "waiting on you" | picking one brings its card to the top of the deck | filters the deck to reviews; again shows everything |
+| Stuck | left | stuck stories, "not being picked up"; red with the alert ring | picking one brings its card to the top | filters the deck to stuck stories |
+| Running | right | stories the agents are on, "2 building, 7 checking"; green, turning | Building first; each opens the story panel | the Details panel |
+| Queued | right | waiting to start, "checked just now"; grey | "New work starts as soon as it's approved." | the Details panel |
 
-**Needs you** heads the middle column: its amber indicator, the deck's count and "3 more waiting on others"; with a filter on, "Ready to review only · Show all 14".
+While a tile filters the deck, its border turns blue.
+
+**Needs you** heads the middle column: the title and the deck's count in grey. With a filter on, the count becomes a blue chip ("Stuck · 2 ×") that clears it.
 
 ### The stage: Needs you (`NeedsDeck`, `DecisionCard`, `decisions.ts`)
 One decision at a time: the stories waiting on you, plus Stuck, in the prototype's group order (Stuck first).
 
-- **The card:** the status pill and when it last changed; the question as the headline (20/28 semibold: "It passed its checks, but main has moved on since it was built. Rebuild it before it merges?"); the story it's about (title, ID, owner; opens the story panel); and the evidence: short facts as chips (a checks bar, "Preview ready", the question's default), a sentence of context as plain text. No agent is named on the card: the agents are in the sidebar.
-- **Answers:** the recommended one is the page's one solid button (40 px); the others are quiet outlines; what the focused or hovered one does is said under them. A note box ("Ask for changes…", "Write your answer…", "Ask a question…", "Add a note…") takes anything else; Enter sends it as a note with the right intent.
+- **The card:** the status pill and when it last changed; the question as the headline (20/28 semibold: "It passed its checks, but main has moved on since it was built. Rebuild it before it merges?"); then one quiet line: the story's title (underlined; opens the story panel), its ID and the facts, joined by " · " ("6 of 8 checks passed", "Preview ready", a sentence of context), with a failing fact in red ink. No agent is named on the card: the agents are in the sidebar.
+- **Answers:** four rows in one rounded list, split by hairlines, the way Claude asks a question. Rows 1–3 each have a plain number (its key), the answer and what it does in a grey line under it. The first is the recommended one: a pale blue row, a blue number and "Recommended" in blue. Row 4 is Other, a box ("Other: ask for changes…", "Other: add a note…"); Enter sends what you write as a note with the right intent.
 - **The answers by kind** (`decisionFor`): Review → Rebuild it · Accept as it is; Stuck → Try again · Back to planning · Cancel it; Decision → Keep the default · Read the plan ↗; Planning → Approve the plan · Read the plan ↗; Triage → Plan it · Close it. They map to the story panel's actions.
 - **Answering:** reversible, so it acts at once (`DESIGN.md` §6.11). The card says what happened (a green tick, "Rebuilding on the latest code.", the story) for 0.7 s; it lifts 28 px and fades (180 ms); the next rises from the pile (240 ms). The toast offers **Undo**, which puts the card back on top.
 - **The pile:** two cards under the top one, 16 and 32 px lower and a little smaller, so it reads as a deck. No rotation, ever (`DESIGN.md` §6.12).
-- **Browsing:** swiping only browses, so a stray swipe never approves anything: left sends the card to the back, right brings the last one back, with a "Later ›" or "‹ Back" tag fading in as you drag; the card lifts to 1.02 while held. ← → and the round arrow buttons do the same; 1–3 answer; the keys work in the deck, or anywhere while nothing else has the keyboard and no panel or menu is open. The hint line shows only with a mouse or trackpad.
-- **Under the deck:** the next title (it's also Later) and **All 14 ⌄**, a menu of every decision grouped by kind (Stuck, Ready to review, Decisions, Plans to approve, New stories), to jump to any one.
+- **Browsing:** swiping only browses, so a stray swipe never approves anything: left sends the card to the back, right brings the last one back, with a "Later ›" or "‹ Back" tag fading in as you drag; the card lifts to 1.02 while held. ← → and the round arrow buttons do the same; 1–3 answer; the keys work in the deck, or anywhere while nothing else has the keyboard and no panel or menu is open. The numbers on the answers are their keys, so there's no hint line.
+- **Under the deck:** three quiet controls, centred: ‹ (Back), **See all ⌄**, a menu of every decision grouped by kind (Stuck, Ready to review, Decisions, Plans to approve, New stories) to jump to any one, and › (Later). With one card left they go.
 
 ### All clear (`AllClear`)
 `DESIGN.md` §6.7: the PM (64 px, blinking), "Nothing needs you", "The agents will ask here when they need you.", centred, at most 360 px wide, no action; plus "You answered 14 decisions" when you cleared it yourself.
@@ -140,7 +144,7 @@ The screenshot is at 2×; values are halved. They live in `src/components/dashbo
 | card radius | 12 px | corner fit |
 | card shadow / hover | `0 1px 2px rgb(0 0 0/.04)` / `0 4px 12px rgb(0 0 0/.08)` | card shading / the raised card |
 
-**Type** (Inter): 12/16 table headers; 13/18 card labels, sub-lines, pills, chips; 15/22 table text and panel body; 21/28 medium page and panel titles; 32/36 regular stat numbers. **Spacing:** top bar 48; title 24 below it; cards 16 below the title and 16 apart, padding 12 × 16; pills 20 below the cards; table 16 below the pills; header 36; rows 46.
+**Type** (Inter): 12/16 table headers; 13/18 card labels, sub-lines, pills, chips; 15/22 table text and panel body; 21/28 medium page and panel titles; 30/36 medium tile numbers. **Spacing:** top bar 48; title 24 below it; cards 16 below the title and 16 apart, padding 12 × 16; pills 20 below the cards; table 16 below the pills; header 36; rows 46.
 
 ## 7. Where this differs from DESIGN.md
 
