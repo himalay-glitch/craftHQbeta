@@ -82,7 +82,7 @@ function TopCard({
       whileDrag={{ scale: 1.02, cursor: "grabbing" }}
       onDragEnd={onDragEnd}
       style={{ x, zIndex: 3 }}
-      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-7 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
+      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
     >
       {/* Swipe hints, fading in with the drag. */}
       <motion.span
@@ -197,10 +197,15 @@ export function NeedsDeck({ stories, onDecide, onOpen }: NeedsDeckProps) {
       e.preventDefault();
       back();
     } else if (decision && /^[1-9]$/.test(e.key)) {
-      const option = decision.options[Number(e.key) - 1];
+      const n = Number(e.key);
+      const option = decision.options[n - 1];
       if (option) {
         e.preventDefault();
         choose(option);
+      } else if (n === decision.options.length + 1) {
+        // The last number is Other: it puts you in its box.
+        e.preventDefault();
+        root.current?.querySelector<HTMLInputElement>(`[data-deck-id="${topId}"] [data-deck-other]`)?.focus();
       }
     }
   };
@@ -322,7 +327,7 @@ export function NeedsDeck({ stories, onDecide, onOpen }: NeedsDeckProps) {
         </DropdownMenu.Root>
       </div>
       <p aria-hidden="true" className="mt-3 hidden text-center text-[12px] leading-4 text-[var(--tx2)] [@media(pointer:fine)]:block">
-        Swipe or use ← → to browse · 1–{decision.options.length} to answer
+        Swipe or use ← → to browse · 1–{decision.options.length} to answer · {decision.options.length + 1} to write your own
       </p>
     </section>
   );

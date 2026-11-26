@@ -340,8 +340,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
               />
             </div>
 
-            {/* The stage, centred: the deck, or, once it's empty, the all clear. They cross-fade. */}
-            <div className="mx-auto mt-10 w-full max-w-[760px]">
+            {/* The stage, centred: the deck of tall cards, or, once it's empty, the all clear. They cross-fade. */}
+            <div className="mx-auto mt-10 w-full max-w-[480px]">
               {override === "error" ? (
                 <QueueMessage kind="error" onRetry={() => window.location.assign(window.location.pathname)} />
               ) : (

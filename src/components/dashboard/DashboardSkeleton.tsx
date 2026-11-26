@@ -16,7 +16,7 @@ export function DashboardSkeleton() {
           </div>
         ))}
       </div>
-      <div className="relative mx-auto mt-10 w-full max-w-[760px] pb-8">
+      <div className="relative mx-auto mt-10 w-full max-w-[480px] pb-8">
         <div className="absolute inset-x-0 top-0 bottom-8 translate-y-8 scale-[0.91] rounded-[24px] border border-black/[0.06] bg-white" />
         <div className="absolute inset-x-0 top-0 bottom-8 translate-y-4 scale-[0.955] rounded-[24px] border border-black/[0.06] bg-white" />
         <div className="relative rounded-[24px] border border-black/[0.06] bg-white p-7">

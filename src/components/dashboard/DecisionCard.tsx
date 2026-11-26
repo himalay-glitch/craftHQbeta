@@ -1,16 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUp, ArrowUpRight, Check, CircleAlert } from "lucide-react";
+import { ArrowUp, ArrowUpRight, Check, ChevronRight, CircleAlert } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { Story } from "@/types/dashboard";
 import type { Decision, DecisionOption, Evidence } from "./decisions";
 import { NEED_STATUS, storyRef } from "./format";
 import { PersonAvatar } from "./PersonAvatar";
-
-// 40 px buttons: the recommended answer is the page's one solid button; the others are quiet outlines.
-const BTN = "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] leading-5 font-medium whitespace-nowrap transition-colors duration-[120ms]";
-const PRIMARY = `${BTN} bg-[var(--cta)] text-white hover:bg-[var(--cta-h)] active:translate-y-px`;
-const SECONDARY = `${BTN} border border-[var(--ctl)] bg-white text-[var(--tx)] hover:border-[var(--ctl-h)] hover:bg-[var(--ctl-bg-h)] active:translate-y-px`;
 
 /** Evidence longer than this is a sentence, not a fact, so it isn't put in a chip. */
 const CHIP_MAX = 28;
@@ -45,15 +40,13 @@ interface DecisionCardProps {
 }
 
 /**
- * One decision: its status and when it changed, the question as the headline, and the story it's about under it,
- * with the evidence (DESIGN.md §2.2). Then the recommended answer as the one solid button, the others quieter, what
- * each does said underneath, and a note box for anything else.
+ * One decision, on a tall card: its status and when it changed, the question as the headline, and the story it's
+ * about under it, with the evidence (DESIGN.md §2.2). Then four answers, one under another, each with its number
+ * key: three to pick (the recommended one first, in blue) and Other, a box to write your own.
  */
 export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen }: DecisionCardProps) {
-  const [hint, setHint] = useState(0);
   const [text, setText] = useState("");
   const qId = `deck-q-${story.id}`;
-  const hintId = `deck-hint-${story.id}`;
 
   return (
     <article aria-labelledby={qId} className="relative">
@@ -93,59 +86,96 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
           ))}
       </ul>
 
-      {/* The answers. */}
-      <div className="mt-6 flex flex-wrap items-center gap-2" onMouseLeave={() => setHint(0)}>
-        {decision.options.map((o, i) => (
-          <button
-            key={o.label}
-            type="button"
-            aria-keyshortcuts={String(i + 1)}
-            aria-describedby={hintId}
-            onMouseEnter={() => setHint(i)}
-            onFocus={() => setHint(i)}
-            onClick={() => onChoose(o)}
-            className={i === 0 ? PRIMARY : SECONDARY}
-          >
-            {o.label}
-            {o.choice.kind === "open" && <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.75} />}
-          </button>
-        ))}
-      </div>
-      <p id={hintId} className="mt-2 min-h-[18px] text-[13px] leading-[18px] text-[var(--tx2)]">
-        {decision.options[hint]?.detail}
-      </p>
+      {/* Four answers, one under another: three to pick, the recommended one first, then Other to write your own. */}
+      <ul aria-label="Your answer" className="mt-5 flex list-none flex-col gap-2">
+        {decision.options.map((o, i) => {
+          const recommended = i === 0;
+          return (
+            <li key={o.label}>
+              <button
+                type="button"
+                aria-keyshortcuts={String(i + 1)}
+                onClick={() => onChoose(o)}
+                className={`group flex w-full items-center gap-3 rounded-[14px] border px-3.5 py-3 text-left transition-[background-color,border-color] duration-[120ms] active:translate-y-px ${
+                  recommended
+                    ? "border-[#BFD3FB] bg-[#F5F8FF] hover:border-[var(--cta)] hover:bg-[#EEF4FF]"
+                    : "border-[var(--card-line)] bg-white hover:border-[var(--ctl-h)] hover:bg-[var(--ctl-bg-h)]"
+                }`}
+              >
+                <kbd
+                  aria-hidden="true"
+                  className={`inline-flex size-6 flex-none items-center justify-center rounded-[7px] font-sans text-[12px] font-medium tabular-nums ${
+                    recommended ? "bg-[var(--cta)] text-white" : "bg-[#F1F1F2] text-[var(--tx2)]"
+                  }`}
+                >
+                  {i + 1}
+                </kbd>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="text-[14px] leading-5 font-medium text-[var(--tx)]">{o.label}</span>
+                    {recommended && (
+                      <span className="rounded-full bg-[#E3ECFD] px-2 py-px text-[11px] leading-4 font-medium text-[#1F57C3]">Recommended</span>
+                    )}
+                  </span>
+                  <span className="mt-0.5 block text-[13px] leading-[18px] text-[var(--tx2)]">{o.detail}</span>
+                </span>
+                {o.choice.kind === "open" ? (
+                  <ArrowUpRight aria-hidden="true" size={16} strokeWidth={1.75} className="flex-none text-[var(--tx2)]" />
+                ) : (
+                  <ChevronRight
+                    aria-hidden="true"
+                    size={16}
+                    strokeWidth={1.75}
+                    className="flex-none text-[var(--tx2)] opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-visible:opacity-100"
+                  />
+                )}
+              </button>
+            </li>
+          );
+        })}
 
-      {/* Anything else: a note on the story. */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (text.trim()) onReply(text.trim());
-        }}
-        className="mt-4 flex items-center gap-2 rounded-[14px] border border-[var(--card-line)] bg-[#FAFAFA] pr-1.5 pl-3.5 transition-[border-color,background-color] duration-[120ms] focus-within:border-[var(--cta)] focus-within:bg-white"
-      >
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              setText("");
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-          placeholder={decision.reply.placeholder}
-          aria-label="Add a note"
-          className="h-11 min-w-0 flex-1 text-[14px] leading-5 text-[var(--tx)] outline-none"
-        />
-        <button
-          type="submit"
-          disabled={!text.trim()}
-          aria-label="Send"
-          className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-[var(--ink)] text-white transition-opacity duration-[120ms] disabled:opacity-25"
-        >
-          <ArrowUp aria-hidden="true" size={16} strokeWidth={2} />
-        </button>
-      </form>
+        {/* 4: Other, with its own box. Enter sends it as a note on the story. */}
+        <li>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (text.trim()) onReply(text.trim());
+            }}
+            className="flex items-center gap-3 rounded-[14px] border border-[var(--card-line)] bg-white py-1.5 pr-1.5 pl-3.5 transition-[border-color,box-shadow] duration-[120ms] focus-within:border-[var(--cta)] focus-within:shadow-[0_0_0_3px_rgb(47_111_237/0.12)]"
+          >
+            <kbd
+              aria-hidden="true"
+              className="inline-flex size-6 flex-none items-center justify-center rounded-[7px] bg-[#F1F1F2] font-sans text-[12px] font-medium text-[var(--tx2)] tabular-nums"
+            >
+              {decision.options.length + 1}
+            </kbd>
+            <input
+              data-deck-other
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setText("");
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              placeholder={`Other: ${decision.reply.placeholder.charAt(0).toLowerCase()}${decision.reply.placeholder.slice(1)}`}
+              aria-label="Other: write your own answer"
+              aria-keyshortcuts={String(decision.options.length + 1)}
+              className="h-10 min-w-0 flex-1 text-[14px] leading-5 text-[var(--tx)] outline-none placeholder:text-[var(--tx2)]"
+            />
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              aria-label="Send"
+              className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-[var(--cta)] text-white transition-opacity duration-[120ms] disabled:opacity-0"
+            >
+              <ArrowUp aria-hidden="true" size={16} strokeWidth={2} />
+            </button>
+          </form>
+        </li>
+      </ul>
 
       {/* What happened, as the card leaves. */}
       {sent !== null && (
@@ -153,7 +183,7 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.15 }}
-          className="absolute -inset-7 z-10 flex flex-col items-center justify-center rounded-[24px] bg-white px-7 text-center"
+          className="absolute -inset-6 z-10 flex flex-col items-center justify-center rounded-[24px] bg-white px-6 text-center"
         >
           <span className="inline-flex size-11 items-center justify-center rounded-full bg-[#16A34A] text-white">
             <Check aria-hidden="true" size={22} strokeWidth={2.5} />

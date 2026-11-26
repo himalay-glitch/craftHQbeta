@@ -31,7 +31,7 @@ export interface Decision {
   /** The question: the card's headline. */
   question: string;
   evidence: Evidence[];
-  /** The recommended answer first. */
+  /** Three answers, the recommended one first; Other (the reply) is the fourth. */
   options: DecisionOption[];
   reply: DecisionReply;
 }
@@ -66,6 +66,7 @@ export function decisionFor(story: Story): Decision {
             choice: { kind: "act", action: { type: "accept" } },
             says: "Accepted.",
           },
+          { label: "Open the preview", detail: "Try it before you decide.", choice: { kind: "open" }, says: "" },
         ],
         reply: { placeholder: "Ask for changes…", intent: "changes", says: "Changes sent." },
       };
@@ -114,6 +115,12 @@ export function decisionFor(story: Story): Decision {
             says: "Default kept. The plan is approved.",
           },
           { label: "Read the plan", detail: "Opens the story with the whole plan.", choice: { kind: "open" }, says: "" },
+          {
+            label: "Cancel the story",
+            detail: "Stops it before it’s built. You can undo.",
+            choice: { kind: "act", action: { type: "cancel" } },
+            says: "Cancelled. You can undo.",
+          },
         ],
         reply: { placeholder: "Write your answer…", intent: "note", says: "Answer sent. The plan gets updated." },
       };
@@ -130,6 +137,12 @@ export function decisionFor(story: Story): Decision {
             says: "Approved. Building starts within a minute.",
           },
           { label: "Read the plan", detail: "Opens the story with the whole plan.", choice: { kind: "open" }, says: "" },
+          {
+            label: "Cancel the story",
+            detail: "Stops it before it’s built. You can undo.",
+            choice: { kind: "act", action: { type: "cancel" } },
+            says: "Cancelled. You can undo.",
+          },
         ],
         reply: { placeholder: "Ask a question…", intent: "question", says: "Question sent. The answer comes on the story." },
       };
@@ -150,6 +163,7 @@ export function decisionFor(story: Story): Decision {
             choice: { kind: "act", action: { type: "cancel" } },
             says: "Closed. You can undo.",
           },
+          { label: "Open the story", detail: "Read it before you decide.", choice: { kind: "open" }, says: "" },
         ],
         reply: { placeholder: "Add a note…", intent: "note", says: "Note sent." },
       };
@@ -165,6 +179,12 @@ export function decisionFor(story: Story): Decision {
             says: "Moved to planning.",
           },
           { label: "Open the story", detail: "See where it stopped.", choice: { kind: "open" }, says: "" },
+          {
+            label: "Cancel the story",
+            detail: "Stops work on it. You can undo.",
+            choice: { kind: "act", action: { type: "cancel" } },
+            says: "Cancelled. You can undo.",
+          },
         ],
         reply: { placeholder: "Say what you want next…", intent: "note", says: "Note sent." },
       };
