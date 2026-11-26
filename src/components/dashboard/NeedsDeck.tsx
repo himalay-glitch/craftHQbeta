@@ -1,39 +1,43 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "framer-motion";
-import { ChevronLeft, ChevronRight, CircleExclamationPoint, Users } from "lucide-react";
-import type { NeedKind, Story } from "@/types/dashboard";
-import { BTN_SECONDARY } from "./classes";
-import { DecisionCard, type Writing } from "./DecisionCard";
-import { decisionFor, KINDS, OTHER, type DecisionOption } from "./decisions";
-import { DOT, Indicator } from "./Indicator";
+import { DropdownMenu } from "radix-ui";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { BotAvatar } from "@/components/ask/BotAvatar";
+import { TEAM, TEAM_ORDER } from "@/components/ask/team";
+import type { BotId } from "@/types/ask";
+import type { Story } from "@/types/dashboard";
+import { MENU_CONTENT, MENU_ITEM, MENU_SEPARATOR } from "./classes";
+import { DecisionCard } from "./DecisionCard";
+import { decisionFor, type DecisionOption, type DecisionReply } from "./decisions";
+import { storyRef } from "./format";
 
 type KeyLike = Pick<globalThis.KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "preventDefault"> & {
   target: EventTarget | null;
 };
 
-/** How the top card leaves: you decided, you sent it to the back (Later), or an earlier card comes back on top. */
-type Move = "decided" | "later" | "back";
+/** How the top card leaves: you answered, you sent it to the back (Later), or an earlier card comes back on top. */
+type Move = "answered" | "later" | "back";
 
 const EASE_OUT = [0.2, 0, 0, 1] as const;
 const EASE_IN = [0.4, 0, 1, 1] as const;
-// The two cards showing behind the top one: each a little lower and smaller (no rotation, DESIGN.md §6.12).
+// The cards under the top one: each lower and a little smaller, so the pile reads as a deck (no rotation, §6.12).
 const BEHIND = [
-  { y: 12, scale: 0.965 },
-  { y: 24, scale: 0.93 },
+  { y: 16, scale: 0.955, opacity: 1 },
+  { y: 32, scale: 0.91, opacity: 0.7 },
 ];
 const SWIPE = 110; // px dragged, or …
 const FLICK = 500; // … px/s flicked, to count as a swipe
-const SAY_MS = 420; // how long the card says what you chose before it leaves
+const SAY_MS = 900; // how long the agent's reply shows before the card leaves
 
 const variants = {
-  enter: (m: Move) => (m === "back" ? { opacity: 0, x: -48, y: 0, scale: 1 } : { opacity: 0, x: 0, ...BEHIND[0] }),
-  center: { opacity: 1, x: 0, y: 0, scale: 1, transition: { duration: 0.2, ease: EASE_OUT } },
+  enter: (m: Move) => (m === "back" ? { opacity: 0, x: -56, y: 0, scale: 1 } : { opacity: 0, x: 0, y: BEHIND[0].y, scale: BEHIND[0].scale }),
+  center: { opacity: 1, x: 0, y: 0, scale: 1, transition: { duration: 0.24, ease: EASE_OUT } },
   exit: (m: Move) =>
     m === "later"
-      ? { opacity: 0, x: -72, transition: { duration: 0.15, ease: EASE_IN } }
+      ? { opacity: 0, x: -80, transition: { duration: 0.15, ease: EASE_IN } }
       : m === "back"
-        ? { opacity: 0, ...BEHIND[0], transition: { duration: 0.15, ease: EASE_IN } }
-        : { opacity: 0, y: -18, scale: 0.98, transition: { duration: 0.15, ease: EASE_IN } },
+        ? { opacity: 0, y: BEHIND[0].y, scale: BEHIND[0].scale, transition: { duration: 0.15, ease: EASE_IN } }
+        : { opacity: 0, y: -28, scale: 0.98, transition: { duration: 0.18, ease: EASE_IN } },
 };
 const fades = {
   enter: { opacity: 0 },
@@ -81,20 +85,20 @@ function TopCard({
       whileDrag={{ scale: 1.02, cursor: "grabbing" }}
       onDragEnd={onDragEnd}
       style={{ x, zIndex: 3 }}
-      className={`relative rounded-[20px] border border-[var(--card-line)] bg-white p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.07)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 md:p-6 ${draggable ? "cursor-grab" : ""}`}
+      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-7 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
     >
       {/* Swipe hints, fading in with the drag. */}
       <motion.span
         aria-hidden="true"
         style={{ opacity: laterHint }}
-        className="pointer-events-none absolute top-4 right-4 z-20 inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[12px] font-medium text-white"
+        className="pointer-events-none absolute top-5 right-5 z-30 inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[12px] font-medium text-white"
       >
         Later <ChevronRight size={13} strokeWidth={2} />
       </motion.span>
       <motion.span
         aria-hidden="true"
         style={{ opacity: backHint }}
-        className="pointer-events-none absolute top-4 left-4 z-20 inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[12px] font-medium text-white"
+        className="pointer-events-none absolute top-5 right-5 z-30 inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[12px] font-medium text-white"
       >
         <ChevronLeft size={13} strokeWidth={2} /> Back
       </motion.span>
@@ -104,52 +108,45 @@ function TopCard({
 }
 
 interface NeedsDeckProps {
-  /** The stories that need you, in the queue's order (Stuck first), with the filter applied. */
+  /** The stories that need you, in the queue's order (Stuck first). */
   stories: Story[];
-  /** All of them, for the chips' counts. */
-  all: Story[];
-  filter: "all" | NeedKind;
-  onFilter: (f: "all" | NeedKind) => void;
-  /** Answered since the page opened, for the progress. */
-  answered: number;
-  othersWaiting: number;
-  onDecide: (story: Story, option: DecisionOption, text?: string) => void;
+  onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
   onOpen: (id: number) => void;
+  /** Which agent the top card is from, so the team strip can show who's asking. */
+  onAsking: (agent: BotId | null) => void;
 }
 
+const ICON_BTN =
+  "inline-flex size-9 items-center justify-center rounded-full border border-[var(--card-line)] bg-white text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl-h)] disabled:opacity-40 disabled:hover:border-[var(--card-line)]";
+
 /**
- * Needs you, as a deck: one decision at a time, with the next two showing behind it. Pick an answer and the card
- * says what you chose, then lifts away. Swiping only browses (left sends the card to the back, right brings the
- * last one back), so nothing is ever approved by a stray swipe; ← → and the Later / Back buttons do the same.
+ * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the agent replies on
+ * the card, which lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
+ * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same, and 1–3 answer.
+ * Under the deck, who's next, and All, to jump to any decision.
  */
-export function NeedsDeck({ stories, all, filter, onFilter, answered, othersWaiting, onDecide, onOpen }: NeedsDeckProps) {
+export function NeedsDeck({ stories, onDecide, onOpen, onAsking }: NeedsDeckProps) {
   const reduced = useReducedMotion();
   const [seq, setSeq] = useState<number[]>([]);
-  const [move, setMove] = useState<Move>("decided");
-  const [writing, setWriting] = useState<Writing | null>(null);
-  const [leaving, setLeaving] = useState<{ id: number; label: string } | null>(null);
+  const [move, setMove] = useState<Move>("answered");
+  const [sent, setSent] = useState<{ id: number; text: string } | null>(null);
   const root = useRef<HTMLElement>(null);
-  // Whether the keyboard was in the deck, so it stays there when the card it was on leaves.
   const hadFocus = useRef(false);
 
-  // The deck's order: stories you haven't moved, in the queue's order, then the ones you browsed past. A story that
-  // comes back (Undo) isn't in `seq`, so it lands on top.
+  // The order: stories you haven't moved, in the queue's order, then the ones you browsed past. A story that comes
+  // back (Undo) isn't in `seq`, so it lands on top.
   const ids = stories.map((s) => s.id);
   const order = [...ids.filter((id) => !seq.includes(id)), ...seq.filter((id) => ids.includes(id))];
   const byId = new Map(stories.map((s) => [s.id, s]));
   const top = order.length ? byId.get(order[0])! : null;
   const decision = top ? decisionFor(top) : null;
-  const total = answered + order.length;
-
-  // A new top card drops whatever was being written on the last one.
+  const next = order.slice(1).map((id) => byId.get(id)!);
   const topId = top?.id ?? null;
-  const [lastTop, setLastTop] = useState(topId);
-  if (lastTop !== topId) {
-    setLastTop(topId);
-    setWriting(null);
-  }
+  const asking = decision?.agent ?? null;
 
-  // Keep the keyboard in the deck as cards come and go: if it was on the card that left, it moves to the new one.
+  useEffect(() => onAsking(asking), [asking, onAsking]);
+
+  // If the keyboard was on the card that left, it moves to the new one.
   useEffect(() => {
     if (topId === null || !hadFocus.current) return;
     const active = document.activeElement as HTMLElement | null;
@@ -159,44 +156,45 @@ export function NeedsDeck({ stories, all, filter, onFilter, answered, othersWait
   }, [topId]);
 
   const later = () => {
-    if (order.length < 2 || leaving) return;
+    if (order.length < 2 || sent) return;
     setMove("later");
     setSeq([...order.slice(1), order[0]]);
   };
   const back = () => {
-    if (order.length < 2 || leaving) return;
+    if (order.length < 2 || sent) return;
     setMove("back");
     setSeq([order[order.length - 1], ...order.slice(0, -1)]);
   };
+  const jumpTo = (id: number) => {
+    if (id === topId || sent) return;
+    setMove("back");
+    setSeq([id, ...order.filter((x) => x !== id)]);
+  };
 
-  const decide = (story: Story, option: DecisionOption, text?: string) => {
-    setMove("decided");
-    setLeaving({ id: story.id, label: option.done });
+  const answer = (story: Story, says: string, done: () => void) => {
+    setMove("answered");
+    setSent({ id: story.id, text: says });
     window.setTimeout(
       () => {
-        setLeaving(null);
-        setWriting(null);
-        onDecide(story, option, text);
+        setSent(null);
+        done();
       },
-      reduced ? 150 : SAY_MS,
+      reduced ? 400 : SAY_MS,
     );
   };
 
   const choose = (option: DecisionOption) => {
-    if (!top || leaving) return;
+    if (!top || sent) return;
     if (option.choice.kind === "open") return onOpen(top.id);
-    if (option.choice.kind === "write") {
-      setWriting((w) => (w?.option.label === option.label ? null : { option, text: "" }));
-      return;
-    }
-    decide(top, option);
+    answer(top, option.says, () => onDecide(top, { option }));
+  };
+  const reply = (text: string) => {
+    if (!top || !decision || sent) return;
+    const r = decision.reply;
+    answer(top, r.says, () => onDecide(top, { reply: r, text }));
   };
 
-  const send = () => {
-    if (top && writing?.text.trim()) decide(top, writing.option, writing.text.trim());
-  };
-
-  // ← → browse, 1–4 answer: inside the deck, or anywhere while nothing else has the keyboard and no panel is open.
+  // ← → browse, 1–3 answer: inside the deck, or anywhere while nothing else has the keyboard and no panel is open.
   const onKeyDown = (e: KeyLike) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if ((e.target as HTMLElement | null)?.closest?.("textarea, input, select, [contenteditable='true']")) return;
@@ -207,14 +205,13 @@ export function NeedsDeck({ stories, all, filter, onFilter, answered, othersWait
       e.preventDefault();
       back();
     } else if (decision && /^[1-9]$/.test(e.key)) {
-      const option = [...decision.options, OTHER][Number(e.key) - 1];
+      const option = decision.options[Number(e.key) - 1];
       if (option) {
         e.preventDefault();
         choose(option);
       }
     }
   };
-
   const keys = useRef(onKeyDown);
   useEffect(() => {
     keys.current = onKeyDown;
@@ -222,22 +219,24 @@ export function NeedsDeck({ stories, all, filter, onFilter, answered, othersWait
   useEffect(() => {
     const onDocument = (e: globalThis.KeyboardEvent) => {
       if (e.defaultPrevented || e.target !== document.body) return;
-      if (document.querySelector('[role="dialog"], dialog[open]')) return;
+      if (document.querySelector('[role="dialog"], dialog[open], [role="menu"]')) return;
       keys.current(e);
     };
     document.addEventListener("keydown", onDocument);
     return () => document.removeEventListener("keydown", onDocument);
   }, []);
 
-  const count = (k: NeedKind) => all.filter((s) => s.need === k).length;
-  const chips = [{ kind: "all" as const, label: "All", n: all.length, tone: null }, ...KINDS.map((k) => ({ ...k, n: count(k.kind) }))].filter(
-    (c) => c.n > 0 || c.kind === filter,
+  if (!top || !decision) return null;
+
+  // All, grouped by who's asking, in the team's order.
+  const groups = TEAM_ORDER.map((agent) => ({ agent, items: order.map((id) => byId.get(id)!).filter((s) => decisionFor(s).agent === agent) })).filter(
+    (g) => g.items.length > 0,
   );
 
   return (
     <section
       ref={root}
-      aria-labelledby="needs-title"
+      aria-label={`Needs you, ${order.length} ${order.length === 1 ? "decision" : "decisions"}`}
       onKeyDown={onKeyDown}
       onFocus={() => (hadFocus.current = true)}
       onBlur={(e) => {
@@ -245,132 +244,104 @@ export function NeedsDeck({ stories, all, filter, onFilter, answered, othersWait
       }}
       className="min-w-0"
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Indicator icon={CircleExclamationPoint} tone="attention" on={all.length > 0} />
-        <h2 id="needs-title" className="text-[17px] leading-6 font-semibold text-[var(--tx)]">
-          Needs you
-        </h2>
-        <span className="rounded-full bg-[#FCEFD6] px-2 py-px text-[13px] leading-[18px] font-medium text-[#7A4A00] tabular-nums">
-          {all.length}
-        </span>
-        <span className="ml-auto hidden text-[12px] leading-4 text-[var(--tx2)] md:inline">
-          Swipe or <kbd className="font-sans">←</kbd> <kbd className="font-sans">→</kbd> to browse ·{" "}
-          <kbd className="font-sans">1</kbd>–<kbd className="font-sans">4</kbd> to answer
-        </span>
-      </header>
+      {/* The deck: the top card on the next two. Room above for the agent's face, below for the cards behind. */}
+      <div className="relative pt-8 pb-8">
+        {BEHIND.slice(0, Math.min(next.length, BEHIND.length))
+          .map((b, i) => (
+            <motion.div
+              key={`behind-${i}`}
+              aria-hidden="true"
+              initial={false}
+              animate={reduced ? { opacity: b.opacity } : b}
+              transition={{ duration: 0.24, ease: EASE_OUT }}
+              style={{ zIndex: 2 - i }}
+              className="absolute inset-x-0 top-8 bottom-8 origin-bottom rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.12)]"
+            />
+          ))
+          .reverse()}
 
-      {/* The kinds of need, with their counts: these are the old Ready to review and Stuck numbers. */}
-      <div role="group" aria-label="Show" className="mt-3 flex flex-wrap items-center gap-1.5">
-        {chips.map((c) => {
-          const on = filter === c.kind;
-          return (
-            <button
-              key={c.kind}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onFilter(on && c.kind !== "all" ? "all" : c.kind)}
-              className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[13px] leading-[18px] transition-colors duration-[120ms] ${
-                on
-                  ? "border-[var(--ink)] bg-[var(--ink)] text-white"
-                  : "border-[var(--card-line)] bg-white text-[var(--tx)] hover:border-[var(--ctl-h)]"
-              }`}
-            >
-              {c.tone && <span aria-hidden="true" className={`size-1.5 rounded-full ${DOT[c.tone]}`} />}
-              {c.label}
-              <span className={`tabular-nums ${on ? "text-white/70" : "text-[var(--tx2)]"}`}>{c.n}</span>
-            </button>
-          );
-        })}
-        {othersWaiting > 0 && (
-          <span className="ml-1 inline-flex items-center gap-1.5 text-[13px] leading-[18px] text-[var(--tx2)]">
-            <Users aria-hidden="true" size={14} strokeWidth={1.75} />
-            {othersWaiting} more waiting on teammates
-          </span>
-        )}
+        <AnimatePresence initial={false} mode="popLayout" custom={move}>
+          <TopCard
+            key={top.id}
+            id={top.id}
+            move={move}
+            reduced={!!reduced}
+            draggable={!sent && order.length > 1}
+            onSwipe={(dir) => (dir === "later" ? later() : back())}
+          >
+            <DecisionCard
+              story={top}
+              decision={decision}
+              sent={sent?.id === top.id ? sent.text : null}
+              onChoose={choose}
+              onReply={reply}
+              onOpen={() => onOpen(top.id)}
+            />
+          </TopCard>
+        </AnimatePresence>
       </div>
 
-      {top && decision ? (
-        <>
-          {/* The stack: the top card on two blank cards. Room below for the ones behind. */}
-          <div className="relative mt-4 pb-6">
-            {BEHIND.slice(0, Math.min(order.length - 1, BEHIND.length))
-              .map((b, i) => (
-                <motion.div
-                  key={`behind-${i}`}
-                  aria-hidden="true"
-                  initial={false}
-                  animate={reduced ? { opacity: 1 } : { y: b.y, scale: b.scale, opacity: 1 }}
-                  transition={{ duration: 0.2, ease: EASE_OUT }}
-                  style={{ zIndex: 2 - i }}
-                  className="absolute inset-x-0 top-0 bottom-6 origin-bottom rounded-[20px] border border-[var(--card-line)] bg-[#FBFBFB]"
-                />
-              ))
-              .reverse()}
-
-            <AnimatePresence initial={false} mode="popLayout" custom={move}>
-              <TopCard
-                key={top.id}
-                id={top.id}
-                move={move}
-                reduced={!!reduced}
-                draggable={!writing && !leaving && order.length > 1}
-                onSwipe={(dir) => (dir === "later" ? later() : back())}
-              >
-                <DecisionCard
-                  story={top}
-                  decision={decision}
-                  writing={writing}
-                  leaving={leaving?.id === top.id ? leaving.label : null}
-                  onChoose={choose}
-                  onWrite={(text) => setWriting((w) => (w ? { ...w, text } : w))}
-                  onSend={send}
-                  onCancelWrite={() => setWriting(null)}
-                  onOpen={() => onOpen(top.id)}
-                />
-              </TopCard>
-            </AnimatePresence>
-          </div>
-
-          {/* Where you are: answered (green), this one (blue), still to come (grey); Back and Later either side. */}
-          <div className="mt-1 flex items-center gap-3">
-            <button type="button" onClick={back} disabled={order.length < 2} className={BTN_SECONDARY} aria-keyshortcuts="ArrowLeft">
-              <ChevronLeft aria-hidden="true" size={16} strokeWidth={1.75} />
-              Back
-            </button>
-            <div className="flex min-w-0 flex-1 items-center justify-center gap-2.5">
-              {total <= 24 && (
-                <span aria-hidden="true" className="hidden items-center gap-1 sm:flex">
-                  {Array.from({ length: total }, (_, i) => (
-                    <span
-                      key={i}
-                      className={`h-1.5 rounded-full transition-[background-color,width] duration-200 ${
-                        i < answered ? "w-1.5 bg-[#16A34A]" : i === answered ? "w-4 bg-[var(--cta)]" : "w-1.5 bg-[#DCDCDC]"
-                      }`}
-                    />
-                  ))}
-                </span>
-              )}
-              <span className="text-[13px] leading-[18px] whitespace-nowrap text-[var(--tx2)] tabular-nums" aria-live="polite">
-                {answered + 1} of {total}
-              </span>
-            </div>
-            <button type="button" onClick={later} disabled={order.length < 2} className={BTN_SECONDARY} aria-keyshortcuts="ArrowRight">
-              Later
-              <ChevronRight aria-hidden="true" size={16} strokeWidth={1.75} />
-            </button>
-          </div>
-        </>
-      ) : (
-        <div className="mt-4 flex flex-col items-center rounded-[20px] border border-dashed border-[var(--ctl)] px-4 py-14 text-center">
-          <p className="text-[15px] leading-[22px] font-medium text-[var(--tx)]">
-            No {KINDS.find((k) => k.kind === filter)?.label.toLowerCase() ?? "stories"} left
-          </p>
-          <p className="mt-1 text-[14px] leading-5 text-[var(--tx2)]">The rest still need you.</p>
-          <button type="button" onClick={() => onFilter("all")} className={`${BTN_SECONDARY} mt-4`}>
-            Show all
+      {/* Under the deck: back and later, who's next, and All. */}
+      <div className="flex items-center gap-3">
+        <div className="flex flex-none gap-1.5">
+          <button type="button" onClick={back} disabled={order.length < 2} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
+            <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.75} />
+          </button>
+          <button type="button" onClick={later} disabled={order.length < 2} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
+            <ChevronRight aria-hidden="true" size={18} strokeWidth={1.75} />
           </button>
         </div>
-      )}
+
+        {next.length > 0 ? (
+          <button
+            type="button"
+            onClick={later}
+            className="group flex min-w-0 flex-1 items-center gap-2.5 text-left text-[13px] leading-[18px] text-[var(--tx2)]"
+          >
+            <span aria-hidden="true" className="flex flex-none -space-x-2">
+              {next.slice(0, 3).map((s) => (
+                <span key={s.id} className="rounded-full ring-2 ring-white">
+                  <BotAvatar id={decisionFor(s).agent} size={22} />
+                </span>
+              ))}
+            </span>
+            <span className="truncate">
+              Next: <span className="text-[var(--tx)] group-hover:underline">{next[0].title}</span>
+            </span>
+          </button>
+        ) : (
+          <span className="flex-1 text-[13px] leading-[18px] text-[var(--tx2)]">The last one</span>
+        )}
+
+        <DropdownMenu.Root modal={false}>
+          <DropdownMenu.Trigger className="inline-flex h-9 flex-none items-center gap-1 rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.04] data-[state=open]:bg-black/[0.06]">
+            All {order.length}
+            <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content align="end" sideOffset={6} className={`${MENU_CONTENT} max-h-[420px] w-[340px] overflow-y-auto`}>
+              {groups.map((g, gi) => (
+                <DropdownMenu.Group key={g.agent}>
+                  {gi > 0 && <DropdownMenu.Separator className={MENU_SEPARATOR} />}
+                  <DropdownMenu.Label className="flex items-center gap-2 px-4 pt-2 pb-1 text-[12px] leading-4 text-[var(--tx2)]">
+                    <BotAvatar id={g.agent} size={18} />
+                    {TEAM[g.agent].name} · {g.items.length}
+                  </DropdownMenu.Label>
+                  {g.items.map((s) => (
+                    <DropdownMenu.Item key={s.id} onSelect={() => jumpTo(s.id)} className={`${MENU_ITEM} ${s.id === topId ? "font-medium" : ""}`}>
+                      <span className="w-11 flex-none text-[12px] text-[var(--tx2)] tabular-nums">{storyRef(s.id)}</span>
+                      <span className="truncate">{s.title}</span>
+                    </DropdownMenu.Item>
+                  ))}
+                </DropdownMenu.Group>
+              ))}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </div>
+      <p aria-hidden="true" className="mt-3 hidden text-center text-[12px] leading-4 text-[var(--tx2)] [@media(pointer:fine)]:block">
+        Swipe or use ← → to browse · 1–{decision.options.length} to answer
+      </p>
     </section>
   );
 }

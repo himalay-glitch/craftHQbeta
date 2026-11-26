@@ -2,47 +2,46 @@ import type { BotId } from "@/types/ask";
 import type { NeedKind, Story } from "@/types/dashboard";
 import type { StoryAction } from "./StoryPanel";
 
-// Each story that needs a person, as one decision on the Needs you deck: who's asking, the question, the evidence,
-// and two or three answers with the recommended one first, then "Other…" to write your own (the way Claude asks).
-
-/** What picking an answer does: a story action, a note you write first, or opening the story for the details. */
-export type DecisionChoice =
-  | { kind: "act"; action: StoryAction }
-  | { kind: "write"; intent: "changes" | "question" | "note"; placeholder: string }
-  | { kind: "open" };
+// Each story that needs a person, as a message from the agent whose question it is: the question in its own
+// words, the evidence, one recommended answer, quieter alternatives, and a reply box for anything else.
 
 export interface DecisionOption {
   label: string;
+  /** What it does, shown under the buttons while this one is focused or hovered. */
   detail: string;
-  choice: DecisionChoice;
-  /** Said on the card as it leaves: "Rebuilding", "Approved". */
-  done: string;
+  /** A story action, or opening the story to read it first. */
+  choice: { kind: "act"; action: StoryAction } | { kind: "open" };
+  /** The agent's reply as the card leaves ("On it. Rebuilding now."). */
+  says: string;
 }
 
-export type EvidenceTone = "positive" | "negative" | "neutral";
+export interface DecisionReply {
+  placeholder: string;
+  intent: "changes" | "question" | "note";
+  says: string;
+}
+
+export interface Evidence {
+  text: string;
+  tone: "positive" | "negative" | "neutral";
+  /** Checks: passed of total, drawn as a bar. */
+  bar?: { value: number; total: number };
+}
 
 export interface Decision {
   /** The agent whose question it is. */
   agent: BotId;
-  /** "checked it", "couldn't fix it": after the agent's name. */
-  asks: string;
+  /** The question, in the agent's words: the card's headline. */
   question: string;
-  evidence: { text: string; tone: EvidenceTone }[];
+  evidence: Evidence[];
   /** The recommended answer first. */
   options: DecisionOption[];
+  reply: DecisionReply;
 }
 
-const OTHER_PLACEHOLDER = "Tell the agents what you want instead…";
-
-/** "Other…": write your own answer; it goes on the story as a note. */
-export const OTHER: DecisionOption = {
-  label: "Other…",
-  detail: "Write your own answer",
-  choice: { kind: "write", intent: "note", placeholder: OTHER_PLACEHOLDER },
-  done: "Note sent",
-};
-
 const firstSentence = (text: string) => text.split(/(?<=\.)\s/)[0];
+const rest = (text: string) => text.slice(firstSentence(text).length).trim();
+const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 export function decisionFor(story: Story): Decision {
   const need = story.need as NeedKind;
@@ -51,162 +50,135 @@ export function decisionFor(story: Story): Decision {
       const c = story.checks;
       return {
         agent: "tester",
-        asks: "checked it",
-        question: "It’s ready for you. Main has moved on since it was built, so it needs a rebuild before it can merge.",
+        question: "It passed my checks, but main has moved on since it was built. Rebuild it before it merges?",
         evidence: [
-          ...(c ? [{ text: `${c.passed} of ${c.total} checks passed`, tone: (c.passed === c.total ? "positive" : "negative") as EvidenceTone }] : []),
+          ...(c
+            ? [{ text: `${c.passed} of ${c.total} checks`, tone: (c.passed === c.total ? "positive" : "negative") as Evidence["tone"], bar: { value: c.passed, total: c.total } }]
+            : []),
           { text: "Preview ready", tone: "neutral" },
-          { text: "Main moved on", tone: "neutral" },
         ],
         options: [
           {
-            label: "Rebuild on the latest code",
-            detail: "Merge main in, run the checks again and refresh the preview",
+            label: "Rebuild it",
+            detail: "Merges main in, runs the checks again and refreshes the preview.",
             choice: { kind: "act", action: { type: "approve" } },
-            done: "Rebuilding",
+            says: "On it. Rebuilding on the latest code.",
           },
           {
-            label: "Accept it as it is",
-            detail: "Mark it done now, without a rebuild",
+            label: "Accept as it is",
+            detail: "Marks it done now, without a rebuild.",
             choice: { kind: "act", action: { type: "accept" } },
-            done: "Accepted",
-          },
-          {
-            label: "Ask for changes",
-            detail: "Tell the Developer what to change",
-            choice: { kind: "write", intent: "changes", placeholder: "What should change?" },
-            done: "Changes sent",
+            says: "Done. It’s accepted.",
           },
         ],
+        reply: { placeholder: "Ask for changes…", intent: "changes", says: "Got it. I’ve passed that to the Developer." },
       };
     }
-    case "stuck":
+    case "stuck": {
+      const why = story.action ? firstSentence(story.action) : "It isn’t being picked up.";
       return {
         agent: "debugger",
-        asks: "couldn’t get it going",
-        question: story.action ? firstSentence(story.action) : "It stopped and isn’t being picked up.",
+        question: `It’s stuck: ${lower(why.replace(/\.$/, ""))}. Want me to try again?`,
         evidence: [
           { text: "Not being picked up", tone: "negative" },
-          ...(story.action && story.action !== firstSentence(story.action)
-            ? [{ text: story.action.slice(firstSentence(story.action).length).trim(), tone: "neutral" as EvidenceTone }]
-            : []),
+          ...(story.action && rest(story.action) ? [{ text: rest(story.action), tone: "neutral" as const }] : []),
         ],
         options: [
           {
             label: "Try again",
-            detail: "Restart it; the Debugger watches the run",
+            detail: "Restarts it; I’ll watch the run.",
             choice: { kind: "act", action: { type: "restart" } },
-            done: "Restarted",
+            says: "Restarting it now. I’ll keep an eye on it.",
           },
           {
             label: "Back to planning",
-            detail: "Rethink it before it’s built again",
+            detail: "Rethink it before it’s built again.",
             choice: { kind: "act", action: { type: "plan" } },
-            done: "Moved to planning",
+            says: "Moved back to planning.",
           },
           {
-            label: "Cancel the story",
-            detail: "Stop work on it; you can undo",
+            label: "Cancel it",
+            detail: "Stops work on the story. You can undo.",
             choice: { kind: "act", action: { type: "cancel" } },
-            done: "Cancelled",
+            says: "Cancelled. You can undo.",
           },
         ],
+        reply: { placeholder: "Tell the Debugger something…", intent: "note", says: "Noted. I’ll look into it." },
       };
+    }
     case "decision": {
       const q = story.question;
       return {
         agent: "pm",
-        asks: "needs an answer",
-        question: q ? q.text : `${story.meta ?? "An open question"} before the build can start.`,
+        question: q ? q.text : `${story.meta ?? "There’s an open question"} before the build can start. Keep the defaults?`,
         evidence: [
-          ...(q ? [{ text: `Default: ${q.fallback}`, tone: "neutral" as EvidenceTone }] : []),
-          ...(story.meta ? [{ text: story.meta, tone: "neutral" as EvidenceTone }] : []),
+          ...(q ? [{ text: `If you don’t answer: ${q.fallback}`, tone: "neutral" as const }] : []),
+          ...(story.meta ? [{ text: story.meta, tone: "neutral" as const }] : []),
         ],
         options: [
           {
             label: q ? "Keep the default" : "Keep the defaults",
-            detail: q ? `Go with “${q.fallback}” and approve the plan` : "Approve the plan with the defaults",
+            detail: q ? `Goes with “${q.fallback}” and approves the plan.` : "Approves the plan with the defaults.",
             choice: { kind: "act", action: { type: "defaults" } },
-            done: "Approved",
+            says: "Going with the default. The plan’s approved.",
           },
-          {
-            label: "Answer it",
-            detail: "Write your answer; the PM updates the plan",
-            choice: { kind: "write", intent: "note", placeholder: "Your answer…" },
-            done: "Answer sent",
-          },
-          { label: "Open the plan", detail: "Read the whole plan first", choice: { kind: "open" }, done: "" },
+          { label: "Read the plan", detail: "Opens the story with the whole plan.", choice: { kind: "open" }, says: "" },
         ],
+        reply: { placeholder: "Answer the PM…", intent: "note", says: "Thanks. I’ll update the plan." },
       };
     }
     case "planning":
       return {
         agent: "pm",
-        asks: "wrote a plan",
-        question: "The plan is ready. Start building?",
+        question: "The plan is ready. Shall the Developer start building?",
         evidence: story.action ? [{ text: firstSentence(story.action), tone: "neutral" }] : [],
         options: [
           {
             label: "Approve the plan",
-            detail: "The Developer starts within a minute",
+            detail: "The Developer starts within a minute.",
             choice: { kind: "act", action: { type: "approve" } },
-            done: "Approved",
+            says: "Approved. The Developer starts within a minute.",
           },
-          {
-            label: "Ask a question",
-            detail: "The PM answers on the story",
-            choice: { kind: "write", intent: "question", placeholder: "What do you want to know?" },
-            done: "Question sent",
-          },
-          { label: "Open the plan", detail: "Read the whole plan first", choice: { kind: "open" }, done: "" },
+          { label: "Read the plan", detail: "Opens the story with the whole plan.", choice: { kind: "open" }, says: "" },
         ],
+        reply: { placeholder: "Ask the PM a question…", intent: "question", says: "Good question. I’ll answer on the story." },
       };
     case "triage":
       return {
         agent: "pm",
-        asks: "found a new story",
-        question: "It isn’t planned yet. Is it worth planning?",
-        evidence: [{ text: "New, not planned", tone: "neutral" }],
+        question: "This one’s new and not planned yet. Is it worth planning?",
+        evidence: [{ text: "New", tone: "neutral" }],
         options: [
           {
             label: "Plan it",
-            detail: "The PM drafts a plan for you to approve",
+            detail: "I’ll draft a plan for you to approve.",
             choice: { kind: "act", action: { type: "plan" } },
-            done: "Planning",
+            says: "I’ll draft a plan.",
           },
           {
             label: "Close it",
-            detail: "Cancel the story; you can undo",
+            detail: "Cancels the story. You can undo.",
             choice: { kind: "act", action: { type: "cancel" } },
-            done: "Closed",
+            says: "Closed. You can undo.",
           },
-          { label: "Open the story", detail: "Read it before you decide", choice: { kind: "open" }, done: "" },
         ],
+        reply: { placeholder: "Tell the PM something…", intent: "note", says: "Noted." },
       };
     case "next":
       return {
         agent: "pm",
-        asks: "needs a next step",
-        question: "No step applies. What should happen next?",
+        question: "No step applies to this one. What should happen next?",
         evidence: story.meta ? [{ text: story.meta, tone: "neutral" }] : [],
         options: [
           {
             label: "Move it to planning",
-            detail: "The PM picks it up again",
+            detail: "I’ll pick it up again.",
             choice: { kind: "act", action: { type: "plan" } },
-            done: "Planning",
+            says: "Picking it up again.",
           },
-          { label: "Open the story", detail: "See where it stopped", choice: { kind: "open" }, done: "" },
+          { label: "Open the story", detail: "See where it stopped.", choice: { kind: "open" }, says: "" },
         ],
+        reply: { placeholder: "Tell the PM what you want…", intent: "note", says: "Noted." },
       };
   }
 }
-
-/** The deck's filter chips: each kind of need, the tone of its dot, and its name on a chip. */
-export const KINDS: { kind: NeedKind; label: string; tone: "attention" | "negative" }[] = [
-  { kind: "review", label: "Review", tone: "attention" },
-  { kind: "decision", label: "Decisions", tone: "attention" },
-  { kind: "planning", label: "Plans", tone: "attention" },
-  { kind: "triage", label: "Triage", tone: "attention" },
-  { kind: "stuck", label: "Stuck", tone: "negative" },
-];

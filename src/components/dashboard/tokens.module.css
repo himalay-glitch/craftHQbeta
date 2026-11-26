@@ -115,11 +115,24 @@
   }
 }
 
+/* An agent at work: the arc of its ring turns, once every 1.6 s (DESIGN.md §8.5). */
+.ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ring-turn 1.6s linear infinite;
+}
+@keyframes ring-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu[data-state="open"],
   .menu[data-state="closed"],
   .pulse,
-  .alertIcon {
+  .alertIcon,
+  .ring {
     animation: none;
   }
 }
