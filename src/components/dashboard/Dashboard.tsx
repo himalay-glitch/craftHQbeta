@@ -373,7 +373,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 </div>
               </section>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:order-1 lg:flex lg:flex-col">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:order-1 lg:flex lg:flex-col">
                 <StatPanel
                   label="Ready to review"
                   value={reviewCount}
@@ -407,7 +407,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:order-3 lg:flex lg:flex-col">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:order-3 lg:flex lg:flex-col">
                 <StatPanel
                   label="Running"
                   value={data.running.length}

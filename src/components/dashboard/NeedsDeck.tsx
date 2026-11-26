@@ -305,7 +305,7 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
             onClick={later}
             className="group flex min-w-0 flex-1 items-center gap-2.5 text-left text-[13px] leading-[18px] text-[var(--tx2)]"
           >
-            <span className="truncate">
+            <span className="min-w-0 truncate">
               Next: <span className="text-[var(--tx)] group-hover:underline">{next[0].title}</span>
             </span>
           </button>
