@@ -16,7 +16,7 @@ interface DecisionCardProps {
   onOpen: () => void;
 }
 
-const ROW = "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-[120ms] outline-none";
+const ROW = "flex w-full gap-3 px-4 py-3 text-left transition-colors duration-[120ms] outline-none";
 const NUM = "w-3 flex-none pt-px text-[13px] leading-5 font-medium tabular-nums";
 
 /**
@@ -71,7 +71,7 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
                 type="button"
                 aria-keyshortcuts={String(i + 1)}
                 onClick={() => onChoose(o)}
-                className={`${ROW} focus-visible:shadow-[inset_0_0_0_2px_var(--cta)] ${
+                className={`${ROW} items-start focus-visible:shadow-[inset_0_0_0_2px_var(--cta)] ${
                   recommended ? "bg-[#F5F8FF] hover:bg-[#EDF3FF]" : "bg-white hover:bg-[var(--row-h)]"
                 }`}
               >
@@ -102,7 +102,7 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
             }}
             className={`${ROW} items-center py-1.5 pr-1.5 focus-within:shadow-[inset_0_0_0_2px_var(--cta)]`}
           >
-            <span aria-hidden="true" className={`${NUM} pt-0 text-[var(--tx2)]`}>
+            <span aria-hidden="true" className="w-3 flex-none text-[13px] leading-5 font-medium text-[var(--tx2)] tabular-nums">
               {otherKey}
             </span>
             <input

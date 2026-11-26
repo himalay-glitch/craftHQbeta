@@ -32,9 +32,9 @@ interface StatPanelProps {
 const SHOWN = 3;
 
 /**
- * A KPI tile beside the deck (DESIGN.md §5.6): the label, the number, one line of context, and at the foot the
- * first few stories behind the number. Nothing else: no ids, no times, no dividers. It stretches to its column, so
- * the space between the number and the names is the tile's own, not a gap in the page.
+ * A KPI tile beside the deck (DESIGN.md §5.6): the label, the number, one line of context, then the first few
+ * stories behind the number. Nothing else: no ids, no times, no dividers. Every tile reads the same way
+ * down, and it stretches to its column, so whatever room is left is the tile's own, not a gap in the page.
  */
 export function StatPanel(p: StatPanelProps) {
   const shown = p.items.slice(0, SHOWN);
@@ -69,9 +69,9 @@ export function StatPanel(p: StatPanelProps) {
       </button>
 
       {shown.length === 0 ? (
-        <p className="mt-auto pt-5 text-[13px] leading-[18px] text-[var(--tx2)]">{p.empty}</p>
+        <p className="pt-5 text-[13px] leading-[18px] text-[var(--tx2)]">{p.empty}</p>
       ) : (
-        <ul className="mt-auto flex list-none flex-col pt-5">
+        <ul className="flex list-none flex-col pt-5">
           {shown.map((s) => (
             <li key={s.id}>
               <button

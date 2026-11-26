@@ -382,7 +382,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   openLabel={need === "review" ? "Show everything in the deck" : "Show only these in the deck"}
                   pressed={need === "review"}
                   empty="Nothing to review."
-                  className="lg:flex-1"
+                  className="lg:flex-[3]"
                 />
                 <StatPanel
                   label="Stuck"
@@ -397,7 +397,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   openLabel={need === "stuck" ? "Show everything in the deck" : "Show only these in the deck"}
                   pressed={need === "stuck"}
                   empty="Nothing is stuck."
-                  className="lg:flex-1"
+                  className="lg:flex-[2]"
                 />
               </div>
 
@@ -414,7 +414,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   onOpen={() => openLocal({ kind: "details", tab: "agent" })}
                   openLabel="See what the agents are doing"
                   empty="The agents are idle."
-                  className="lg:flex-1"
+                  className="lg:flex-[3]"
                 />
                 <StatPanel
                   label="Queued"
@@ -427,7 +427,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   onOpen={() => openLocal({ kind: "details", tab: "agent" })}
                   openLabel="Open the queue"
                   empty="New work starts as soon as it’s approved."
-                  className="lg:flex-1"
+                  className="lg:flex-[2]"
                 />
               </div>
             </div>

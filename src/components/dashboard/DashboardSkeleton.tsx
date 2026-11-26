@@ -1,13 +1,13 @@
 import { SKELETON } from "./classes";
 
-/** A KPI tile: its label, its number, its line, and the names at the foot. */
-function Tile({ names }: { names: number }) {
+/** A KPI tile: its label, its number, its line, then the names. */
+function Tile({ names, grow }: { names: number; grow: string }) {
   return (
-    <div className="flex flex-col rounded-[12px] border border-[var(--card-line)] bg-white p-4 lg:flex-1">
+    <div className={`flex flex-col rounded-[12px] border border-[var(--card-line)] bg-white p-4 ${grow}`}>
       <span className={`${SKELETON} h-5 w-28`} />
       <span className={`${SKELETON} mt-3 h-9 w-12`} />
       <span className={`${SKELETON} mt-1 h-[18px] w-32`} />
-      <span className="mt-auto flex flex-col gap-2 pt-5">
+      <span className="flex flex-col gap-2 pt-5">
         {Array.from({ length: names }, (_, j) => (
           <span key={j} className={`${SKELETON} h-3`} style={{ width: `${80 - j * 14}%` }} />
         ))}
@@ -42,8 +42,8 @@ export function DashboardSkeleton() {
       </div>
       {[0, 1].map((col) => (
         <div key={col} className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:flex-col lg:gap-6 ${col === 0 ? "lg:order-1" : "lg:order-3"}`}>
-          <Tile names={3} />
-          <Tile names={col === 0 ? 2 : 1} />
+          <Tile names={3} grow="lg:flex-[3]" />
+          <Tile names={col === 0 ? 2 : 1} grow="lg:flex-[2]" />
         </div>
       ))}
     </div>
