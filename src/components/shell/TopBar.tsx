@@ -2,7 +2,7 @@ import { DropdownMenu, Tooltip } from "radix-ui";
 import { Menu } from "lucide-react";
 import type { SearchItem, Viewer } from "@/types/dashboard";
 import { ICON_BTN, MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
-import { Messages } from "@/components/messages";
+import { Notifications } from "@/components/notifications";
 import { AvatarMenu } from "./AvatarMenu";
 import { NAV, currentPath } from "./nav";
 import { SearchBox } from "./SearchBox";
@@ -16,14 +16,17 @@ interface TopBarProps {
 
 /**
  * The app's top bar, 48 px on the reference's light grey and the full width of the window, as in Asana:
- * the glass wordmark on the left, search in the middle, the account menu on the right. The main links
+ * the glass wordmark on the left, search in the middle, notifications and the account menu on the right (Shubham,
+ * 26 Nov: notifications in place of Messages, which mattered less there). The main links
  * live in the sidebar; below 1024 px, where there's no sidebar, they're in a menu here.
  */
 export function TopBar({ viewer, search, current }: TopBarProps) {
   const path = currentPath(current);
   return (
     <Tooltip.Provider delayDuration={400}>
-      <header className="sticky top-0 z-40 h-[var(--bar-h)] bg-[var(--bar)]">
+      {/* White, like the sidebar (Shubham, 26 Nov): one white frame around the tinted page. Below 1024 px, where pages are
+          white too, a hairline keeps it apart from the page. */}
+      <header className="sticky top-0 z-40 h-[var(--bar-h)] bg-white max-lg:border-b max-lg:border-[var(--line)]">
         <div className="flex h-full items-center gap-2 px-4 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-4">
           <div className="flex items-center gap-1">
             <DropdownMenu.Root modal={false}>
@@ -63,7 +66,7 @@ export function TopBar({ viewer, search, current }: TopBarProps) {
           </div>
 
           <div className="flex items-center justify-end gap-2">
-            <Messages viewer={viewer} />
+            <Notifications />
             <AvatarMenu viewer={viewer} />
           </div>
         </div>

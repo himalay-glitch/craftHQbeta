@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleCheck, CircleSlash, GitMerge } from "lucide-react";
+import { CircleCheck, CircleSlash, GitMerge, GitPullRequestClosed } from "lucide-react";
 import { Tip } from "@/components/dashboard/Tip";
 import type { LiveRun, StoryItem } from "@/types/stories";
 import { liveSpoken, runStart } from "./LiveLine";
@@ -9,7 +9,7 @@ import { storyStage } from "./stage";
 import { CHIP } from "./StageLabel";
 import { WorkingIndicator } from "./WorkingIndicator";
 
-const PILL = "inline-flex h-[22px] max-w-full min-w-0 items-center gap-1.5 rounded-full px-2 text-[12px] leading-4";
+const PILL = "inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 rounded-full px-2 text-xs";
 const OUTLINE = `${PILL} border border-[var(--card-line)] bg-white`;
 
 /** Short words for the robots' own stages when no live run is reported. */
@@ -36,7 +36,7 @@ function LivePill({ story }: { story: StoryItem & { live: LiveRun } }) {
 /**
  * A board card's one status chip. A person's turn keeps its tinted chip ("Approve the plan", "1 question for you");
  * everything else is an outlined chip: a robot at work (it turns), merged (GitMerge, positive ink), done, cancelled,
- * or a quiet stage ("Waiting to start"). DESIGN.md §7.12: tints only where someone must act; green only for merged.
+ * or a quiet stage ("Queued"). DESIGN.md §7.12: tints only where someone must act; green only for merged.
  */
 export function CardStatus({ story }: { story: StoryItem }) {
   // A change made in place (a new phase, a robot finishing) crossfades over 150 ms; nothing animates on load.
@@ -68,7 +68,7 @@ function StatusChip({ story }: { story: StoryItem }) {
   }
   if (stage.tone === "done") {
     const merged = stage.outcome === "merged";
-    const Icon = merged ? GitMerge : stage.outcome === "cancelled" ? CircleSlash : CircleCheck;
+    const Icon = merged ? GitMerge : stage.outcome === "closed" ? GitPullRequestClosed : stage.outcome === "cancelled" ? CircleSlash : CircleCheck;
     return (
       <span className={`${OUTLINE} ${merged ? "font-medium text-success-ink" : "text-[var(--tx2)]"}`}>
         <Icon aria-hidden="true" size={12} strokeWidth={2} className={`flex-none ${merged ? "text-success" : ""}`} />

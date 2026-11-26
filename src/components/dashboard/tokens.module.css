@@ -7,7 +7,9 @@
  */
 .tokens {
   --page: #ffffff;
-  --bar: #f9f9f9;
+  /* The frame: top bar, sidebar and the canvas behind the page sheet. Deep enough that the white sheet and its rounded
+     corner read against it (Shubham, 26 Nov: the corner was merging into #f9f9f9). The same grey as the tab tracks. */
+  --bar: #f4f4f5;
   --tx: #1e1f21;
   --tx2: #6d6e6f;
   --line: #e8e8e8;
@@ -134,5 +136,18 @@
   .pulse,
   .alertIcon {
     animation: none;
+  }
+}
+
+/* Ask PM's wash, as on the story page (Shubham, 26 Nov: trying it behind the dashboard too). Cool at the page's top-left
+   corner, warm at the window's bottom right, over #F4F4F6 (Shubham, 26 Nov: white was tried and the grey kept; the
+   sidebar went white instead, so the page stands apart from it). Pinned to the window (`fixed`), so it holds still while the
+   dashboard scrolls over it, as it sits on the story page, with no edge where the glow would stop. Phones stay white. */
+@media (min-width: 768px) {
+  .wash {
+    background:
+      radial-gradient(60% 55% at var(--sidebar-w, 0px) var(--bar-h), #e9eefa 0%, transparent 70%) fixed,
+      radial-gradient(55% 60% at 100% 100%, #fbe3d6 0%, transparent 72%) fixed,
+      #f4f4f6;
   }
 }

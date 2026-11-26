@@ -2,6 +2,7 @@ import { useId } from "react";
 import type { NeedKind } from "@/types/dashboard";
 import type { ActivityItem, PreviewActions } from "@/types/stories";
 import { NowArea, Outputs } from "./StoryActivity";
+import type { ColumnKey } from "./stage";
 
 interface StoryRailProps {
   /** Desktop: headed "Activity". On phones it sits in a disclosure that already says so. */
@@ -16,6 +17,8 @@ interface StoryRailProps {
   preview: PreviewActions;
   /** Buttons whose service isn't connected yet say so in a toast. */
   onSoon: (message: string) => void;
+  /** The story's column: what that stage needs comes first in the outputs. */
+  stage?: ColumnKey;
 }
 
 /**
@@ -24,12 +27,12 @@ interface StoryRailProps {
  * groups. When something finishes it goes down from one to the other. No story details at the foot: Shubham took
  * them out (23 Nov); the owner is changed on the board, and attached files show in the chat.
  */
-export function StoryRail({ withHeader, activity, yours, restartInChat, epoch, preview, onSoon }: StoryRailProps) {
+export function StoryRail({ withHeader, activity, yours, restartInChat, epoch, preview, onSoon, stage }: StoryRailProps) {
   const headingId = useId();
-  const activityProps = { items: activity, yours, restartInChat, epoch, preview, onSoon };
+  const activityProps = { items: activity, yours, restartInChat, epoch, preview, onSoon, stage };
 
   return (
-    <section aria-labelledby={withHeader ? headingId : undefined} aria-label={withHeader ? undefined : "Activity"} className="flex flex-col pt-1 pb-3 md:pt-0 md:pb-0">
+    <section aria-labelledby={withHeader ? headingId : undefined} aria-label={withHeader ? undefined : "Work"} className="flex flex-col gap-6 pt-1 pb-3 md:pt-0 md:pb-0">
       {/* Desktop: as tall as the chat sheet's header row beside it, so the two tops line up. */}
       {withHeader && (
         <h2 id={headingId} className="m-0 flex h-14 flex-none items-center text-sm font-medium text-[var(--tx)]">
@@ -38,9 +41,7 @@ export function StoryRail({ withHeader, activity, yours, restartInChat, epoch, p
       )}
       {/* One group under the other, like a sidebar: what's running now, then the outputs it finished into. */}
       <NowArea {...activityProps} />
-      <div className="mt-6">
-        <Outputs {...activityProps} />
-      </div>
+      <Outputs {...activityProps} />
     </section>
   );
 }

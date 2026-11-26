@@ -9,6 +9,7 @@ export const STATUS_LABEL: Record<StoryStatus, string> = {
   approved: "Approved",
   in_progress: "In progress",
   in_review: "In review",
+  pull_request: "Pull request",
   done: "Done",
   cancelled: "Cancelled",
 };
@@ -50,9 +51,9 @@ const ORDER = Object.fromEntries(NEEDS.map((n, i) => [n.kind, i])) as Record<Nee
 export type SortMode = "group" | "updated-desc" | "updated-asc";
 
 /** Default order: the prototype's groups (Stuck first), then its own order within each group. */
-export function sortQueue(stories: Story[], mode: SortMode): Story[] {
+export function sortQueue<T extends Pick<Story, "need" | "updatedMinutes">>(stories: T[], mode: SortMode): T[] {
   const indexed = stories.map((s, i) => ({ s, i }));
-  const mins = (s: Story) => s.updatedMinutes ?? Number.MAX_SAFE_INTEGER;
+  const mins = (s: T) => s.updatedMinutes ?? Number.MAX_SAFE_INTEGER;
   indexed.sort((a, b) => {
     if (mode === "updated-desc") return mins(a.s) - mins(b.s) || a.i - b.i;
     if (mode === "updated-asc") return mins(b.s) - mins(a.s) || a.i - b.i;

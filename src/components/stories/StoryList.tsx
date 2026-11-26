@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
+import { isOnline } from "./presence";
 import { storyRef } from "@/components/dashboard/format";
 import type { StoryItem } from "@/types/stories";
 import { LiveLine, liveSpoken } from "./LiveLine";
@@ -50,10 +51,10 @@ function StoryRow({ story, fresh, arrived }: { story: StoryItem; fresh: boolean;
         data-story-row={story.id}
         className={`grid w-full ${GRID} items-center gap-x-3 px-4 py-3 text-left transition-colors duration-[80ms] hover:bg-[var(--row-h)] focus-visible:bg-[var(--row-h)] md:min-h-[46px] md:py-0`}
       >
-        <span className="self-start text-[13px] leading-[22px] text-[var(--tx2)] tabular-nums md:self-center">{storyRef(story.id)}</span>
+        <span className="self-start font-mono text-xs leading-[22px] text-[var(--tx2)] tabular-nums md:self-center">{storyRef(story.id)}</span>
         <span className="min-w-0 md:py-3">
-          <span className="block truncate text-[15px] leading-[22px] text-[var(--tx)]">{story.title}</span>
-          {story.why && <span className="block truncate text-[13px] leading-[18px] text-[var(--tx2)]">{story.why}</span>}
+          <span className="block truncate text-sm leading-[22px] text-[var(--tx)]">{story.title}</span>
+          {story.why && <span className="block truncate text-xs text-[var(--tx2)]">{story.why}</span>}
           <span aria-hidden="true" className="mt-1.5 flex md:hidden">
             {where}
           </span>
@@ -65,12 +66,15 @@ function StoryRow({ story, fresh, arrived }: { story: StoryItem; fresh: boolean;
         <span className="hidden md:flex">
           {story.owner && (
             <>
-              <PersonAvatar initials={story.owner} />
-              <span className="sr-only">, owner {story.owner}</span>
+              <PersonAvatar initials={story.owner} online={isOnline(story.owner)} />
+              <span className="sr-only">
+                , owner {story.owner}
+                {isOnline(story.owner) ? ", online now" : ""}
+              </span>
             </>
           )}
         </span>
-        <span className="hidden text-right text-[13px] leading-[18px] text-[var(--tx2)] tabular-nums md:block">{story.updated}</span>
+        <span className="hidden text-right text-xs text-[var(--tx2)] tabular-nums md:block">{story.updated}</span>
       </a>
     </li>
   );
@@ -118,7 +122,7 @@ export function StoryList({ columns, justAdded, landed, zones }: StoryListProps)
           const Chevron = isFolded ? ChevronRight : ChevronDown;
           return (
             <section key={g.key} aria-labelledby={`group-${g.key}`}>
-              <h2 id={`group-${g.key}`} className="flex flex-wrap items-baseline gap-x-2 text-[13px] leading-[18px] font-medium">
+              <h2 id={`group-${g.key}`} className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
                 <button
                   type="button"
                   aria-expanded={!isFolded}
@@ -127,14 +131,14 @@ export function StoryList({ columns, justAdded, landed, zones }: StoryListProps)
                   className="-ml-1.5 inline-flex h-7 items-center gap-1.5 rounded-[6px] pr-2 pl-1 text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.04] hover:text-[var(--tx)]"
                 >
                   <Chevron aria-hidden="true" size={14} strokeWidth={1.75} />
-                  <span className="text-[14px] text-[var(--tx)]">{g.label}</span>
+                  <span className="text-sm text-[var(--tx)]">{g.label}</span>
                   <span className="tabular-nums">{g.stories.length}</span>
                 </button>
-                <span className="text-[12px] leading-4 font-normal text-[var(--tx2)]">{g.hint}</span>
+                <span className="text-xs font-normal text-[var(--tx2)]">{g.hint}</span>
               </h2>
               {!isFolded && (
                 <div id={`group-${g.key}-list`} className="mt-1.5 overflow-clip rounded-[12px] border border-[var(--card-line)] bg-white">
-                  <div aria-hidden="true" className={`hidden h-9 ${GRID} items-center gap-x-3 px-4 text-[12px] leading-4 text-[var(--tx2)] md:grid`}>
+                  <div aria-hidden="true" className={`hidden h-9 ${GRID} items-center gap-x-3 px-4 text-xs text-[var(--tx2)] md:grid`}>
                     <span />
                     <span>Story</span>
                     <span>Where it is</span>

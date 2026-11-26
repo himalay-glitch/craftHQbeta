@@ -1,6 +1,6 @@
 import { useEffect, useRef, type Ref } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { GitCompareArrows, Plus } from "lucide-react";
 import { storyRef } from "@/components/dashboard/format";
 import type { Person } from "@/types/dashboard";
 import type { StoryItem } from "@/types/stories";
@@ -75,7 +75,8 @@ function StoryCard({
   const drop = landing === "clear" ? { y: -24, duration: 0.3 } : { y: -8, duration: 0.2 };
   const ownerName = story.owner ? people.find((p) => p.initials === story.owner)?.name : undefined;
   const who = story.owner === viewerInitials ? "You" : (ownerName?.split(" ")[0] ?? story.owner);
-  const meta = [ref, who, story.updated].filter(Boolean).join(" · ");
+  // The ID in mono (DESIGN.md §3.2: IDs), then whose and when, in the caption face.
+  const rest = [who, story.updated].filter(Boolean).join(" · ");
   return (
     <motion.li
       // popLayout hands its ref here, so a card that's leaving lifts out of the flow as it fades.
@@ -86,7 +87,7 @@ function StoryCard({
       initial={arrived === "move" || arrived === "merge" ? { opacity: 0, y: drop.y } : false}
       animate={{ opacity: 1, y: 0, transition: { duration: drop.duration, ease: EASE_OUT } }}
       exit={{ opacity: 0, transition: { duration: 0.15, ease: EASE_IN } }}
-      className="relative overflow-hidden rounded-xl border border-[var(--card-line)] bg-white p-3 text-left shadow-[var(--shadow-card)] transition-[border-color,box-shadow] duration-[120ms] hover:border-[var(--card-line-h)] hover:shadow-[var(--shadow-card-h)] has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-[var(--cta)]"
+      className="relative overflow-hidden rounded-xl border border-[var(--card-line)] bg-white p-3 text-left transition-[border-color] duration-[120ms] hover:border-[var(--card-line-h)] has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-[var(--cta)]"
     >
       {/* Just moved here: a moment of highlight (DESIGN.md §8.4), green when it merged (§8.6). */}
       {arrived && (
@@ -115,9 +116,19 @@ function StoryCard({
           className="flex flex-col gap-1 outline-none after:absolute after:-inset-3 after:content-['']"
         >
           {/* The light top line: which story, whose, and when it last moved. */}
-          <span className="truncate text-[12px] leading-4 text-[var(--tx2)] tabular-nums">{meta}</span>
-          <span className="line-clamp-2 text-[14px] leading-5 font-medium text-[var(--tx)]">{story.title}</span>
-          {story.why && <span className="line-clamp-1 text-[12px] leading-4 text-[var(--tx2)]">{story.why}</span>}
+          <span className="truncate text-xs text-[var(--tx2)] tabular-nums">
+            <span className="font-mono">{ref}</span>
+            {rest && ` · ${rest}`}
+          </span>
+          <span className="line-clamp-2 text-sm font-medium text-[var(--tx)]">{story.title}</span>
+          {story.why && <span className="line-clamp-1 text-xs text-[var(--tx2)]">{story.why}</span>}
+          {/* Another story changes the same part: said early, so the team can pick an order before they collide. */}
+          {story.overlaps && story.overlaps.length > 0 && (
+            <span className="flex min-w-0 items-center gap-1 text-xs text-[var(--tx2)]">
+              <GitCompareArrows aria-hidden="true" size={12} strokeWidth={2} className="flex-none" />
+              <span className="truncate">Overlaps with {story.overlaps.map(storyRef).join(", ")}</span>
+            </span>
+          )}
           <span className="sr-only">
             , {story.live ? `${liveSpoken(story.live)}${now && started !== undefined ? `, ${spokenSince(now - started)}` : ""}` : storyStage(story).text}
             , {ownerName ? `owner ${ownerName}` : story.owner ? `owner ${story.owner}` : "no owner"}
@@ -181,10 +192,13 @@ export function StoriesBoard({ columns, justAdded, onNew, landed, landing, zones
           onBlur={(e) => {
             if (!e.currentTarget.contains(e.relatedTarget as Node | null)) zones.focus(col.key, false);
           }}
-          className="flex w-[85%] flex-none snap-start flex-col rounded-[14px] bg-[var(--ctl-bg-on)] md:max-h-full md:w-auto md:min-w-[240px] md:flex-1 md:basis-0"
+          // On the page's grey wash (from 768 px) a grey lane disappeared (Shubham, 26 Nov): each lane is a frosted white
+          // panel with a hairline, lighter than the page, so the columns read and the cards sit in them. Phones, where the
+          // page is white, keep the grey lane.
+          className="flex w-[85%] flex-none snap-start flex-col rounded-[14px] bg-[var(--ctl-bg-on)] md:max-h-full md:w-auto md:min-w-[240px] md:flex-1 md:basis-0 md:bg-white/60 md:ring-1 md:ring-black/[0.05]"
         >
           <header className="flex-none px-4 pt-3.5 pb-3">
-            <h2 id={`column-${col.key}`} className="flex items-baseline gap-2 text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
+            <h2 id={`column-${col.key}`} className="flex items-baseline gap-2 text-sm font-semibold text-[var(--tx)]">
               {col.label}
               {/* The count changes in place, with a moment of highlight. */}
               <AnimatePresence initial={false} mode="popLayout">
@@ -193,13 +207,13 @@ export function StoriesBoard({ columns, justAdded, onNew, landed, landing, zones
                   initial={{ opacity: 0, backgroundColor: "rgba(0,0,0,0.08)" }}
                   animate={{ opacity: 1, backgroundColor: "rgba(0,0,0,0)", transition: { opacity: { duration: 0.15 }, backgroundColor: { duration: 0.6 } } }}
                   exit={{ opacity: 0, transition: { duration: 0.1 } }}
-                  className="-mx-1 rounded-[6px] px-1 text-[14px] font-normal text-[var(--tx2)] tabular-nums"
+                  className="-mx-1 rounded-[6px] px-1 text-sm font-normal text-[var(--tx2)] tabular-nums"
                 >
                   {col.stories.length}
                 </motion.span>
               </AnimatePresence>
             </h2>
-            <p className="mt-0.5 text-[12px] leading-4 text-[var(--tx2)]">{col.hint}</p>
+            <p className="mt-0.5 text-xs text-[var(--tx2)]">{col.hint}</p>
           </header>
           <motion.div layoutScroll className="px-2 pb-2 md:min-h-0 md:overflow-y-auto">
             {/* Always there, so a card landing in an empty lane still drops in, and the last one leaving still fades. */}
@@ -219,7 +233,7 @@ export function StoriesBoard({ columns, justAdded, onNew, landed, landing, zones
               </AnimatePresence>
             </ul>
             {col.stories.length === 0 && (
-              <p className="m-0 flex h-16 items-center justify-center text-[13px] leading-[18px] text-[var(--tx2)]">No stories here</p>
+              <p className="m-0 flex h-16 items-center justify-center text-xs text-[var(--tx2)]">No stories here</p>
             )}
           </motion.div>
           {/* Pinned under the scrolling cards, so it's always in reach. */}
@@ -228,7 +242,7 @@ export function StoriesBoard({ columns, justAdded, onNew, landed, landing, zones
               <button
                 type="button"
                 onClick={onNew}
-                className="flex h-10 w-full items-center gap-2 rounded-[10px] px-3 text-[14px] leading-5 text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)]"
+                className="flex h-10 w-full items-center gap-2 rounded-[10px] px-3 text-sm text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)]"
               >
                 <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
                 New story

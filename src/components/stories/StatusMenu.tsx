@@ -1,26 +1,69 @@
 import { useState } from "react";
 import { DropdownMenu } from "radix-ui";
-import { CircleCheck, CircleSlash, Ellipsis, Eye, PencilLine, Play, RotateCcw, RotateCw, type LucideIcon } from "lucide-react";
+import {
+  Circle,
+  CircleCheck,
+  CircleDashed,
+  CircleExclamationPoint,
+  CircleSlash,
+  CircleX,
+  Ellipsis,
+  Eye,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestCreate,
+  LoaderCircle,
+  PencilLine,
+  Play,
+  RotateCcw,
+  RotateCw,
+  type LucideIcon,
+} from "lucide-react";
 import type { StoryStatus } from "@/types/dashboard";
 import { ICON_BTN } from "@/components/dashboard/classes";
 import { Tip } from "@/components/dashboard/Tip";
 import chat from "./chat.module.css";
 import { STATUS_LABEL, type MoveOption, type StatusMove } from "./stage";
 
+/** DESIGN.md §3.1's tones, read from the status dot the page already works out. */
+type Tone = "positive" | "attention" | "negative" | "neutral" | "active";
+const toneOf = (dot: string): Tone =>
+  dot.includes("16a34a") ? "positive" : dot.includes("d97706") ? "attention" : dot.includes("b91c1c") ? "negative" : dot.includes("--tx)") ? "active" : "neutral";
+const TONE_PILL: Record<Tone, string> = {
+  positive: "bg-success-tint text-success-ink",
+  attention: "bg-warning-tint text-warning-ink",
+  negative: "bg-danger-tint text-danger-ink",
+  neutral: "bg-field text-[var(--tx)]",
+  active: "bg-field text-[var(--tx)]",
+};
+/** One icon per state (DESIGN.md §3.6): each status has its own shape, so it reads without the colour. */
+function StatusIcon({ tone, status }: { tone: Tone; status: StoryStatus }) {
+  const props = { "aria-hidden": true, size: 12, strokeWidth: 2, className: `flex-none ${tone === "neutral" || tone === "active" ? "text-[var(--tx2)]" : ""}` } as const;
+  if (tone === "negative") return <CircleX {...props} />;
+  if (tone === "attention") return <CircleExclamationPoint {...props} />;
+  if (tone === "positive") return <GitMerge {...props} />;
+  if (tone === "active") return <LoaderCircle {...props} />;
+  if (status === "pull_request") return <GitPullRequest {...props} />;
+  if (status === "cancelled") return <CircleSlash {...props} />;
+  if (status === "done") return <CircleCheck {...props} />;
+  if (status === "new" || status === "planning") return <CircleDashed {...props} />;
+  return <Circle {...props} />;
+}
+
 /**
- * The status at the top of the chat, as words: "● In progress · Builder is making the change". Read-only: the
- * status is changed from the page's ⋯ menu, and the everyday next step (approve, accept) is the chat's decision.
- */
-/**
- * The status, once, beside the story's title (Shubham, 25 Nov: simpler; it was said in a row of its own, on the
- * decision and in the chat): "● In review" in a small soft pill. What's under way, or whose turn it is, is its tooltip
- * and part of its spoken name. Read-only: it changes from the ⋯ menu.
+ * The status, once, beside the story's title (Shubham, 25 Nov: simpler). DESIGN.md §7.12's pill: the tone's icon
+ * (12 px) and the label in caption medium, on the tone's tint, 20 px tall. What's under way, or whose turn it is, is
+ * its tooltip and part of its spoken name. Read-only: it changes from the ⋯ menu.
  */
 export function StatusBadge({ status, detail, dot }: { status: StoryStatus; detail?: string; dot: string }) {
   const name = STATUS_LABEL[status];
+  // Queued and waiting to be picked up say the same thing: no tooltip repeating the name.
+  if (detail === name) detail = undefined;
+  const tone = toneOf(dot);
   const pill = (
-    <span key={name} className={`inline-flex h-6 flex-none items-center gap-1.5 rounded-full bg-[#F4F4F5] px-2.5 text-[12px] leading-4 font-medium text-[var(--tx)] ${chat.labelIn}`}>
-      <span aria-hidden="true" className={`size-1.5 flex-none rounded-full ${dot}`} />
+    <span key={name} className={`inline-flex h-5 flex-none items-center gap-1 rounded-full px-2 text-xs font-medium ${TONE_PILL[tone]} ${chat.labelIn}`}>
+      <StatusIcon tone={tone} status={status} />
       <span className="sr-only">Status: </span>
       {name}
       {detail && <span className="sr-only">, {detail}</span>}
@@ -29,34 +72,21 @@ export function StatusBadge({ status, detail, dot }: { status: StoryStatus; deta
   return detail ? <Tip label={detail}>{pill}</Tip> : pill;
 }
 
-export function StatusLine({ status, detail, dot }: { status: StoryStatus; detail?: string; dot: string }) {
-  const name = STATUS_LABEL[status];
-  const shown = detail ? `${name} · ${detail}` : name;
-  return (
-    <p className="m-0 flex min-w-0 items-center gap-2">
-      <span aria-hidden="true" className={`size-2 flex-none rounded-full ${dot}`} />
-      <span key={shown} title={shown} className={`truncate text-[14px] leading-5 ${chat.labelIn}`}>
-        <span className="sr-only">Status: </span>
-        <span className="font-medium text-[var(--tx)]">{name}</span>
-        {detail && <span className="text-[var(--tx2)]"> · {detail}</span>}
-      </span>
-    </p>
-  );
-}
-
 const ICON: Record<MoveOption["icon"], LucideIcon> = {
   plan: PencilLine,
   build: Play,
   rebuild: RotateCw,
   reopen: RotateCcw,
+  pr: GitPullRequestCreate,
+  close: GitPullRequestClosed,
   done: CircleCheck,
   cancel: CircleSlash,
 };
 
-// DESIGN.md §7.6: a card with a hairline ring and a soft shadow, 4 px inside; one-line 32 px items with a muted
+// DESIGN.md §7.6: a card with a hairline ring (no shadow, Shubham 26 Nov), 4 px inside; one-line 32 px items with a muted
 // 16 px icon; groups split by a hairline with 4 px of space; the destructive item last, in danger ink. It's portalled
 // out of the page, so it uses DESIGN.md's global tokens (foreground, muted), not the page's scoped ones.
-const CONTENT = `${chat.menu} z-50 max-h-[60vh] min-w-[180px] max-w-[320px] overflow-y-auto rounded-xl bg-card p-1 shadow-popover outline-none`;
+const CONTENT = `${chat.menu} z-50 max-h-[60vh] min-w-[180px] max-w-[320px] overflow-y-auto rounded-xl bg-card p-1 ring-1 ring-black/[0.08] outline-none`;
 const ITEM =
   "flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm whitespace-nowrap outline-none select-none " +
   "data-highlighted:bg-hover data-disabled:cursor-default data-disabled:opacity-40";

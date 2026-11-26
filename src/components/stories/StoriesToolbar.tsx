@@ -51,7 +51,7 @@ export function StoriesToolbar({ view, onView, query, onQuery, owner, ownerOptio
               tabIndex={selected ? 0 : -1}
               onClick={() => onView(key)}
               onKeyDown={(e) => onTabKey(e, i)}
-              className={`-mb-px inline-flex h-10 items-center border-b-2 text-[14px] leading-5 font-medium transition-colors duration-[120ms] ${
+              className={`-mb-px inline-flex h-10 items-center border-b-2 text-sm font-medium transition-colors duration-[120ms] ${
                 selected ? "border-[var(--tx)] text-[var(--tx)]" : "border-transparent text-[var(--tx2)] hover:text-[var(--tx)]"
               }`}
             >
@@ -82,7 +82,7 @@ export function StoriesToolbar({ view, onView, query, onQuery, owner, ownerOptio
             }}
             placeholder="Search stories"
             autoComplete="off"
-            className="h-[30px] w-44 rounded-full border border-[var(--ctl)] bg-white pr-3 pl-8 text-[13px] leading-[18px] text-[var(--tx)] transition-[border-color,box-shadow,width] duration-[120ms] hover:border-[var(--ctl-h)] focus:w-56 focus:border-[var(--cta)] focus:shadow-[0_0_0_3px_rgb(47_111_237/0.16)] focus:outline-none"
+            className="h-7 w-44 rounded-full border border-[var(--ctl)] bg-white pr-3 pl-8 text-sm text-[var(--tx)] transition-[border-color,box-shadow,width] duration-[120ms] hover:border-[var(--ctl-h)] focus:w-56 focus:border-[var(--cta)] focus:shadow-[0_0_0_3px_rgb(47_111_237/0.16)] focus:outline-none"
           />
         </label>
 
@@ -92,7 +92,7 @@ export function StoriesToolbar({ view, onView, query, onQuery, owner, ownerOptio
           <button
             type="button"
             onClick={onClear}
-            className="h-[30px] rounded-full px-2.5 text-[13px] text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.04] hover:text-[var(--tx)]"
+            className="h-7 rounded-full px-2.5 text-sm text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.04] hover:text-[var(--tx)]"
           >
             Clear
           </button>

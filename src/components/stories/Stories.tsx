@@ -6,6 +6,8 @@ import { BTN_PRIMARY, BTN_SECONDARY } from "@/components/dashboard/classes";
 import type { FilterOption } from "@/components/dashboard/FilterPill";
 import { storyRef } from "@/components/dashboard/format";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
+import tokens from "@/components/dashboard/tokens.module.css";
+import { isOnline } from "./presence";
 import { Toast, type ToastMessage } from "@/components/dashboard/Toast";
 import { addCreated, useCreatedStories } from "./created";
 import { setDraft } from "./draft";
@@ -199,7 +201,7 @@ export function Stories({ data }: { data: StoriesData }) {
     ...ownerList.map((i) => ({
       value: i,
       label: names.get(i) ?? i,
-      icon: <PersonAvatar initials={i} />,
+      icon: <PersonAvatar initials={i} online={isOnline(i)} />,
       count: all.filter((s) => s.owner === i).length,
     })),
   ];
@@ -235,18 +237,21 @@ export function Stories({ data }: { data: StoriesData }) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const create = ({ title, why, detail, ownerId, files }: NewStoryInput) => {
+  const create = ({ title, why, detail, ownerId, files, source, attachments = [] }: NewStoryInput) => {
     const id = nextId;
     const story: StoryItem = {
       id,
       title,
       why: why || undefined,
       detail: detail || undefined,
-      files: files.length ? files.map((f) => f.name) : undefined,
+      // Files attached here, then the imported ticket's (names only, for now).
+      files: files.length || attachments.length ? [...files.map((f) => f.name), ...attachments] : undefined,
+      importedFrom: source,
       status: "new",
       owner: data.people.find((p) => p.id === ownerId)?.initials,
       updated: "just now",
       updatedMinutes: 0,
+      createdAt: Date.now(),
     };
     addCreated(story);
     setJustAdded((ids) => [id, ...ids]);
@@ -281,7 +286,9 @@ export function Stories({ data }: { data: StoriesData }) {
   return (
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
       {/* Desktop: the page fits the window under the top bar and never scrolls. The header and tabs stay
-          put; the board scrolls sideways and each lane (or the list) scrolls on its own. Phones scroll normally. */}
+          put; the board scrolls sideways and each lane (or the list) scrolls on its own. Phones scroll normally.
+          Behind it, the wash the story page, Ask PM and the dashboard have (Shubham, 26 Nov). */}
+      <div className={tokens.wash}>
       <main
         id="main"
         className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-16 md:flex md:h-[calc(100dvh-var(--bar-h))] md:flex-col md:overflow-hidden md:px-8 md:pb-0"
@@ -290,10 +297,10 @@ export function Stories({ data }: { data: StoriesData }) {
           <h1
             id="stories-title"
             tabIndex={-1}
-            className="flex items-baseline gap-2 text-[21px] leading-7 font-medium tracking-[-0.01em] text-[var(--tx)] outline-none"
+            className="flex items-baseline gap-2 text-xl font-semibold tracking-title text-[var(--tx)] outline-none"
           >
             Stories
-            {!firstUse && <span className="text-[15px] font-normal tracking-normal text-[var(--tx2)] tabular-nums">{all.length}</span>}
+            {!firstUse && <span className="text-sm font-normal tracking-normal text-[var(--tx2)] tabular-nums">{all.length}</span>}
           </h1>
           <button type="button" className={BTN_PRIMARY} onClick={() => setCreating(true)}>
             <Plus aria-hidden="true" size={16} strokeWidth={2} />
@@ -324,8 +331,8 @@ export function Stories({ data }: { data: StoriesData }) {
               {shown.length === 0 ? (
                 <div className="mt-5 flex flex-col items-center rounded-[12px] border border-[var(--card-line)] px-4 py-16 text-center">
                   <ListFilter aria-hidden="true" size={20} strokeWidth={1.5} className="text-[var(--tx2)]" />
-                  <p className="mt-3 text-[15px] leading-[22px] font-medium">No stories match</p>
-                  <p className="mt-1 text-[15px] leading-[22px] text-[var(--tx2)]">Try other words, or another owner.</p>
+                  <p className="mt-3 text-base font-semibold">No stories match</p>
+                  <p className="mt-1 text-sm text-[var(--tx2)]">Try other words, or another owner.</p>
                   <button type="button" onClick={clearFilters} className={`${BTN_SECONDARY} mt-4`}>
                     Clear filters
                   </button>
@@ -349,6 +356,7 @@ export function Stories({ data }: { data: StoriesData }) {
           </>
         )}
       </main>
+      </div>
 
       <NewStoryDialog
         open={creating}

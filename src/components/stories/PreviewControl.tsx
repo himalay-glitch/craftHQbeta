@@ -8,7 +8,7 @@ import { Tip } from "@/components/dashboard/Tip";
 // on the activity item in the story page, so they survive the card handing over to the next job.
 
 /** Every button in the activity column is secondary: the chat's decision owns the page's one primary. */
-export const SMALL_BTN = `${BTN_SECONDARY} h-7 px-3 text-[13px] pointer-coarse:h-11`;
+export const SMALL_BTN = `${BTN_SECONDARY} h-7 px-3 text-sm pointer-coarse:h-11`;
 
 /** A round 28 px icon button in the same outline style (44 px on touch). */
 const ICON_SMALL_BTN =
@@ -43,7 +43,7 @@ export function DeviceSwitch({ device, onChange, compact }: { device: Device; on
           aria-checked={device === value}
           tabIndex={device === value ? 0 : -1}
           onClick={() => onChange(value)}
-          className={`flex items-center justify-center rounded-full text-[12px] leading-4 pointer-coarse:min-w-11 ${compact ? "px-2" : "px-2.5"} transition-[background-color,color,box-shadow] duration-[120ms] ${device === value ? "bg-white font-medium text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-[var(--tx2)] hover:text-[var(--tx)]"}`}
+          className={`flex items-center justify-center rounded-full text-xs pointer-coarse:min-w-11 ${compact ? "px-2" : "px-2.5"} transition-[background-color,color,box-shadow] duration-[120ms] ${device === value ? "bg-white font-medium text-[var(--tx)] ring-1 ring-black/[0.06]" : "text-[var(--tx2)] hover:text-[var(--tx)]"}`}
         >
           {label}
         </button>
@@ -70,10 +70,10 @@ export function PreviewButtons({ item, failed, preview, onSoon }: PreviewButtons
           <ArrowUpRight aria-hidden="true" size={14} strokeWidth={2} />
         </button>
         <button type="button" aria-label={`Stop preview on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
-          <Square aria-hidden="true" size={11} strokeWidth={2.25} />
+          <Square aria-hidden="true" size={12} strokeWidth={2} />
           Stop preview
         </button>
-        <p className="m-0 w-full text-[12px] leading-4 text-[var(--tx2)]">It stops by itself after 30 minutes unused.</p>
+        <p className="m-0 w-full text-xs text-[var(--tx2)]">It stops by itself after 30 minutes unused.</p>
       </>
     );
   }
@@ -86,7 +86,7 @@ export function PreviewButtons({ item, failed, preview, onSoon }: PreviewButtons
   }
   return (
     <button type="button" onClick={() => preview.start(item.id)} className={SMALL_BTN}>
-      <Play aria-hidden="true" size={12} strokeWidth={2.25} />
+      <Play aria-hidden="true" size={12} strokeWidth={2} />
       {failed ? "Start again" : "Start preview"}
     </button>
   );
@@ -99,7 +99,7 @@ export function PreviewRow({ item, preview, onSoon, compact }: { item: ActivityI
   const where = item.device ?? "web";
   if (item.run === "starting") {
     return (
-      <div className="flex min-h-7 w-full items-center gap-2 text-[13px] leading-[18px]">
+      <div className="flex min-h-7 w-full items-center gap-2 text-sm">
         <LoaderCircle aria-hidden="true" size={14} strokeWidth={1.75} className="flex-none animate-spin text-[var(--tx2)] [animation-duration:0.8s] motion-reduce:animate-none" />
         <span className="min-w-0 flex-1 truncate">Starting the preview on {where}…</span>
         <button type="button" onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
@@ -120,14 +120,14 @@ export function PreviewRow({ item, preview, onSoon, compact }: { item: ActivityI
     </button>
   );
   return (
-    <div className="flex min-h-7 w-full items-center gap-2 text-[13px] leading-[18px]">
+    <div className="flex min-h-7 w-full items-center gap-2 text-sm">
       <span aria-hidden="true" className="size-2 flex-none rounded-full bg-[var(--green)]" />
       <span className="min-w-0 flex-1 truncate">
         Preview running<span className="text-[var(--tx2)]"> on {where}</span>
       </span>
       {compact ? <Tip label="Open preview">{open}</Tip> : open}
       <button type="button" aria-label={`Stop preview on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
-        <Square aria-hidden="true" size={11} strokeWidth={2.25} />
+        <Square aria-hidden="true" size={12} strokeWidth={2} />
         Stop
       </button>
     </div>
@@ -150,7 +150,7 @@ export function PreviewInline({ item, preview, onSoon }: { item: ActivityItem; p
         </Tip>
         <Tip label="Stop preview · it stops by itself after 30 minutes unused">
           <button type="button" aria-label={`Stop preview on ${where}`} onClick={() => preview.stop(item.id)} className={ICON_SMALL_BTN}>
-            <Square aria-hidden="true" size={11} strokeWidth={2.25} />
+            <Square aria-hidden="true" size={12} strokeWidth={2} />
           </button>
         </Tip>
       </span>
@@ -164,7 +164,7 @@ export function PreviewInline({ item, preview, onSoon }: { item: ActivityItem; p
           type="button"
           aria-label={`Cancel preview on ${where}`}
           onClick={() => preview.stop(item.id)}
-          className="h-7 rounded-full px-2 text-[12px] leading-4 text-[var(--tx2)] hover:bg-black/[0.05] hover:text-[var(--tx)] pointer-coarse:h-11 pointer-coarse:px-3"
+          className="h-7 rounded-full px-2 text-xs text-[var(--tx2)] hover:bg-black/[0.05] hover:text-[var(--tx)] pointer-coarse:h-11 pointer-coarse:px-3"
         >
           Cancel
         </button>
@@ -176,7 +176,7 @@ export function PreviewInline({ item, preview, onSoon }: { item: ActivityItem; p
       <DeviceSwitch compact device={where} onChange={(d) => preview.device(item.id, d)} />
       <Tip label={`Start preview on ${where}`}>
         <button type="button" aria-label={`Start preview on ${where}`} onClick={() => preview.start(item.id)} className={ICON_SMALL_BTN}>
-          <Play aria-hidden="true" size={12} strokeWidth={2.25} className="translate-x-px" />
+          <Play aria-hidden="true" size={12} strokeWidth={2} className="translate-x-px" />
         </button>
       </Tip>
     </span>

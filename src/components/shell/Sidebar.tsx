@@ -99,7 +99,7 @@ function BotItem({ id, current }: { id: BotId; current: boolean }) {
           {working && (
             <span
               aria-hidden="true"
-              className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-[#22A06B] ring-2 ring-[var(--bar)] motion-safe:animate-pulse"
+              className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-[#22A06B] ring-2 ring-white motion-safe:animate-pulse"
             />
           )}
         </span>
@@ -149,7 +149,7 @@ export function Sidebar({ current }: { current: string }) {
   return (
     <nav
       aria-label="Main"
-      className="sticky top-[var(--bar-h)] z-20 hidden h-[calc(100dvh-var(--bar-h))] w-[var(--sidebar-w)] flex-none flex-col justify-between self-start bg-[var(--bar)] px-2 py-3 transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none lg:flex"
+      className="sticky top-[var(--bar-h)] z-20 hidden h-[calc(100dvh-var(--bar-h))] w-[var(--sidebar-w)] flex-none flex-col justify-between self-start bg-white px-2 py-3 transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none lg:flex"
     >
       <div className="flex min-h-0 flex-col">
         <ul className="flex list-none flex-col gap-0.5">{list(false)}</ul>

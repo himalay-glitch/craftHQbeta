@@ -15,20 +15,20 @@ export function StoriesEmpty({ onExample }: { onExample: (title: string) => void
       <span className="flex size-24 items-center justify-center overflow-hidden rounded-[24px] bg-bot-builder-bg">
         <img src="/images/bots/builder.webp" width={256} height={256} alt="" className="size-24 object-contain" />
       </span>
-      <h2 id="stories-empty-title" className="mt-4 text-[15px] leading-[22px] font-medium text-[var(--tx)]">
+      <h2 id="stories-empty-title" className="mt-4 text-base font-semibold text-[var(--tx)]">
         No stories yet
       </h2>
-      <p className="mt-1 max-w-90 text-[15px] leading-[22px] text-[var(--tx2)]">
+      <p className="mt-1 max-w-90 text-sm text-[var(--tx2)]">
         Write what you want built, the way you’d tell a colleague. The agent reads it and asks about anything that’s unclear.
       </p>
-      <p className="mt-6 text-[13px] leading-[18px] text-[var(--tx2)]">Not sure where to start? Try one:</p>
+      <p className="mt-6 text-xs text-[var(--tx2)]">Not sure where to start? Try one:</p>
       <ul className="mt-2 mb-0 flex max-w-xl list-none flex-col items-stretch gap-2 p-0 sm:flex-row sm:flex-wrap sm:justify-center">
         {EXAMPLES.map((title) => (
           <li key={title}>
             <button
               type="button"
               onClick={() => onExample(title)}
-              className="min-h-8 w-full rounded-full border border-[var(--ctl)] bg-white px-3.5 py-1.5 text-[14px] leading-5 text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl-h)] hover:bg-[var(--ctl-bg-h)]"
+              className="min-h-8 w-full rounded-full border border-[var(--ctl)] bg-white px-3.5 py-1.5 text-sm text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl-h)] hover:bg-[var(--ctl-bg-h)]"
             >
               {title}
             </button>

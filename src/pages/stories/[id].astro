@@ -26,6 +26,7 @@ const data: StoryPageData = {
   people: storiesData.people,
   stories: storiesData.stories.map(({ id, title }) => ({ id, title })),
   queue: storiesData.stories.map(({ id, title, status, need, waitingOn, meta, outcome, pr, updated }) => ({ id, title, status, need, waitingOn, meta, outcome, pr, updated })),
+  merger: storiesData.merger,
 };
 const search = storiesData.stories.map(({ id, title, status }) => ({ id, title, status }));
 ---

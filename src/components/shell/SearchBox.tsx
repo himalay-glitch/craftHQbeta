@@ -82,7 +82,7 @@ export function SearchBox({ items }: { items: SearchItem[] }) {
       )}
       <div
         className={`${
-          expanded ? "fixed inset-x-0 top-0 z-50 flex h-[var(--bar-h)] items-center gap-2 bg-[var(--bar)] px-4" : "hidden"
+          expanded ? "fixed inset-x-0 top-0 z-50 flex h-[var(--bar-h)] items-center gap-2 bg-white px-4" : "hidden"
         } lg:static lg:flex lg:h-auto lg:bg-transparent lg:p-0`}
       >
         <div className="relative w-full lg:w-[280px] xl:w-[360px]">
@@ -117,7 +117,7 @@ export function SearchBox({ items }: { items: SearchItem[] }) {
             className="h-8 w-full rounded-full border border-[var(--ctl)] bg-white pr-3 pl-9 text-[16px] leading-5 text-[var(--tx)] transition-[border-color,box-shadow] duration-[120ms] hover:border-[var(--ctl-h)] focus:border-[var(--cta)] focus:shadow-[0_0_0_3px_rgb(47_111_237/0.16)] focus:outline-none lg:text-[14px]"
           />
           {showList && (
-            <div className="absolute top-[calc(100%+4px)] right-0 left-0 z-50 overflow-hidden rounded-[8px] bg-white py-1 shadow-[var(--shadow-menu)] lg:left-auto lg:w-[400px]">
+            <div className="absolute top-[calc(100%+4px)] right-0 left-0 z-50 overflow-hidden rounded-[8px] bg-white py-1 ring-1 ring-black/[0.08] lg:left-auto lg:w-[400px]">
               <ul id={listId} role="listbox" aria-label="Stories" className="max-h-80 overflow-y-auto">
                 {results.map((t, i) => (
                   <li

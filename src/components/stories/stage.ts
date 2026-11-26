@@ -1,20 +1,20 @@
 import type { NeedKind, StoryStatus } from "@/types/dashboard";
-import type { StoryItem } from "@/types/stories";
+import type { PullRequest, StoryItem } from "@/types/stories";
 
 // Where a story is, in plain words, for people who don't know the pipeline's stage names.
 // The dashboard's stages and needs stay the source of truth; this only words and orders them.
 
 /** you: a person can act now (blue). question: the agent asked something (amber). stuck: red.
  *  waiting: a teammate's turn (grey). agent: the agent is working on it. queued: nobody is working on it
- *  (not planned yet, approved and not started, or checked and waiting for review).
+ *  (not planned yet, approved and queued for Builder, or checked and waiting for review).
  *  done: finished or cancelled. The first four are chips; the rest are calm text. */
 export type StageTone = "you" | "question" | "stuck" | "waiting" | "agent" | "queued" | "done";
 
 export interface Stage {
   text: string;
   tone: StageTone;
-  /** Finished stories: which mark goes with the words (GitMerge, a tick, or a slash for cancelled). */
-  outcome?: "merged" | "done" | "cancelled";
+  /** Finished stories: which mark goes with the words (GitMerge, a tick, a closed pull request, or a slash). */
+  outcome?: "merged" | "done" | "closed" | "cancelled";
   /** When it finished, after the words: "Merged · 9d ago". */
   when?: string;
 }
@@ -31,23 +31,46 @@ const FOR_YOU: Record<Exclude<NeedKind, "stuck" | "decision">, string> = {
 const WITH_AGENT: Record<StoryStatus, string> = {
   new: "Not planned yet",
   planning: "Asker is planning the work",
-  approved: "Waiting to start",
+  approved: "Queued",
   in_progress: "Builder is making the change",
   in_review: "Checked · ready for review",
+  pull_request: "Ready to merge",
   done: "Done",
   cancelled: "Cancelled",
 };
 
-/** The seven statuses by name, as the story's status menu shows them. */
+/** The statuses by name, as the story's status badge shows them. Approved reads "Queued": it's Building's first step,
+ *  waiting for Builder (Shubham, 26 Nov). Pull request: created from In review, merged on GitHub by one person. */
 export const STATUS_LABEL: Record<StoryStatus, string> = {
   new: "New",
   planning: "Planning",
-  approved: "Approved",
+  approved: "Queued",
   in_progress: "In progress",
   in_review: "In review",
+  pull_request: "Pull request",
   done: "Done",
   cancelled: "Cancelled",
 };
+
+/** A story in Pull request: what's happening to its pull request. Ready, it waits on the one person who merges (a grey
+ *  chip: someone else's turn). Otherwise the robots are keeping it mergeable after another story merged first. Never
+ *  "you" (a status never says you). */
+export function prStage(pr?: PullRequest): Stage {
+  switch (pr?.merge) {
+    case "updating":
+      return { text: "Bringing in the latest main", tone: "agent" };
+    case "checks":
+      return { text: "Checks running", tone: "agent" };
+    case "conflict":
+      return { text: pr.conflictWith ? `Fixing conflicts with hq-${pr.conflictWith}` : "Fixing conflicts", tone: "agent" };
+    case "failing":
+      return { text: "Fixing a failed check", tone: "agent" };
+    case "blocked":
+      return { text: "Couldn’t update the PR", tone: "stuck" };
+    default:
+      return { text: pr?.number ? `PR #${pr.number} · Ready to merge` : "Ready to merge", tone: "waiting" };
+  }
+}
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -65,20 +88,32 @@ export function storyStage(s: StageInput): Stage {
   if (s.need && s.waitingOn && s.waitingOn !== "You") return { text: `Waiting on ${s.waitingOn}`, tone: "waiting" };
   if (s.need === "decision") return { text: questionsForYou(s.meta), tone: "question" };
   if (s.need) return { text: FOR_YOU[s.need], tone: "you" };
-  // Finished: merged (its pull request went in), done without one, or cancelled; with when (DESIGN.md §7.12).
+  // Finished: merged (its pull request went in), closed without merging, done with nothing to merge, or cancelled;
+  // with when (DESIGN.md §7.12).
   if (s.status === "cancelled") return { text: "Cancelled", tone: "done", outcome: "cancelled", when: s.updated };
   if (s.status === "done") {
     const merged = s.outcome === "merged" || s.pr?.state === "merged";
-    return { text: merged ? "Merged" : "Done", tone: "done", outcome: merged ? "merged" : "done", when: s.updated };
+    const closed = !merged && (s.outcome === "closed" || s.pr?.state === "closed");
+    return {
+      text: merged ? "Merged" : closed ? "Closed, not merged" : "Done",
+      tone: "done",
+      outcome: merged ? "merged" : closed ? "closed" : "done",
+      when: s.updated,
+    };
   }
+  if (s.status === "pull_request") return prStage(s.pr);
   // Only planning and building have a robot at work; the rest wait (an empty dot).
   const idle = s.status === "new" || s.status === "approved" || s.status === "in_review";
   return { text: WITH_AGENT[s.status], tone: idle ? "queued" : "agent" };
 }
 
-// ---- Columns: the statuses guide's five groups, left to right, in plain words ----
+// ---- Columns: the flow, left to right, in plain words (Shubham, 26 Nov: Planning, Building, In review, Pull request,
+// Done) ----
+// Approved has no column of its own: an approved story is Building's first step, "Queued" until Builder picks it up.
+// In review asks "is this what we asked for?" (anyone on the story tries the preview); Pull request asks "is the code
+// ready to ship?" (the one person with GitHub access checks and merges it). Two people, two questions.
 
-export type ColumnKey = "planning" | "ready" | "building" | "review" | "done";
+export type ColumnKey = "planning" | "building" | "review" | "pr" | "done";
 
 export interface Column {
   key: ColumnKey;
@@ -90,10 +125,10 @@ export interface Column {
 
 export const COLUMNS: Column[] = [
   { key: "planning", label: "Planning", hint: "A plan first; nothing is built", statuses: ["new", "planning"] },
-  { key: "ready", label: "Ready to build", hint: "Approved, waiting to start", statuses: ["approved"] },
-  { key: "building", label: "Building", hint: "Builder builds, Checker checks", statuses: ["in_progress"] },
-  { key: "review", label: "In review", hint: "Checked; waiting for a review", statuses: ["in_review"] },
-  { key: "done", label: "Done", hint: "Merged, or closed by a person", statuses: ["done", "cancelled"] },
+  { key: "building", label: "Building", hint: "Queued, then Builder builds and Checker checks", statuses: ["approved", "in_progress"] },
+  { key: "review", label: "In review", hint: "Try the preview, then create the pull request", statuses: ["in_review"] },
+  { key: "pr", label: "Pull request", hint: "Waiting to be checked and merged on GitHub", statuses: ["pull_request"] },
+  { key: "done", label: "Done", hint: "Merged, closed or cancelled", statuses: ["done", "cancelled"] },
 ];
 
 /** The board column a status sits in, by name; "Cancelled" for cancelled stories. */
@@ -121,6 +156,9 @@ function needRank(s: StoryItem) {
   return s.need ? 2 : 3;
 }
 
+/** In Building, what's being built goes above what's queued. */
+const queuedRank = (s: StoryItem) => (s.status === "approved" ? 1 : 0);
+
 /** Every column, in order, even when empty. Within one: just created here first, then what needs a person,
  *  then the most recently updated (a story that just moved here is "just now", so it lands on top of its group).
  *  `held`: stories kept in the lane they're leaving while someone's pointer or focus is there (DESIGN.md §8.4).
@@ -140,6 +178,7 @@ export function storyColumns(stories: StoryItem[], justAdded: number[], held?: M
       (a, b) =>
         freshRank(a.k) - freshRank(b.k) ||
         needRank(a.k) - needRank(b.k) ||
+        queuedRank(a.k) - queuedRank(b.k) ||
         (held?.has(a.s.id) ? FAR : (moved.get(a.s.id) ?? FAR)) - (held?.has(b.s.id) ? FAR : (moved.get(b.s.id) ?? FAR)) ||
         (a.k.updatedMinutes ?? FAR) - (b.k.updatedMinutes ?? FAR) ||
         a.i - b.i,
@@ -156,15 +195,16 @@ export function fileSize(bytes: number) {
 
 // ---- The story's ⋯ menu: the status moves a person can make from where the story is (statuses guide §7) ----
 
-/** What a person can set. New, In progress and In review are the robots' moves, never offered. */
-export type StatusMove = "planning" | "approved" | "done" | "cancelled";
+/** What a person can set. New, In progress and In review are the robots' moves, never offered. A pull request is
+ *  created from In review and closed from Pull request; merging happens on GitHub, never here. */
+export type StatusMove = "planning" | "approved" | "pull_request" | "close" | "done" | "cancelled";
 
 /** A menu item: a verb and its object (DESIGN.md §9.2). What it does is said after you choose it (the toast,
  *  or the confirm), not on the item. `icon` tells a fresh build apart from picking up again. */
 export interface MoveOption {
   move: StatusMove;
   label: string;
-  icon: "plan" | "build" | "rebuild" | "reopen" | "done" | "cancel";
+  icon: "plan" | "build" | "rebuild" | "reopen" | "pr" | "close" | "done" | "cancel";
 }
 
 /** The moves that make sense from a status, in the menu's order. `stopped`: a build stopped and needs a person. */
@@ -173,11 +213,14 @@ export function statusMoves(status: StoryStatus, stopped = false): MoveOption[] 
   const approved: MoveOption =
     status === "new" || status === "planning"
       ? { move: "approved", label: "Approve and build", icon: "build" }
-      : status === "in_review"
+      : status === "in_review" || status === "pull_request"
         ? { move: "approved", label: "Rebuild with my notes", icon: "rebuild" }
         : status === "done" || status === "cancelled"
           ? { move: "approved", label: "Reopen story", icon: "reopen" }
           : { move: "approved", label: "Start a new build", icon: "rebuild" };
+  const pullRequest: MoveOption = { move: "pull_request", label: "Create pull request", icon: "pr" };
+  const close: MoveOption = { move: "close", label: "Close without merging", icon: "close" };
+  // From In review, Done means there was nothing to merge; a pull request's story is done when it's merged on GitHub.
   const done: MoveOption = { move: "done", label: "Mark as Done", icon: "done" };
   const cancelled: MoveOption = { move: "cancelled", label: "Cancel story", icon: "cancel" };
 
@@ -191,7 +234,9 @@ export function statusMoves(status: StoryStatus, stopped = false): MoveOption[] 
     case "in_progress":
       return [planning, approved, cancelled];
     case "in_review":
-      return [planning, approved, done, cancelled];
+      return [pullRequest, planning, approved, done, cancelled];
+    case "pull_request":
+      return [approved, close, cancelled];
     case "done":
     case "cancelled":
       return [planning, approved];

@@ -2,7 +2,6 @@ import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEve
 import { ArrowUp, AtSign, Paperclip, RefreshCw, Sparkles } from "lucide-react";
 import type { Person } from "@/types/dashboard";
 import type { FileRef, Segment } from "@/types/stories";
-import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
 import { storyRef } from "@/components/dashboard/format";
 import { AttachedFiles, type Attachment } from "./AttachedFiles";
 import { names, parseText } from "./RichText";
@@ -23,11 +22,9 @@ interface StoryComposerProps {
   /** The line above the box: what a note does in the story's status (statuses guide: a note is a conversation,
    *  a status is an instruction). */
   hint?: string;
-  /** The writer, left out of the "@" list. */
+  /** The writer: tagging yourself needs no warning. */
   viewerName?: string;
   onSend: (message: { text: Segment[]; files: FileRef[]; rebuild: boolean }) => void;
-  /** Moves a draft meant for a teammate to the story's Team conversation, where people talk. */
-  onWriteToTeam: (draft: string) => void;
 }
 
 const draftKey = (id: number) => `crafthq:story-draft:${id}`;
@@ -52,17 +49,17 @@ const kindOf = (f: File): FileRef["kind"] => (f.type.startsWith("image/") ? "ima
 // Ask PM's message box, so the two chats feel like one (Shubham, 25 Nov): a two-row card, the field with a sparkle
 // on top, Attach and the send button under it, and a short centred note below the box.
 const PILL =
-  "inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] " +
+  "inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--card-line)] bg-white px-3 text-sm " +
   "text-[var(--tx)] transition-colors duration-[120ms] hover:bg-[#F6F6F7]";
 
 /**
  * The message box of the story's chat, which is the robots': a two-row card with Attach (or paste, or drop anything
  * on it) and a send button that wakes up as you type. Everything sent here goes to the agent; people talk
- * in Team. So "@" lists teammates only to move the draft to Team, and a teammate tagged here anyway gets a line
- * saying they won't see it, with the same way out. "#" links another story. In review, "Rebuild after sending"
+ * in Messages (Shubham, 26 Nov: no Team on the story page). So "@" lists nobody, and a teammate tagged here anyway
+ * gets a line saying they won't see it. "#" links another story. In review, "Rebuild after sending"
  * turns a note into a change request (a note, then Approved). The draft is kept per story.
  */
-export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, onRebuildChange, suggestions = [], hint, viewerName, onSend, onWriteToTeam }: StoryComposerProps) {
+export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, onRebuildChange, suggestions = [], hint, viewerName, onSend }: StoryComposerProps) {
   // The story page renders only in the browser (client:only), so local storage can be read straight away.
   const [text, setText] = useState(() => readDraft(storyId));
   const [files, setFiles] = useState<Attachment[]>([]);
@@ -78,13 +75,6 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
     writeDraft(storyId, value);
   };
 
-  // The draft goes to Team as it is, tag included (and a space, to go on typing), and this box empties.
-  const toTeam = (draft: string) => {
-    onWriteToTeam(`${draft.trim()} `);
-    update("", 0);
-  };
-
-  const teammates = people.filter((p) => p.name !== viewerName);
   const list = useSuggestions({
     text,
     caret,
@@ -92,9 +82,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
     apply: update,
     find: (sigil, q): Suggestion[] =>
       sigil === "@"
-        ? teammates
-            .filter((p) => p.name.toLowerCase().includes(q))
-            .map((p) => ({ key: p.id, insert: `@${p.name.split(" ")[0]}`, label: p.name, meta: "Write in Team", icon: <PersonAvatar initials={p.initials} />, pick: toTeam }))
+        ? []
         : stories
             .filter((s) => s.id !== storyId && (storyRef(s.id).includes(q) || String(s.id).startsWith(q.replace(/^hq-/, "")) || s.title.toLowerCase().includes(q)))
             .map((s) => ({ key: String(s.id), insert: `#${storyRef(s.id)}`, label: s.title, meta: storyRef(s.id), icon: null })),
@@ -152,7 +140,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
                 list.placeCaret(s.length);
                 update(s, s.length);
               }}
-              className="h-8 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] leading-[18px] text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl)] hover:bg-[var(--ctl-bg-h)]"
+              className="h-8 rounded-full border border-[var(--card-line)] bg-white px-3 text-sm text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl)] hover:bg-[var(--ctl-bg-h)]"
             >
               {s}
             </button>
@@ -161,14 +149,11 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
       )}
 
       {tagged.length > 0 && (
-        <p id={`${COMPOSER_INPUT_ID}-hint`} className="m-0 mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-3 text-[12px] leading-4 text-[var(--tx)]">
+        <p id={`${COMPOSER_INPUT_ID}-hint`} className="m-0 mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-3 text-xs text-[var(--tx)]">
           <AtSign aria-hidden="true" size={12} strokeWidth={2} className="flex-none text-[var(--tx2)]" />
           <span>
-            {names(tagged)} won’t see this. Messages here go to the agent.
+            {names(tagged)} won’t see this. Messages here go to the agent; to reach {tagged.length === 1 ? "them" : "them all"}, use Messages.
           </span>
-          <button type="button" onClick={() => toTeam(text)} className="font-medium underline decoration-black/20 underline-offset-2 hover:decoration-current">
-            Write to {names(tagged)} in Team
-          </button>
         </p>
       )}
 
@@ -187,7 +172,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
           setDragging(false);
           addFiles(e.dataTransfer.files);
         }}
-        className={`relative rounded-[20px] border bg-white p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_rgb(0_0_0/0.05)] transition-[border-color,box-shadow] duration-[160ms] focus-within:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.08)] ${
+        className={`relative rounded-[20px] border bg-white p-3 transition-[border-color] duration-[160ms] ${
           dragging ? "border-[var(--cta)]" : "border-[var(--card-line)] focus-within:border-[var(--ctl)]"
         }`}
       >
@@ -195,7 +180,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
           <SuggestionList
             items={list.shown}
             active={list.active}
-            label={list.sigil === "@" ? "Teammates: choose one to write to them in Team" : "Stories"}
+            label="Stories"
             onHover={list.setActive}
             onChoose={list.choose}
           />
@@ -214,7 +199,10 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
         )}
 
         <div className="flex items-start gap-2 px-1">
-          <Sparkles aria-hidden="true" size={16} strokeWidth={1.75} className="mt-[5px] flex-none text-[var(--tx2)]" />
+          {/* As tall as one line of the box, so the mark sits on the first line's middle. */}
+          <span className="flex h-6 flex-none items-center">
+            <Sparkles aria-hidden="true" size={16} strokeWidth={1.75} className="text-[var(--tx2)]" />
+          </span>
           <label htmlFor={COMPOSER_INPUT_ID} className="sr-only">
             Tell PM about {storyRef(storyId)}
           </label>
@@ -234,7 +222,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
             }}
             placeholder={`Tell PM about ${storyRef(storyId)}`}
             aria-describedby={described || canRebuild ? [tagged.length > 0 && `${COMPOSER_INPUT_ID}-hint`, (hint || canRebuild) && `${COMPOSER_INPUT_ID}-note`].filter(Boolean).join(" ") : undefined}
-            className="field-sizing-content block max-h-40 min-h-6 w-full min-w-0 flex-1 resize-none bg-transparent text-[15px] leading-6 text-[var(--tx)] placeholder:text-[var(--tx2)] focus:outline-none"
+            className="field-sizing-content block max-h-40 min-h-6 w-full min-w-0 flex-1 resize-none bg-transparent text-base text-[var(--tx)] placeholder:text-[var(--tx2)] focus:outline-none"
           />
         </div>
 
@@ -248,7 +236,7 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
               type="button"
               aria-pressed={rebuild}
               onClick={() => onRebuildChange(!rebuild)}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] leading-[18px] transition-colors duration-[120ms] ${
+              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors duration-[120ms] ${
                 rebuild ? "border-[#C9DAFB] bg-[#E9F0FE] text-[#1F57C3]" : "border-[var(--card-line)] bg-white text-[var(--tx)] hover:bg-[#F6F6F7]"
               }`}
             >
@@ -265,23 +253,24 @@ export function StoryComposer({ storyId, people, stories, canRebuild, rebuild, o
             title={canRebuild && rebuild ? "Send and rebuild" : "Send (Enter)"}
             className="inline-flex size-9 flex-none items-center justify-center rounded-full bg-[var(--cta)] text-white transition-[background-color,transform] duration-[120ms] hover:bg-[var(--cta-h)] active:scale-95 disabled:bg-[#E4E4E7]"
           >
-            {canRebuild && rebuild ? <RefreshCw aria-hidden="true" size={16} strokeWidth={2.25} /> : <ArrowUp aria-hidden="true" size={17} strokeWidth={2.25} />}
+            {canRebuild && rebuild ? <RefreshCw aria-hidden="true" size={16} strokeWidth={2} /> : <ArrowUp aria-hidden="true" size={16} strokeWidth={2} />}
           </button>
         </div>
 
         {dragging && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[20px] bg-white/90 text-[14px] font-medium text-[var(--cta)]"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[20px] bg-white/90 text-sm font-medium text-[var(--cta)]"
           >
             Drop files to attach them
           </div>
         )}
       </div>
 
-      {/* What a note does here, under the box like Ask PM's line; in review, what Rebuild after sending changes. */}
+      {/* What a note does here (in review, what Rebuild after sending changes). Not on screen (Shubham, 26 Nov: no line
+          under the box); screen readers still hear it as the box's description. */}
       {(hint || canRebuild) && (
-        <p id={`${COMPOSER_INPUT_ID}-note`} className="m-0 mt-2 text-center text-[12px] leading-4 text-pretty text-[var(--tx2)]">
+        <p id={`${COMPOSER_INPUT_ID}-note`} className="sr-only">
           {canRebuild
             ? rebuild
               ? "Sets the story to Approved: Builder rebuilds with your note, Checker checks it again, then you review."

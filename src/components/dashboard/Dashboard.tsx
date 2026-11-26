@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { ConnectAccountsModal } from "@/components/connect-accounts";
 import type { DashboardData, DashboardStateOverride, NeedKind } from "@/types/dashboard";
 import { BTN_PRIMARY } from "./classes";
+import tokens from "./tokens.module.css";
 import { NEEDS, sortQueue, storyRef, type SortMode } from "./format";
 import { ActivityPanel, type DetailsTab } from "./ActivityPanel";
 import { DashboardSkeleton } from "./DashboardSkeleton";
@@ -165,7 +166,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
 
   // One way to write a story everywhere: the Stories area's centred New story dialog. What's created here is
   // kept with the stories created on the Stories page, so it shows on the board too.
-  const createStory = ({ title, why, detail, ownerId, files }: NewStoryInput) => {
+  const createStory = ({ title, why, detail, ownerId, files, source, attachments = [] }: NewStoryInput) => {
     const id = Math.max(nextId, ...created.map((s) => s.id + 1));
     setNextId(id + 1);
     setStories((ss) => [...ss, { id, title, status: "new" }]);
@@ -174,11 +175,14 @@ export function Dashboard({ data }: { data: DashboardData }) {
       title,
       why: why || undefined,
       detail: detail || undefined,
-      files: files.length ? files.map((f) => f.name) : undefined,
+      // Files attached here, then the imported ticket's (names only, for now).
+      files: files.length || attachments.length ? [...files.map((f) => f.name), ...attachments] : undefined,
+      importedFrom: source,
       status: "new",
       owner: data.people.find((p) => p.id === ownerId)?.initials,
       updated: "just now",
       updatedMinutes: 0,
+      createdAt: Date.now(),
     });
     showToast(`${storyRef(id)} added. The agent drafts the spec from it.`, { label: "Open", run: () => window.location.assign(`/stories/${storyRef(id)}`) });
   };
@@ -214,7 +218,9 @@ export function Dashboard({ data }: { data: DashboardData }) {
 
   return (
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
-      {/* Panels float over the page from the right; the table keeps its full width underneath. */}
+      {/* Panels float over the page from the right; the table keeps its full width underneath. The wash behind it all is
+          the story page's (an experiment, Shubham, 26 Nov); the cards stay white on it. */}
+      <div className={`${tokens.wash} md:min-h-[calc(100dvh-var(--bar-h))]`}>
       <main id="main" className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-16 md:px-8">
         <div className="flex items-center justify-between gap-4">
           <h1
@@ -312,6 +318,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
           </>
         )}
       </main>
+      </div>
 
       <AnimatePresence>
         {panel === "details" && localPanel?.kind === "details" && (

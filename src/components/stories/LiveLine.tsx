@@ -38,7 +38,7 @@ export function LiveLine({ live, size = 12 }: { live: LiveRun; size?: 12 | 16 })
   const time = now && started !== undefined ? sinceLabel(now - started) : null;
   return (
     // Wraps to a second line rather than cutting the words off: they say who is doing what.
-    <span title={time ? `${words} · ${time}` : words} className="inline-flex max-w-full min-w-0 items-start gap-1.5 text-[13px] leading-[18px] text-[var(--tx)]">
+    <span title={time ? `${words} · ${time}` : words} className="inline-flex max-w-full min-w-0 items-start gap-1.5 text-sm text-[var(--tx)]">
       <span className="flex h-[18px] flex-none items-center">
         <WorkingIndicator size={size} />
       </span>

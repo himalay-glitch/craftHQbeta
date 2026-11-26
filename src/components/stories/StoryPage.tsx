@@ -1,40 +1,45 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence } from "framer-motion";
 import { Tooltip } from "radix-ui";
-import { ArrowDown, ArrowLeft, BellRing, ChevronLeft, ChevronRight, Link as LinkIcon } from "lucide-react";
+import { ArrowDown, ArrowLeft, ChevronLeft, ChevronRight, FileText, Link as LinkIcon } from "lucide-react";
 import type { NeedKind, Person, StoryStatus } from "@/types/dashboard";
-import type { ActivityItem, AskCard, AskRefusal, Author, FileRef, LiveState, PhaseKey, PreviewActions, RunPhase, Segment, StoryItem, StoryPageData, ThreadEntry } from "@/types/stories";
+import type { ActivityItem, AskCard, AskRefusal, Author, Decision, FileRef, LiveState, MainState, PhaseKey, PrMerge, PreviewActions, PullRequest, RunPhase, Segment, StoryItem, StoryNavItem, StoryPageData, ThreadEntry } from "@/types/stories";
 import { BTN_SECONDARY, ICON_BTN } from "@/components/dashboard/classes";
-import { storyRef } from "@/components/dashboard/format";
+import { sortQueue, storyRef } from "@/components/dashboard/format";
 import { Tip } from "@/components/dashboard/Tip";
 import { Toast } from "@/components/dashboard/Toast";
-import { saveDraft } from "@/components/messages/MessageComposer";
-import { isOpenAsk, useStoryMessages } from "@/components/messages/store";
-import { buildActivity, DEVICE_NAME, livePreview, restoreActivity, taskFor, type Task } from "./activity";
+import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
+import { anyWorking, buildActivity, DEVICE_NAME, livePreview, mainDetail, nowOf, PR_DETAIL, readyOf, restoreActivity, taskFor, type Task } from "./activity";
 import { ActivitySummary } from "./ActivitySummary";
 import chat from "./chat.module.css";
 import { CancelStoryDialog } from "./CancelStoryDialog";
 import { findCreated } from "./created";
 import { LIVE_WORDS } from "./LiveLine";
 import { PHASE_LABEL } from "./phases";
-import { names } from "./RichText";
 import { PreviewRow } from "./PreviewControl";
-import { columnLabel, statusMoves, type StatusMove } from "./stage";
+import { COLUMNS, columnLabel, prStage, statusMoves, type StatusMove } from "./stage";
+import { DecisionDock } from "./DecisionDock";
+import { MainDemo, type MainDemoStep } from "./MainDemo";
 import { MORE_BUTTON_ID, StatusBadge, StatusMenu } from "./StatusMenu";
 import { ownerOf, useStoryOwners } from "./owners";
 import { COMPOSER_INPUT_ID, StoryComposer } from "./StoryComposer";
-import { ActivityCorner, activityDot } from "./ActivityCorner";
-import { useIsPhone } from "./hooks";
-import { StoryNav, StoryNavToggle } from "./StoryNav";
+import { ActivityCorner } from "./ActivityCorner";
 import { StoryRail } from "./StoryRail";
-import { SideTabs, type SideTab } from "./SideTabs";
-import { DirectConversation, StoryTeam, TeamConversation } from "./StoryTeam";
+import { StoryDetails, storyCardFor, type StoryBrief } from "./StoryDetails";
+import { StatusGuide } from "./StatusGuide";
+import { StatusPicker, type Turn } from "./StatusPicker";
+import { addDecision, decisionsFrom, removeDecision, useSavedDecisions } from "./decisions";
+import { StoryDecisions } from "./StoryDecisions";
+import { HistoryList } from "./StoryHistory";
+import { PanelTabs, type PanelTab } from "./PanelTabs";
+import { StoryOverview } from "./StoryOverview";
+import { useIsWide } from "./hooks";
+import { FilesSection, type ChatFile } from "./StoryMore";
 import { StoryThread } from "./StoryThread";
-import { TeamButton, TeamChip } from "./TeamButton";
+import { StoryTour } from "./StoryTour";
 import { ago, TeammateBanner, type TeammateChange } from "./TeammateBanner";
 import { TeammateDemo, type TeammateMove } from "./TeammateDemo";
 import { useToastQueue } from "./toasts";
-import { AGENT, buildFacts, buildThread, personFor, prNumberFor } from "./thread";
+import { AGENT, buildFacts, buildThread, personFor, prNumberFor, titleOnlyAsk } from "./thread";
 
 interface State {
   status: StoryStatus;
@@ -46,9 +51,14 @@ const isYours = (s: State) => Boolean(s.need) && (s.waitingOn ?? "You") === "You
 
 /** What the robots are doing when nothing is happening on this page right now (the statuses guide, §2–6).
  *  `run`: the build under way that the board shows (its phase and start), so both say the same words and time. */
-function restingLive(s: State, run?: { phase: PhaseKey; since?: number }): LiveState | null {
+function restingLive(s: State, run?: { phase: PhaseKey; since?: number }, ship?: { pr: string; merger: string; merge?: PrMerge }): LiveState | null {
   if (s.status === "cancelled") return { kind: "quiet", text: "Cancelled. Nothing more will happen." };
-  if (s.status === "done") return { kind: "quiet", text: "Done · merged into main" };
+  if (s.status === "done")
+    return { kind: "quiet", text: ship?.pr === "merged" ? "Done · merged into main" : ship?.pr === "closed" ? "Closed · the pull request wasn’t merged" : "Done · nothing to merge" };
+  // The pull request waits on the one person with GitHub access; nobody here has to act.
+  // A refused update is stuck: the card says so, never "with the person who merges" (hq-35, 25 Nov).
+  if (s.status === "pull_request" && ship?.merge === "blocked") return null;
+  if (s.status === "pull_request" && !s.need) return { kind: "quiet", text: `With ${ship?.merger ?? "the person who merges"} to check and merge on GitHub` };
   if (s.need === "stuck" || isYours(s)) return null; // the card says what's needed
   if (s.need) return { kind: "waiting", text: `Waiting on ${s.waitingOn}` };
   if (s.status === "in_progress") {
@@ -59,7 +69,7 @@ function restingLive(s: State, run?: { phase: PhaseKey; since?: number }): LiveS
   if (s.status === "in_review") return { kind: "quiet", text: "Checked · waiting for review" };
   // Planning with nothing to read: moved back by a person, and a plan is only written in answer to a note.
   if (s.status === "planning") return { kind: "quiet", text: "Back in planning. Say in a note what should change." };
-  if (s.status === "approved") return { kind: "quiet", text: "Approved · waiting to start" };
+  if (s.status === "approved") return { kind: "quiet", text: "Queued · Builder picks it up next" };
   // New is not a plan being written.
   return { kind: "quiet", text: "Nothing has been planned yet" };
 }
@@ -101,19 +111,19 @@ const BOX_COLUMN = "md:mx-auto md:w-full md:max-w-[768px] md:px-6";
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now()}-${(seq += 1)}`;
 
-/** A nudge for the teammate a story is waiting on, offered above the message box (it goes to Messages). */
-const NUDGE: Partial<Record<NeedKind, string>> = {
-  review: "the review is pending. Can you take a look?",
-  decision: "there’s an open question here for you.",
-  planning: "the plan is ready for you to approve.",
-  next: "this is waiting on you. Can you say what’s next?",
-  triage: "can you plan this one or cancel it?",
-};
+/** A note about main or the pull request on built work ("does it clash with main?", "update the pr", "merge main
+ *  in"): answered with where it stands, and an update started if main moved on. Never "move it back to Approved":
+ *  bringing in main is upkeep, not a change to what the story does (hq-35, 17–25 Nov). */
+const ABOUT_MAIN = /\b(merge|rebase|conflicts?|clash(es)?|up to date|out of date|behind main|latest main|from main|with main|the pr|pull request)\b/i;
+
+const refsOf = (ids: number[]) => ids.map((id) => `hq-${id}`).join(", ");
 
 /** What a ⋯ menu move does, for the reason it was refused: "Couldn’t cancel it: …". */
 const MOVE_VERB: Record<StatusMove, string> = {
   planning: "move it to Planning",
   approved: "start the build",
+  pull_request: "create the pull request",
+  close: "close the pull request",
   done: "mark it Done",
   cancelled: "cancel it",
 };
@@ -128,18 +138,13 @@ const ON_HOLD: Partial<Record<NeedKind, string>> = {
   stuck: "Your restart isn’t needed now.",
 };
 
-/** What a teammate on the story is doing, by its status, for the presence line. */
-const DOING: Record<StoryStatus, string> = {
-  new: "reading it",
-  planning: "reading the plan",
-  approved: "watching the build",
-  in_progress: "watching the build",
-  in_review: "reviewing",
-  done: "looking",
-  cancelled: "looking",
-};
-
 const firstName = (p: Person) => p.name.split(" ")[0];
+
+/** What a teammate is sent a story to do, by the decision it was waiting on (Shubham, 26 Nov: "Send to someone"). */
+const HANDOFF: Partial<Record<NeedKind, { to: string; until: string }>> = {
+  planning: { to: "approve the plan", until: "approves the plan" },
+  review: { to: "review it", until: "reviews it" },
+};
 
 /** The island for /stories/hq-N: renders only in the browser, so created stories can be read from storage. */
 export function StoryPage({ data }: { data: StoryPageData }) {
@@ -147,8 +152,8 @@ export function StoryPage({ data }: { data: StoryPageData }) {
   if (!story) {
     return (
       <main id="main" className="mx-auto w-full max-w-[1344px] px-4 pt-16 text-center md:px-8">
-        <p className="text-[17px] font-medium">There’s no story {storyRef(data.storyId)}</p>
-        <p className="mt-1 text-[15px] text-[var(--tx2)]">It may have been created in another browser, or the link is wrong.</p>
+        <p className="text-base font-semibold">There’s no story {storyRef(data.storyId)}</p>
+        <p className="mt-1 text-sm text-[var(--tx2)]">It may have been created in another browser, or the link is wrong.</p>
         <a href="/stories" className={`${BTN_SECONDARY} mt-5`}>
           Back to stories
         </a>
@@ -159,27 +164,34 @@ export function StoryPage({ data }: { data: StoryPageData }) {
 }
 
 function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
-  const initial = data.thread ?? buildThread(story, data.people, data.viewer);
+  const initial = data.thread ?? buildThread(story, data.people, data.viewer, data.story === null && !story.createdAt ? "Earlier" : undefined);
   const [entries, setEntries] = useState<ThreadEntry[]>(initial.entries);
   const [activity, setActivity] = useState<ActivityItem[]>(() => buildActivity(story, initial.facts, Date.now()));
   const [state, setState] = useState<State>({ status: story.status, need: story.need, waitingOn: story.waitingOn });
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState<LiveState | null>(null);
   const [rebuild, setRebuild] = useState(false);
-  // The story's Team conversation: the Team tab of the card beside the chat (Shubham, 25 Nov), the same tab in the corner
-  // card at 768–1023 px, or a full screen on phones. `teamEpoch` is bumped when a draft is put into it from outside (a
-  // nudge, or "Write to Esha in Team" from the agent's box), so its reply box reads the draft again.
-  const [teamOpen, setTeamOpen] = useState(false);
-  const [teamEpoch, setTeamEpoch] = useState(0);
-  // The corner card (768–1023 px), open; the faces open it straight on Team.
+  // The activity's corner card (768–1023 px), open.
   const [cornerOpen, setCornerOpen] = useState(false);
-  // A private word with one person, from their face's card: shown in the Team tab, under "← Team".
-  const [privateWith, setPrivateWith] = useState<Person | null>(null);
-  const isPhone = useIsPhone();
   const [atBottom, setAtBottom] = useState(true);
   // The story's pull request: the agent opens it once the work passes its check; a person merges it.
   const [pr, setPr] = useState(initial.facts.pullRequest.state);
-  const [prNo, setPrNo] = useState(() => prNumberFor(story.id));
+  const [prNo, setPrNo] = useState(() => story.pr?.number ?? prNumberFor(story.id));
+  // While it waits to be merged: what's happening to the pull request (the sample's state until this page moves it).
+  const [prMerge, setPrMerge] = useState<PrMerge | undefined>(story.pr?.merge);
+  const [unsent, setUnsent] = useState(story.pr?.unsent ?? 0);
+  // Where the branch stands against main; the PM brings main in by itself when another story merges.
+  const [main, setMain] = useState<MainState>(story.main ?? { behind: [], checked: "5m ago" });
+  const updatingMain = useRef(false);
+  // A question about main open in the chat (main removed something this story needs), and a rebuild that brings
+  // main in along with the change, so "Latest main" turns up to date when the build ends.
+  const [mainQuestion, setMainQuestion] = useState<string | null>(null);
+  const mainWithBuild = useRef(false);
+  // hq-35's demo: how far through its steps (it replays the live story's 24–25 Nov, handled the new way).
+  const [demoAt, setDemoAt] = useState(0);
+  // Which waiting decision you chose to write about first ("Ask something first", "Ask for changes"): the message box is
+  // back for that one; a new decision docks again.
+  const [writingFor, setWritingFor] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   // Notes written while the agent holds a build: read after the round, never mid-build.
   const notesDuringJob = useRef(0);
@@ -188,6 +200,9 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const timers = useRef<number[]>([]);
   const firstScroll = useRef(true);
+  // Until when (epoch ms) the chat doesn't follow the bottom: a jump up to an older message ("See in chat", "See what
+  // changed") starts while the chat still counts as at the bottom, and following it would pull the chat straight back.
+  const holdScroll = useRef(0);
   // The one screen-reader line for the activity column: finishes, a preview running or stopped, the build's end.
   const [said, setSaid] = useState("");
   // Bumped by Undo, so the restored activity card appears without motion.
@@ -207,92 +222,70 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const [highlight, setHighlight] = useState<string | undefined>(undefined);
   // Cancel story was chosen while a robot is building: it asks first (DESIGN.md §6.11).
   const [confirmCancel, setConfirmCancel] = useState(false);
+  // Story details: the whole story as it was written, to read (Shubham, 26 Nov).
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  // "How statuses work", from the Status tab and the status box's menu.
+  const [guideOpen, setGuideOpen] = useState(false);
+  // The right-hand side's tab (Shubham, 26 Nov), from ?tab= so a link opens the same one; Status when there's none.
+  const [tab, setTab] = useState<PanelTab>(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t === "story" || t === "work" || t === "history" ? t : "status";
+  });
+  // From 1024 px the tabs sit in a card beside the chat; below it they open from the header's corner icon (tablets) or
+  // the fold under the header (phones), so only one set is mounted where it shows.
+  const wide = useIsWide();
+  // Decisions people saved here (messages saved as decisions, and changes), kept in this browser until there's an API.
+  const savedDecisions = useSavedDecisions(story.id);
+  // Sent to a teammate from the decision card: the story waits on them and is paused for you (Shubham, 26 Nov).
+  // Read against the state, so Undo (which puts the state back) ends it too.
+  const [handoff, setHandoff] = useState<{ name: string; initials: string; need: NeedKind } | null>(null);
+  const handedTo = handoff && state.need === handoff.need && state.waitingOn === handoff.name ? handoff : null;
+  const handedFirst = handedTo?.name.split(" ")[0] ?? "";
 
   const me: Author = { kind: "person", name: data.viewer.name, initials: data.viewer.initials };
-  // The story's Team conversation, people only (it opens in Messages): who's in it, what you haven't read, and
-  // requests still waiting for a reply. None of it shows in this chat, which is the robots'.
-  const storyMessages = useStoryMessages(story.id, data.viewer.id);
   const [openedAt] = useState(() => Date.now());
-  const personOf = (id: string) => data.people.find((p) => p.id === id);
-  const peopleOf = (ids: string[]) => [...new Set(ids)].filter((id) => id !== data.viewer.id).flatMap((id) => personOf(id) ?? []);
-  const teamPeople = peopleOf(storyMessages.flatMap((m) => [m.from, ...m.to]));
-  const teamUnread = storyMessages.filter((m) => m.to.includes(data.viewer.id) && !m.seen[data.viewer.id]).length;
-  const asks = storyMessages.filter((m) => isOpenAsk(m, storyMessages));
-  const waitingOnThem = peopleOf(asks.filter((m) => m.from === data.viewer.id).flatMap((m) => m.ask?.of ?? []));
-  const waitingOnMe = peopleOf(asks.filter((m) => m.ask?.of.includes(data.viewer.id)).map((m) => m.from));
-  const openTeam = (draft?: string) => {
-    if (draft) {
-      saveDraft(`story:${story.id}`, draft);
-      setTeamEpoch((n) => n + 1);
-    }
-    setPrivateWith(null);
-    setTeamOpen(true);
-    if (window.matchMedia("(min-width: 768px) and (max-width: 1023.98px)").matches) setCornerOpen(true);
-  };
-  // From a face's card: one to one with them, in the Team tab (Messages has the same conversation).
-  const messagePrivately = (person: Person) => {
-    setPrivateWith(person);
-    setTeamOpen(true);
-    if (window.matchMedia("(min-width: 768px) and (max-width: 1023.98px)").matches) setCornerOpen(true);
-  };
-  // Back to Activity (or the sheet or corner card closes), and focus back on the faces, where you came from.
-  const closeTeam = () => {
-    setTeamOpen(false);
-    setPrivateWith(null);
-    setCornerOpen(false);
-    window.requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-team-button]")?.focus({ preventScroll: true }));
-  };
-  const showTab = (t: SideTab) => (t === "team" ? openTeam() : setTeamOpen(false));
-  // What the Team tab shows: the story's Team conversation, or the private one opened from a face.
-  const teamBody = (compact: boolean, className: string) =>
-    privateWith ? (
-      <DirectConversation key={privateWith.id} person={privateWith} viewerId={data.viewer.id} compact={compact} onBack={() => setPrivateWith(null)} className={className} />
-    ) : (
-      <TeamConversation storyId={story.id} viewerId={data.viewer.id} draftEpoch={teamEpoch} compact={compact} onEscape={closeTeam} className={className} />
-    );
-  const tabs = (small: boolean) => (
-    <SideTabs tab={teamOpen ? "team" : "activity"} onTab={showTab} unread={teamUnread} signal={activityDot(activity, yours)} small={small} />
-  );
   const owners = useStoryOwners();
   const ownerInitials = ownerOf(story, owners);
   const owner = ownerInitials ? personFor(ownerInitials, data.people, data.viewer) : undefined;
   const ownerName = owner?.kind === "person" ? owner.name : undefined;
-  // Who's on this story, as faces in the header (Shubham, 25 Nov: the people, not a "Team" label): its owner, who wrote
-  // it, everyone in its Team conversation, and you. Clicking them opens the Team chat.
-  const byInitials = (initials?: string | null): Person | undefined =>
-    !initials ? undefined : initials === data.viewer.initials ? data.viewer : data.people.find((p) => p.initials === initials);
-  const created = entries.find((e) => e.kind === "created");
-  const members = [
-    ...new Map(
-      [byInitials(ownerInitials), created?.kind === "created" && created.by.kind === "person" ? byInitials(created.by.initials) : undefined, ...teamPeople, data.viewer]
-        .filter((p): p is Person => Boolean(p))
-        .map((p) => [p.id, p] as const),
-    ).values(),
-  ];
   // The teammate in the demo: the story's owner when that isn't you, else the first teammate.
   const teammate = data.people.find((p) => p.initials === ownerInitials && p.id !== data.viewer.id) ?? data.people.find((p) => p.id !== data.viewer.id);
   const mateName = teammate?.name ?? "A teammate";
   const mateFirst = mateName.split(" ")[0];
+  // The one person with GitHub access, who checks and merges every pull request (Shubham, 26 Nov).
+  const merger = data.people.find((p) => p.initials === data.merger);
+  const mergerName = merger ? (merger.id === data.viewer.id ? "you" : merger.name) : "the person who merges";
+  const mergerFirst = merger ? (merger.id === data.viewer.id ? "you" : firstName(merger)) : "the person who merges";
+  // While it waits to be merged: the sample's state (a story merged first, main moved on) until this page changes it.
+  const prNow: PullRequest | undefined = state.status === "pull_request" ? { state: "open", number: prNo, merge: prMerge ?? "ready", conflictWith: story.pr?.conflictWith } : undefined;
   // The status row at the top of the chat: the status and what's under way (the status menu), a dot, and whose
   // turn it is when nobody's working. A status says what was asked for; the detail says what's running.
   // The board's run on this story (StoryItem.live), until this page changes the status: same words, same start.
   const seed = story.live && !changed ? { phase: story.live.phase, since: story.live.startedAt ?? openedAt - (story.live.minutesAgo ?? 0) * 60_000 } : undefined;
-  const live = busy ?? restingLive(state, seed);
+  const live = busy ?? restingLive(state, seed, { pr, merger: mergerFirst, merge: prNow?.merge });
   const working = live?.kind === "working" || live?.kind === "thinking";
   // The robot's one current phase, by its name: the same words as the chat's live line and the board.
   const phase = live?.kind === "working" ? live.phase : undefined;
   const status: { dot: string; detail?: string; turn?: string } = (() => {
-    if (state.status === "done") return { dot: "bg-[#16a34a]" };
+    // Green only for merged (DESIGN.md §3.1); closed without merging, or done with nothing to merge, is quiet.
+    if (state.status === "done") return { dot: pr === "merged" ? "bg-[#16a34a]" : "bg-[var(--tx2)]", detail: pr === "closed" ? "Not merged" : undefined };
     if (state.status === "cancelled") return { dot: "bg-[var(--tx2)]" };
-    if (job === "starting") return { dot: "bg-[var(--tx2)]", detail: "Waiting to start" };
+    if (job === "starting") return { dot: "bg-[var(--tx2)]", detail: "Queued" };
     if (phase) return { dot: "bg-[var(--tx)]", detail: LIVE_WORDS[phase] };
     if (job === "building") return { dot: "bg-[var(--tx)]", detail: "Building" };
     if (job === "verifying") return { dot: "bg-[var(--tx)]", detail: "Verifying" };
     if (state.need === "stuck") return { dot: "bg-[#b91c1c]", detail: "Stopped" };
     if (isYours(state)) return { dot: "bg-[#d97706]", turn: "Waiting on you" };
     if (state.need) return { dot: "bg-[var(--tx2)]", turn: `Waiting on ${state.waitingOn}` };
-    if (state.status === "approved") return { dot: "bg-[var(--tx2)]", detail: "Waiting to start" };
+    if (state.status === "approved") return { dot: "bg-[var(--tx2)]", detail: "Queued" };
     if (state.status === "in_progress") return { dot: "bg-[var(--tx)]", detail: "Building" };
+    // A robot job started here with no build phase (sending to GitHub, bringing in main): say what it is.
+    if (busy?.kind === "working") return { dot: "bg-[var(--tx)]", detail: busy.label };
+    if (prNow) {
+      const stage = prStage(prNow);
+      if (stage.tone === "stuck") return { dot: "bg-[#b91c1c]", detail: stage.text };
+      return { dot: stage.tone === "agent" ? "bg-[var(--tx)]" : "bg-[var(--tx2)]", detail: stage.text, turn: stage.tone === "agent" ? undefined : `With ${mergerFirst}` };
+    }
     return { dot: state.status === "planning" && busy ? "bg-[var(--tx)]" : "bg-[var(--tx2)]" };
   })();
   const locked =
@@ -300,15 +293,24 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       ? "Builder is building; you can change this when it finishes."
       : job === "verifying"
         ? "Checker is verifying; you can change this when it finishes."
-        : undefined;
+        : handedTo
+          ? `It’s with ${handedTo.name}; take it back to change it.`
+          : undefined;
   // Once the stage moves, the facts follow it, but the story's own checks count stays.
   const moved = buildFacts({ ...story, ...state }, ownerName);
   const facts = !changed
     ? initial.facts
     : { ...moved, checks: moved.checks.state === "passed" && initial.facts.checks.state === "passed" ? initial.facts.checks : moved.checks };
-  const index = data.stories.findIndex((s) => s.id === story.id);
-  const prev = index > 0 ? data.stories[index - 1] : undefined;
-  const next = index >= 0 ? data.stories[index + 1] : undefined;
+  // Previous and Next in ⋯ (Shubham, 26 Nov: no stories list beside the chat). They go through the stories that need
+  // you, in the order the dashboard lists them under Mine, round to the start, so you can work through them one after
+  // another. A story that doesn't need you starts from the top of that list. When none needs you: the stories in order.
+  const forYou = (s: StoryNavItem) => s.need === "stuck" || (Boolean(s.need) && (s.waitingOn ?? "You") === "You");
+  const mine = sortQueue(data.queue.filter(forYou), "group");
+  const smart = mine.some((s) => s.id !== story.id);
+  const at = data.queue.findIndex((s) => s.id === story.id);
+  const here = mine.findIndex((s) => s.id === story.id);
+  const prev = smart ? mine.at(here === -1 ? -1 : (here - 1 + mine.length) % mine.length) : at > 0 ? data.queue[at - 1] : undefined;
+  const next = smart ? mine[here === -1 ? 0 : (here + 1) % mine.length] : at >= 0 ? data.queue[at + 1] : undefined;
 
   // Pending agent timers stop when the page goes away.
   useEffect(() => {
@@ -319,7 +321,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   // Newest at the bottom, like a chat: open at the end, and follow new messages unless you've scrolled up.
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || !atBottom) return;
+    if (!el || !atBottom || Date.now() < holdScroll.current) return;
     el.scrollTo({ top: el.scrollHeight, behavior: firstScroll.current ? "auto" : "smooth" });
     firstScroll.current = false;
   }, [entries, busy, atBottom]);
@@ -403,16 +405,14 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   /**
    * An approval, played out (statuses guide §3–4). Approved first: the instruction waits until the agent picks
    * it up and moves it to In progress itself. Then the build ticks through its steps, a second agent (not the
-   * builder) checks the work against the story, the pull request opens or updates, and only then does the
-   * story move to In review. The agent never merges.
+   * builder) checks the work against the story, and the story moves to In review. The pull request is created from
+   * there, by a person (Shubham, 26 Nov); a rebuild while one is open updates it, and the story comes back for review.
    */
   const runBuild = (label: string, stageId?: string) => {
     const buildId = nextId("act");
     const shotsId = nextId("act");
     const verifyId = nextId("act");
-    // A reopened story gets a new pull request; one still open is updated.
     const updating = pr === "open";
-    const number = pr === "merged" ? prNo + 1 : prNo;
     const phases = BUILD_PHASES;
     const of = phases.length;
     // Where each phase starts, after the pick-up.
@@ -425,18 +425,21 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
 
     stopPreviews("Stopped for the new build");
     notesDuringJob.current = 0;
-    log({ kind: "stage", title: label, state: "info", detail: "", move: state.status === "approved" ? undefined : { from: columnLabel(state.status), to: "Ready to build" } });
+    // Approving puts it in Building, queued; a rebuild that's already there doesn't move.
+    const from = columnLabel(state.status);
+    log({ kind: "stage", title: label, state: "info", detail: "", move: from === "Building" ? undefined : { from, to: "Building" } });
     move({ status: "approved" });
     add({ kind: "stage", id: stageId ?? nextId("stage"), at: "Just now", text: label });
     setJob("starting");
-    setBusy({ kind: "waiting", text: "Approved · waiting for Builder to pick it up" });
+    setBusy({ kind: "waiting", text: "Queued · Builder picks it up next" });
 
     later(picked, () => {
       since = Date.now();
       setJob("building");
       move({ status: "in_progress" });
       add({ kind: "stage", id: nextId("stage"), at: "Just now", text: "Builder started building" });
-      log({ kind: "stage", title: "Started building", state: "info", detail: "", move: { from: "Ready to build", to: "Building" } });
+      // Still Building: queued is its first step, so starting isn't a move between columns.
+      log({ kind: "stage", title: "Started building", state: "info", detail: "" });
       log({ id: buildId, kind: "build", title: "Build", state: "working", detail: PHASE_LABEL.plan, progress: { done: 0, total: 4 } });
       enter(0);
     });
@@ -470,11 +473,9 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         enter(i);
       });
     });
-    later(picked + starts[of - 1] + 700, () => {
-      setPr("open");
-      setPrNo(number);
-      log({ kind: "pr", title: `Pull request #${number}`, state: "done", detail: updating ? "Updated · ready to merge" : "Ready to merge" });
-    });
+    // A pull request that's already open gets the new build too, and waits for the story to be reviewed again.
+    if (updating)
+      later(picked + starts[of - 1] + 700, () => log({ kind: "pr", title: `Pull request #${prNo}`, state: "done", detail: "Updated with the new build · review it again" }));
     later(end, () => {
       log({ kind: "preview", title: "Preview · Web", device: "web", run: "off", state: "done", detail: "Ready to try" });
       add({
@@ -484,7 +485,9 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         author: AGENT,
         report: {
           outcome: "Done. Checker verified it: it does what the story asks, and every check passed.",
-          next: `Try the preview and read pull request #${number}. To accept, merge it and mark the story Done. To change something, write a note and rebuild.`,
+          next: updating
+            ? `Try the preview. When it’s right, update pull request #${prNo}, and it goes back to ${mergerName} to merge. To change something, write a note and rebuild.`
+            : `Try the preview. When it’s right, create the pull request, and it goes to ${mergerName} to check and merge on GitHub. To change something, write a note and rebuild.`,
         },
         // The phases, folded into one line under the reply.
         run: phases,
@@ -503,7 +506,13 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       move({ status: "in_review", need: "review", waitingOn: "You" });
       setJob(null);
       setBusy(null);
-      say("Build finished and verified by Checker. The pull request is open and the preview is ready to try.");
+      // Main came in with this build (the answer to a question about main): it's up to date now.
+      if (mainWithBuild.current) {
+        mainWithBuild.current = false;
+        setMain({ behind: [], checked: "just now" });
+        log({ kind: "main", title: "Latest main", state: "done", detail: "Up to date · brought in with this build" });
+      }
+      say("Build finished and verified by Checker. The preview is ready to try.");
     });
   };
 
@@ -569,6 +578,189 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     });
   };
 
+  // ---- Keeping built work up to date with main (Shubham, 26 Nov, from hq-35) ----
+
+  /** The newest "Latest main" line in Activity, and the pull request's. */
+  const rowOf = (kind: ActivityItem["kind"]) => activity.find((x) => x.kind === kind)?.id;
+
+  /**
+   * Another story merged and touched the same files, so main moved on under this one. The PM brings it in by itself,
+   * without asking and without moving the story: a merge of main into this branch, never a rebase, on the same branch
+   * and the same pull request. Clashes where both sides can stay are settled by keeping both, and said in one line.
+   * Then the checks run again, and the pull request gets the new version. The story stays where it was.
+   * `at`: where to pick up, for a story whose update was already under way (the sample's "Fixing conflicts").
+   */
+  const updateFromMain = ({
+    at = "start",
+    behind = main.behind,
+    clashes = main.clashes ?? 0,
+    refused = false,
+  }: { at?: "start" | "clashes"; behind?: number[]; clashes?: number; refused?: boolean } = {}) => {
+    if (updatingMain.current || !behind.length) return;
+    updatingMain.current = true;
+    setMain((m) => ({ ...m, behind, clashes }));
+    const who = refsOf(behind);
+    const onPr = state.status === "pull_request";
+    const mainId = rowOf("main");
+    const prId = rowOf("pr");
+    const since = Date.now();
+    const step = (label: string, detail: string, merge?: PrMerge) => {
+      setBusy({ kind: "working", label, since });
+      if (mainId) patch(mainId, { state: "working", detail });
+      if (onPr && merge) {
+        setPrMerge(merge);
+        if (prId) patch(prId, { state: "working", detail: merge === "checks" ? "Checks running" : "Bringing in the latest main" });
+      }
+    };
+    let t = 0;
+    if (at === "start") {
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `${who} merged into main · the PM is bringing it into this story (a merge, not a rebase)` });
+      step(`Developer is bringing in ${who}`, `Bringing in ${who} · merging main in, not rebasing`, "updating");
+      t += 1800;
+    }
+    if (clashes) {
+      later(t, () => step(`Developer is fitting in both sides of ${clashes} clashes`, `${clashes} clashes with ${who} · keeping both sides`, "conflict"));
+      t += 2200;
+    }
+    later(t, () => step("Tester is running the checks again", "Clashes settled · checks running", "checks"));
+    t += 2000;
+    later(t, () => {
+      updatingMain.current = false;
+      setBusy(null);
+      const now: MainState = { behind: [], checked: "just now", settled: clashes || undefined };
+      setMain(now);
+      if (mainId) patch(mainId, mainDetail(now));
+      const settled = clashes ? ` · ${clashes} clashes settled, both sides kept` : " · nothing clashed";
+      // GitHub refused the update: the work here is up to date, the pull request isn't. Stuck, never "ready".
+      if (onPr && refused) {
+        setPrMerge("blocked");
+        setUnsent(2);
+        if (prId) patch(prId, { state: "failed", detail: PR_DETAIL.blocked() });
+        add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Brought in ${who}${settled} · all checks passed · GitHub refused the update to pull request #${prNo}` });
+        say(`GitHub refused the update to pull request #${prNo}.`);
+        return;
+      }
+      if (onPr) {
+        setPrMerge("ready");
+        if (prId) patch(prId, { state: "done", detail: "Updated · ready to merge on GitHub" });
+      }
+      add({
+        kind: "stage",
+        id: nextId("stage"),
+        at: "Just now",
+        text: `Brought in ${who}${settled} · all checks passed${onPr ? ` · pull request #${prNo} updated` : ""}`,
+      });
+      say(`Up to date with main.${onPr ? ` Pull request #${prNo} updated.` : ""}`);
+    });
+  };
+
+  /** GitHub refused the update (CraftHQ can't write to it): reconnecting sends what's waiting, straight away. */
+  const sendToGitHub = () => {
+    const prId = rowOf("pr");
+    const n = Math.max(1, unsent);
+    setBusy({ kind: "working", label: `Sending ${n} ${n === 1 ? "update" : "updates"} to pull request #${prNo}`, since: Date.now() });
+    if (prId) patch(prId, { state: "working", detail: "Sending to GitHub" });
+    later(1800, () => {
+      setBusy(null);
+      setPrMerge("ready");
+      setUnsent(0);
+      if (prId) patch(prId, { state: "done", detail: "Updated · ready to merge on GitHub" });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `GitHub reconnected · pull request #${prNo} updated with ${n} ${n === 1 ? "update" : "updates"} · with ${mergerName} to merge` });
+      showToast(`Pull request #${prNo} updated.`);
+    });
+  };
+
+  // A story opened while main is being brought in (another story merged first): the update plays on from where it
+  // was, without anyone asking. The latest function is kept in a ref so the effect runs once, on open.
+  const resumeUpdate = useRef(() => {});
+  useEffect(() => {
+    resumeUpdate.current = () => updateFromMain({ at: story.pr?.merge === "conflict" ? "clashes" : "start" });
+  });
+  useEffect(() => {
+    if (!story.main?.behind.length || (story.status !== "pull_request" && story.status !== "in_review")) return;
+    const t = window.setTimeout(() => resumeUpdate.current(), 1200);
+    return () => window.clearTimeout(t);
+  }, [story]);
+
+  /**
+   * The one kind of clash that asks you: main removed or changed something this story needs (hq-35's decision #127:
+   * main replaced the Home events list its ETA button sat on). Both sides can't simply stay, so the PM stops, says
+   * what happened, and asks, with a recommendation and a default. Every other clash it settles itself.
+   */
+  const askAboutRemoval = () => {
+    const mainId = rowOf("main");
+    add({ kind: "stage", id: nextId("stage"), at: "Just now", text: "hq-5 merged into main · the PM is bringing it into this story (a merge, not a rebase)" });
+    setBusy({ kind: "working", label: "Developer is bringing in hq-5", since: Date.now() });
+    setMain((m) => ({ ...m, behind: [5], clashes: 0 }));
+    if (mainId) patch(mainId, { state: "working", detail: "Bringing in hq-5 · merging main in, not rebasing" });
+    later(2200, () => {
+      setBusy(null);
+      const id = nextId("question");
+      setMainQuestion(id);
+      if (mainId) patch(mainId, { state: "waiting", detail: "hq-5 removed something this story needs" });
+      setPrMerge("conflict");
+      move({ status: state.status, need: "decision", waitingOn: "You" });
+      add({
+        kind: "question",
+        id,
+        at: "Just now",
+        question:
+          "hq-5 replaced the Home events list with the real Home feed, and this story’s ETA button sat on that list. Both can’t stay. Where should the button go? With no answer by tomorrow, the first choice goes ahead.",
+        options: [
+          "On the event page, beside Check in, as the design shows (recommended)",
+          "A small events list back on Home, just for the button",
+          "Leave it for now: the pull request can’t be merged until this is settled",
+        ],
+      });
+      say("A question about main: hq-5 removed something this story needs.");
+    });
+  };
+
+  /** The answer to that question. Moving the button changes what the story does, so it's a rebuild, not upkeep. */
+  const answerRemoval = (option: number) => {
+    setMainQuestion(null);
+    if (option === 2) {
+      move({ status: state.status });
+      reply("Left as it is. The pull request stays behind main and can’t be merged until the button has a place. Say here when you want to settle it.");
+      return;
+    }
+    mainWithBuild.current = true;
+    setPrMerge("ready");
+    move({ status: state.status });
+    const mainId = rowOf("main");
+    if (mainId) patch(mainId, { state: "working", detail: "Bringing in hq-5 with the rebuild" });
+    runBuild(option === 0 ? "Answered by you · rebuild with the ETA button on the event page" : "Answered by you · rebuild with a small events list on Home");
+  };
+
+  /** "Does it clash with main?", "update the pr": where it stands, in plain words, and an update if main moved on. */
+  const answerAboutMain = () => {
+    if (prMerge === "blocked" && state.status === "pull_request") {
+      reply(
+        `Pull request #${prNo} isn’t updated: GitHub refused it, because CraftHQ can’t write to the repository. The work here is up to date with main (checked ${main.checked}), and ${unsent} ${unsent === 1 ? "update is" : "updates are"} waiting to be sent. Reconnect GitHub on the card below and they’re sent straight away.`,
+      );
+      return;
+    }
+    if (updatingMain.current) {
+      reply(`I’m bringing in ${refsOf(main.behind)} right now. It’s in Activity on the right, and this story stays where it is.`);
+      return;
+    }
+    if (main.behind.length) {
+      reply(
+        `${refsOf(main.behind)} merged into main since this story last took it in. I’m bringing it in now: a merge, not a rebase, on the same branch${pr === "open" ? ` and pull request #${prNo}` : ""}. Where both sides can stay, I keep both; I’ll ask you only if main removed something this story needs.`,
+      );
+      later(3000, () => updateFromMain());
+      return;
+    }
+    const mainId = rowOf("main");
+    if (mainId) patch(mainId, mainDetail({ ...main, checked: "just now", settled: undefined }));
+    setMain((m) => ({ ...m, checked: "just now" }));
+    reply(
+      state.status === "pull_request"
+        ? `Up to date with main (checked just now), and nothing clashes. Pull request #${prNo} on GitHub has this exact version, with ${mergerName} to merge.`
+        : "There’s no pull request yet. When you create it, it starts from this version, which is up to date with main (checked just now), with nothing clashing.",
+    );
+  };
+
   /** A job from a message: in the log and the chat while it works, then done, with the agent's reply. */
   const runTask = (task: Task, built: boolean) => {
     const id = nextId("act");
@@ -616,15 +808,61 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   };
 
   const ref = storyRef(story.id);
+  // What Story details shows: the why and detail as typed into New story, or, for a conversation written by hand, its
+  // first message as sent; the files with it; who wrote it and when.
+  const created = entries.find((e) => e.kind === "created");
+  const storyEntry = entries.find((e) => e.kind === "message" && e.author.kind === "person");
+  const brief: StoryBrief = {
+    ref,
+    title: story.title,
+    column: columnLabel(state.status),
+    why: story.why,
+    detail: story.detail,
+    ask:
+      !story.why && !story.detail && storyEntry?.kind === "message" && storyEntry.text && storyEntry.text.join("") !== titleOnlyAsk(story.title)
+        ? storyEntry.text
+        : undefined,
+    files: storyEntry?.kind === "message" ? storyEntry.files : undefined,
+    writtenBy: created?.kind === "created" ? (created.by.kind === "agent" ? "the agent" : created.by.name) : undefined,
+    writtenAt: created?.at,
+    owner: ownerName,
+    source: facts.source,
+    repository: facts.repository,
+  };
+  // A long story shows in the chat as its "why" and a card that opens Story details (Shubham, 26 Nov).
+  const card = storyEntry ? storyCardFor(brief) : null;
+  const storyCard = card && storyEntry ? { entryId: storyEntry.id, ...card } : undefined;
   const actions = {
-    // Accepting is the person's: merge the pull request, then mark the story Done (statuses guide §5).
+    // Done from In review: there was nothing to merge. A story with code is done when its pull request is merged.
     accept: () => {
       withUndo(`${ref} marked Done.`);
       move({ status: "done" });
-      setPr("merged");
-      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Pull request #${prNo} merged · marked Done by you` });
-      log({ kind: "pr", title: `Pull request #${prNo}`, state: "done", detail: "Merged into main" });
-      log({ kind: "stage", title: "Marked Done by you", state: "info", detail: "", move: { from: "In review", to: "Done" } });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: "Marked Done by you · nothing to merge" });
+      log({ kind: "stage", title: "Marked Done by you", state: "info", detail: "", move: { from: columnLabel(state.status), to: "Done" } });
+    },
+    // The review is done: the PM opens the pull request on GitHub (or updates the open one), and it goes to the one
+    // person with GitHub access to check and merge. Robots never merge.
+    createPr: () => {
+      const updating = pr === "open";
+      const number = pr === "merged" || pr === "closed" ? prNo + 1 : prNo;
+      withUndo(`Pull request #${number} ${updating ? "updated" : "created"}. It’s with ${mergerFirst} to check and merge.`);
+      setPr("open");
+      setPrNo(number);
+      setPrMerge("ready");
+      setUnsent(0);
+      move({ status: "pull_request" });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Pull request ${updating ? "updated" : "created"} by you · the PM ${updating ? "updated" : "opened"} #${number} on GitHub, with ${mergerName} to merge` });
+      log({ kind: "pr", title: `Pull request #${number}`, state: "done", detail: `Ready to merge · with ${mergerFirst}` });
+      log({ kind: "stage", title: updating ? "Pull request updated by you" : "Pull request created by you", state: "info", detail: "", move: { from: "In review", to: "Pull request" } });
+    },
+    // Not merging after all: the pull request closes on GitHub and the story is closed, not merged.
+    close: () => {
+      withUndo(`Pull request #${prNo} closed without merging. ${ref} is closed.`);
+      setPr("closed");
+      move({ status: "done" });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Pull request #${prNo} closed without merging, by you` });
+      log({ kind: "pr", title: `Pull request #${prNo}`, state: "done", detail: "Closed without merging" });
+      log({ kind: "stage", title: "Closed by you", state: "info", detail: "", move: { from: "Pull request", to: "Done" } });
     },
     approve: () => {
       withUndo(`${ref} approved. Builder starts building when it picks it up.`);
@@ -633,7 +871,8 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     },
     defaults: () => {
       withUndo(`Defaults kept for ${ref}, and it’s approved.`);
-      setEntries((es) => es.map((e) => (e.kind === "question" && !e.answer ? { ...e, answer: { option: 0, by: "Default", at: "Just now" }, fresh: true } : e)));
+      // Each open question takes what it said happens with no answer (its fallback), else its first option.
+      setEntries((es) => es.map((e) => (e.kind === "question" && !e.answer ? { ...e, answer: { option: e.fallback?.option ?? 0, by: "Default", at: "Just now" }, fresh: true } : e)));
       settlePlan();
       runBuild("Defaults kept · plan approved by you");
     },
@@ -666,14 +905,35 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       add({ kind: "stage", id: nextId("stage"), at: "Just now", text: "Cancelled by you" });
       log({ kind: "stage", title: "Cancelled by you", state: "info", detail: "", move: { from: columnLabel(state.status), to: "Cancelled" } });
     },
-    // These hand over to the message box.
+    // Not yours to decide: the decision goes to a teammate, and the story is paused for you until they act or you take
+    // it back. Only the turn moves; the owner stays.
+    handoff: (initials: string) => {
+      const p = data.people.find((x) => x.initials === initials);
+      const what = state.need ? HANDOFF[state.need] : undefined;
+      if (!p || !state.need || !what) return;
+      withUndo(`${ref} sent to ${p.name}. It’s paused for you until ${firstName(p)} ${what.until}.`);
+      setHandoff({ name: p.name, initials: p.initials, need: state.need });
+      move({ ...state, waitingOn: p.name });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Sent to ${p.name} by you, to ${what.to}` });
+      log({ kind: "stage", title: `Sent to ${p.name}`, state: "info", detail: `To ${what.to}. Paused for you until then.` });
+    },
+    takeBack: () => {
+      if (!handedTo) return;
+      setHandoff(null);
+      move({ ...state, waitingOn: "You" });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Taken back from ${handedTo.name} by you` });
+      log({ kind: "stage", title: `Taken back from ${handedTo.name}`, state: "info", detail: "It’s your decision again." });
+      dropUndo(); // the send's Undo would only do the same now
+      showToast(`${ref} is back with you.`);
+    },
+    // These hand over to the message box, which comes back in the decision's place.
     changes: () => {
       setRebuild(true);
-      requestAnimationFrame(focusComposer);
+      writeFirst();
     },
     write: () => {
       setRebuild(false);
-      requestAnimationFrame(focusComposer);
+      writeFirst();
     },
   };
 
@@ -730,6 +990,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     setBanner(null);
     setAtBottom(false);
     setHighlight(id);
+    holdScroll.current = Date.now() + 1200;
     requestAnimationFrame(() => document.querySelector(`[data-entry="${id}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }));
   };
 
@@ -745,12 +1006,15 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   // The decision's buttons, each checked when pressed (closures, so nothing runs while the page renders).
   const act = {
     accept: () => guard("mark it Done", actions.accept),
+    createPr: () => guard("create the pull request", actions.createPr),
     approve: () => guard("approve it", actions.approve),
     defaults: () => guard("approve it", actions.defaults),
     restart: () => guard("start it again", actions.restart),
     plan: () => guard("move it to Planning", actions.plan),
     cancel: () => guard("cancel it", actions.cancel),
     changes: () => guard("ask for changes", actions.changes),
+    handoff: (initials: string) => guard("send it on", () => actions.handoff(initials)),
+    takeBack: () => guard("take it back", actions.takeBack),
   };
 
   /** A choice in the ⋯ menu. Refused (with the reason, shown in the menu) when a teammate moved it first;
@@ -765,11 +1029,13 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     }
     stopAgent();
     if (to === "cancelled") actions.cancel();
+    else if (to === "pull_request") actions.createPr();
+    else if (to === "close") actions.close();
     else if (to === "done") actions.accept();
     else if (to === "planning") actions.plan();
     // Approved: build, rebuild, reopen or try again, depending on where the story is.
     else if (state.status === "new" || state.status === "planning") actions.approve();
-    else if (state.status === "in_review") {
+    else if (state.status === "in_review" || state.status === "pull_request") {
       withUndo(`${ref} sent back to build. Builder rebuilds with your notes, then Checker checks it again.`);
       runBuild("Approved again by you · rebuild with your notes");
     } else if (state.status === "done" || state.status === "cancelled") {
@@ -796,26 +1062,39 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     showToast(`${ref} cancelled. The build was stopped.`);
   };
 
+  // Who a decision can be sent to: everyone on the team but you.
+  const teammates = data.people.filter((p) => p.id !== data.viewer.id);
   // "Needs your OK": what's waiting on the viewer, as the conversation's last card.
   const ask: AskCard | null = busy
     ? null
     : state.need === "stuck"
       ? {
           label: "Stopped",
+          tone: "stuck",
           title: "The preview couldn’t start",
           meta: "Approve it again for a new build from the story as it is now, or write a note.",
           primary: { label: "Try again", onClick: act.restart },
         }
+      : state.status === "pull_request" && prMerge === "blocked"
+        ? {
+            label: "Stuck",
+            tone: "stuck",
+            title: `Couldn’t update pull request #${prNo}`,
+            meta: `GitHub refused it: CraftHQ can’t write to the repository. ${unsent} ${unsent === 1 ? "update is" : "updates are"} saved here (the latest main brought in, checks passed), but GitHub still shows the older version. Reconnect GitHub with write access and they’re sent straight away.`,
+            primary: { label: "Reconnect GitHub", onClick: sendToGitHub },
+          }
       : !isYours(state)
         ? null
         : state.need === "review"
           ? {
               label: "Needs your OK",
               title: `${story.title} · ready for review`,
-              meta: `${facts.checks.line} · verified by Checker. Merge pull request #${prNo} first: robots never merge.`,
-              move: { from: "In review", to: "Done" },
-              primary: { label: "Mark as Done", onClick: act.accept },
+              // Anyone on the story can review; the pull request goes to the one person with GitHub access.
+              meta: `${facts.checks.line} · verified by Checker. Try the preview; when it’s right, ${pr === "open" ? `update pull request #${prNo}` : "create the pull request"} and ${mergerName === "you" ? "you merge it" : `${mergerFirst} merges it`} on GitHub.`,
+              move: { from: "In review", to: "Pull request" },
+              primary: { label: pr === "open" ? "Update pull request" : "Create pull request", onClick: act.createPr },
               secondary: { label: "Ask for changes", onClick: act.changes },
+              handoff: { people: teammates, onSend: act.handoff },
             }
           : state.need === "planning"
             ? {
@@ -825,6 +1104,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                 move: { from: "Planning", to: "Approved" },
                 primary: { label: "Approve and build", onClick: act.approve },
                 secondary: { label: "Ask a question", onClick: actions.write },
+                handoff: { people: teammates, onSend: act.handoff },
               }
             : state.need === "decision"
               ? null // the question card itself is the ask, with "Let the defaults stand" beside its button
@@ -836,11 +1116,25 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                     secondary: { label: "Cancel story", onClick: act.cancel },
                   }
                 : { label: "Needs direction", title: "No step applies right now", meta: "Tell the agent what to do next.", secondary: { label: "Write to the agent", onClick: actions.write } };
+  // While a decision waits on you (the card above, or the agent's open question), it takes the message box's place, so
+  // nothing is typed past it (Shubham, 26 Nov). Writing first is a choice: "Ask something first", "Ask for changes".
+  const openQuestion =
+    !busy && state.need === "decision" ? entries.find((e): e is Extract<ThreadEntry, { kind: "question" }> => e.kind === "question" && !e.answer) : undefined;
+  const decisionKey = handedTo ? null : ask ? `ask:${ask.label}:${ask.title}` : openQuestion ? `question:${openQuestion.id}` : null;
+  const docked = decisionKey !== null && writingFor !== decisionKey;
+  function writeFirst() {
+    setWritingFor(decisionKey);
+    requestAnimationFrame(focusComposer);
+  }
+  const skipQuestion = state.need === "decision" && !busy ? (mainQuestion ? () => answer(mainQuestion, 0) : act.defaults) : undefined;
+
   // A refused button: the reason replaces the card's buttons, with a way to catch up.
   const askRefusal: AskRefusal | undefined = refusal ? { text: refusal, fix: { label: "See the change", onClick: catchUp } } : undefined;
 
   const send = ({ text, files: attached, rebuild: andRebuild }: { text: Segment[]; files: FileRef[]; rebuild: boolean }) => {
     setAtBottom(true);
+    // Written, so a decision still waiting docks again.
+    setWritingFor(null);
     // This chat is the robots'. People talk in Team (in Messages), so nothing written here goes to a person.
     add({ kind: "message", id: nextId("me"), at: "Just now", author: me, text: text.length ? text : undefined, files: attached });
     // A closed story keeps the note, but the agent doesn't answer it (statuses guide §6).
@@ -865,9 +1159,14 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       runBuild("Approved again by you · rebuild with your note");
       return;
     }
-    // Asked for a page edit, screenshots, markup or a preview: the agent does it, and the log shows it live.
     const words = text.map((seg) => (typeof seg === "string" ? seg : seg.type === "person" ? seg.name : seg.type === "agent" ? "agent" : `hq-${seg.id}`)).join(" ");
-    const built = state.status === "in_review";
+    const built = state.status === "in_review" || state.status === "pull_request";
+    // About main or the pull request: answered where the story is, never bounced to Approved.
+    if (built && ABOUT_MAIN.test(words)) {
+      answerAboutMain();
+      return;
+    }
+    // Asked for a page edit, screenshots, markup or a preview: the agent does it, and the log shows it live.
     const task = taskFor(words, story, built);
     if (task) {
       runTask(task, built);
@@ -879,17 +1178,23 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       return;
     }
     reply(
-      state.status === "in_review"
-        ? "Thanks, I’ve read it. A note in review never changes the code. To have it built, switch on “Rebuild after sending” and send it again, or choose Approved in the status menu."
+      state.status === "in_review" || state.status === "pull_request"
+        ? "Thanks, I’ve read it. A note here never changes the code. To have it built, switch on “Rebuild after sending” and send it again, or choose Approved in the status menu."
         : state.need === "stuck"
           ? "Thanks, noted. To build again with it, choose Try again: a new build reads the story as it is now."
           : "Thanks, noted. I’ll take it into account and reply here if I need anything from you.",
     );
   };
 
-  const answer = (entryId: string, option: number) => {
-    const updated = entries.map((e) => (e.id === entryId && e.kind === "question" ? { ...e, answer: { option, by: data.viewer.name, at: "Just now" }, fresh: true } : e));
+  const answer = (entryId: string, option: number, text?: string) => {
+    const updated = entries.map((e) =>
+      e.id === entryId && e.kind === "question" ? { ...e, answer: { option, by: data.viewer.name, at: "Just now", ...(text ? { text } : {}) }, fresh: true } : e,
+    );
     setEntries(updated);
+    if (entryId === mainQuestion) {
+      answerRemoval(option);
+      return;
+    }
     if (state.need === "decision" && !updated.some((e) => e.kind === "question" && !e.answer)) {
       move({ status: "planning" });
       setActivity((a) => a.map((x): ActivityItem => (x.kind === "spec" && x.state === "waiting" ? { ...x, state: "done", detail: "Questions answered" } : x)));
@@ -905,11 +1210,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   };
 
 
-  // Waiting on a teammate: one tap opens Team with a nudge written for them, which reaches them in Messages.
-  const waitingOn = !busy && state.need && !isYours(state) ? data.people.find((p) => p.name === state.waitingOn && p.id !== data.viewer.id) : undefined;
-  // Once you've written to them in Team in the last day, the nudge steps back.
-  const nudged = waitingOn && storyMessages.some((m) => m.from === data.viewer.id && m.to.includes(waitingOn.id) && m.at > openedAt - 86_400_000);
-  const nudge = waitingOn && !nudged && NUDGE[state.need!] ? `@${firstName(waitingOn)} ${NUDGE[state.need!]}` : null;
   const suggestions = busy
     ? []
     : isYours(state) && state.need
@@ -917,22 +1217,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       : working
         ? (SUGGESTIONS.working ?? [])
         : [];
-  // At most one Team chip, beside the faces in the header: a request waiting on you first, then one waiting on them,
-  // then a nudge for whoever the story waits on. Each opens Team.
-  const teamChip =
-    waitingOnMe.length > 0 ? (
-      <TeamChip
-        person={waitingOnMe[0]}
-        text={`${names(waitingOnMe.map(firstName))} ${waitingOnMe.length === 1 ? "is" : "are"} waiting on you`}
-        onYou
-        onClick={() => openTeam()}
-      />
-    ) : waitingOnThem.length > 0 ? (
-      <TeamChip person={waitingOnThem[0]} text={`Waiting on ${names(waitingOnThem.map(firstName))}`} onClick={() => openTeam()} />
-    ) : nudge && waitingOn ? (
-      <TeamChip icon={<BellRing aria-hidden="true" size={14} strokeWidth={1.75} />} text={`Nudge ${firstName(waitingOn)}`} onClick={() => openTeam(nudge)} />
-    ) : null;
-
   // The line above the message box: what a note does from here. A note is a conversation; a status is an instruction.
   const noteHint = (() => {
     if (job === "starting") return "Approved. A note written now may only reach the next build, so write notes before approving.";
@@ -947,15 +1231,169 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         return "The agent reads a note after this round. It won’t change the work under way.";
       case "in_review":
         return busy ? "A note in review gets a reply and never changes the code." : undefined; // the Rebuild switch says it
+      case "pull_request":
+        return busy ? "A note gets a reply and never changes the pull request." : undefined; // the Rebuild switch says it
       default:
-        return "This story is closed, so the agent won’t answer. To talk about it with your team, use Team.";
+        return "This story is closed, so the agent won’t answer. To talk about it with your team, use Messages.";
     }
   })();
+
+  // hq-35's demo (Shubham, 26 Nov): the live story's 17–25 Nov, replayed and handled the new way, one step at a time.
+  const demoSteps: MainDemoStep[] = [
+    {
+      label: "You review it: “all good, update the PR”",
+      live: "Live: Aakash wrote “all good pls update the pr”. Here it’s one button on the card.",
+      run: () => {
+        setDemoAt(1);
+        act.createPr();
+      },
+    },
+    {
+      label: "hq-8 and hq-12 merge into main",
+      live: "Live: Aakash asked “does it clash with main?” again and again, and got 37, 13, none and 21.",
+      run: () => {
+        setDemoAt(2);
+        updateFromMain({ behind: [8, 12], clashes: 13 });
+      },
+    },
+    {
+      label: "You ask: “does it clash with main?”",
+      live: "Live: “This story is in review, move it back to Approved”, four times.",
+      run: () => {
+        setDemoAt(3);
+        send({ text: ["does it clash with main?"], files: [], rebuild: false });
+      },
+    },
+    {
+      label: "hq-1 merges, and GitHub refuses the update",
+      live: "Live: “Ready for your review”, while PR #38 never changed.",
+      run: () => {
+        setDemoAt(4);
+        updateFromMain({ behind: [1], clashes: 0, refused: true });
+      },
+    },
+    {
+      label: "hq-5 merges and removes the Home events list",
+      live: "Live: decision #127. The PM asks only when main changes what the story needs.",
+      run: () => {
+        setDemoAt(5);
+        askAboutRemoval();
+      },
+    },
+  ];
+  const demoWait = busy
+    ? "Watch the chat and Activity…"
+    : prMerge === "blocked" && state.status === "pull_request"
+      ? "Press Reconnect GitHub on the card first."
+      : mainQuestion
+        ? "Answer the question in the chat."
+        : job
+          ? "Wait for the rebuild to finish."
+          : undefined;
 
   // For the activity column: what the viewer has to decide now (its evidence says "Waiting on you"), and a
   // preview that's starting or running, whose Stop must always be on a sharp surface.
   const yours = !busy && isYours(state) ? state.need : undefined;
   const runningPreview = livePreview(activity);
+  // The status moves, for ⋯ and the Status section: an open pull request's move reads "Update pull request #N", and
+  // with a teammate it's paused for you, Cancel too (it's on while a robot builds, but not here).
+  const statusMoveList = statusMoves(state.status, state.need === "stuck")
+    .map((mv) => (mv.move === "pull_request" && pr === "open" ? { ...mv, label: `Update pull request #${prNo}` } : mv))
+    .filter((mv) => !handedTo || mv.move !== "cancelled");
+  // What the agent suggests doing now: the decision card's main button, when it's your turn.
+  const suggestedMove: StatusMove | undefined =
+    busy || !isYours(state)
+      ? undefined
+      : state.need === "planning" || state.need === "stuck"
+        ? "approved"
+        : state.need === "review"
+          ? "pull_request"
+          : state.need === "triage"
+            ? "planning"
+            : undefined;
+  // The Status section, first on the right (Shubham, 26 Nov): the five stages, where the story is, and the moves.
+  // The Status tab's picker (Shubham, 26 Nov: "users are used to changing the status"): whose turn it is, said in the
+  // box; what's under way, under the status; and what a note does now.
+  const turn: Turn =
+    state.need === "stuck"
+      ? { kind: "stuck" }
+      : isYours(state)
+        ? { kind: "you" }
+        : state.need && state.waitingOn
+          ? { kind: "other", name: state.waitingOn.split(" ")[0] }
+          : // Waiting to be merged: the status line already says "With Deepak" then (not while the robots update it).
+            state.status === "pull_request" && status.turn
+            ? { kind: "other", name: mergerFirst }
+            : working || job === "building" || job === "verifying"
+              ? { kind: "working" }
+              : { kind: "none" };
+  const pickerDetail =
+    // A finished story says how it ended; otherwise what's happening, or what the stage is waiting for.
+    state.status === "done"
+      ? pr === "merged"
+        ? "Merged into main"
+        : pr === "closed"
+          ? "Closed, not merged"
+          : "Nothing to merge"
+      : state.status === "cancelled"
+        ? "Nothing more will happen"
+        : state.need === "stuck"
+          ? "The preview couldn’t start" // the tag already says Stopped
+          : state.status === "approved" && !job
+            ? "Builder picks it up next" // the box already says Queued
+            : (status.detail ??
+          (state.need === "planning"
+            ? "The plan is ready to read"
+            : state.need === "decision"
+              ? "Questions to answer before the plan"
+              : state.need === "review"
+                ? "Built and checked · try the preview"
+                : state.need === "triage"
+                  ? "Plan it, or cancel it"
+                  : state.status === "new"
+                    ? "Not planned yet"
+                    : undefined));
+  // No "what a note does" line in Status (Shubham, 26 Nov: not under the box, not here); the composer keeps it for screen
+  // readers only.
+  // ---- Decisions (Shubham, 26 Nov): kept for good, so a misunderstanding or a debate can be settled. People make
+  // them directly (answers, approvals, messages saved as decisions); nothing here waits on an agent. ----
+  const decisions = decisionsFrom(entries, savedDecisions, data.viewer.name);
+  const savedIds = new Set(savedDecisions.flatMap((d) => (d.entryId && !d.replaces ? [d.entryId] : [])));
+  const openQuestions = entries.flatMap((e) => (e.kind === "question" && !e.answer ? [{ id: e.id, question: e.question }] : []));
+  const inChat = (id: string) => entries.some((e) => e.id === id);
+  /** "See in chat": the chat scrolls to the entry and tints it. An open question waiting in the message box's place
+   *  isn't in the chat itself, so it goes to the foot, where the question is. */
+  const seeEntry = (id: string) => {
+    setCornerOpen(false);
+    setHighlight(undefined);
+    requestAnimationFrame(() => {
+      setHighlight(id);
+      const el = document.querySelector(`[data-entry="${id}"]`);
+      if (el) {
+        holdScroll.current = Date.now() + 1200;
+        setAtBottom(false);
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      } else {
+        setAtBottom(true);
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+      }
+    });
+  };
+  const saveDecision = (entryId: string, text: string, from: string) => {
+    const id = nextId("decision");
+    addDecision(story.id, { id, kind: "saved", text, by: data.viewer.name, at: "Today", ts: Date.now(), entryId, from });
+    showToast("Saved as a decision. It’s listed on the right, for good.", { label: "Undo", run: () => removeDecision(story.id, id) });
+  };
+  const changeDecision = (d: Decision, text: string) => {
+    const id = nextId("decision");
+    addDecision(story.id, { id, kind: "saved", text, by: data.viewer.name, at: "Today", ts: Date.now(), entryId: d.entryId, question: d.question, replaces: d.id });
+    showToast("Decision changed. The old one stays, crossed out.", { label: "Undo", run: () => removeDecision(story.id, id) });
+  };
+  const decisionsPanel = <StoryDecisions decisions={decisions} open={openQuestions} onSee={seeEntry} inChat={inChat} onChange={changeDecision} />;
+  // Everything attached in the chat, for Files; a file opens the message it came with.
+  const chatFiles: ChatFile[] = entries.flatMap((e) => (e.kind === "message" && e.files ? e.files.map((file, i) => ({ key: `${e.id}-${i}`, entryId: e.id, file })) : []));
+  const stageKey = COLUMNS.find((c) => c.statuses.includes(state.status))?.key ?? "done";
+
   const rail = (withHeader: boolean) => (
     <StoryRail
       withHeader={withHeader}
@@ -965,27 +1403,134 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       epoch={epoch}
       preview={preview}
       onSoon={(m) => showToast(m)}
+      stage={stageKey}
+    />
+  );
+  // The story's own files: the chat goes to its first message, where they are.
+  const storyEntryId = storyEntry?.id;
+  const seeStoryFiles = () => {
+    if (storyEntryId) seeEntry(storyEntryId);
+  };
+  const changeTab = (t: PanelTab) => {
+    setTab(t);
+    const url = new URL(window.location.href);
+    if (t === "status") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", t);
+    window.history.replaceState(window.history.state, "", url);
+  };
+  /** A decision's "Read more in the plan": the Work tab, where the plan is, wherever the tabs are at this width. */
+  const openWork = () => {
+    changeTab("work");
+    if (window.matchMedia("(min-width: 768px) and (max-width: 1023.98px)").matches) setCornerOpen(true);
+    else if (window.matchMedia("(max-width: 767.98px)").matches) {
+      const fold = document.querySelector<HTMLDetailsElement>('[data-tour="fold"]');
+      if (fold) {
+        fold.open = true;
+        fold.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
+    }
+  };
+  // Work: what's running and what was made, then the files attached after the story was written (the story's own files
+  // are in the Story tab).
+  const workFiles = chatFiles.filter((f) => f.entryId !== storyEntry?.id);
+  const workEmpty = nowOf(activity).length === 0 && readyOf(activity).length === 0 && workFiles.length === 0;
+  // A tab shows once it has something in it: Story when more than the title was written (or files came with it), Work
+  // once something is made or under way. A link to a tab that isn't there opens Status.
+  const storyWritten = Boolean(brief.why || brief.detail || (brief.ask && brief.ask.length > 0) || (brief.files && brief.files.length > 0));
+  const shownTabs: PanelTab[] = ["status", ...(storyWritten ? (["story"] as const) : []), ...(workEmpty ? [] : (["work"] as const)), "history"];
+  const openTab: PanelTab = shownTabs.includes(tab) ? tab : "status";
+  // A tab you're not on says when it needs you, or while something is being made there.
+  const tabDots: Partial<Record<PanelTab, "yours" | "busy">> = {
+    status: yours ? "yours" : undefined,
+    work: anyWorking(activity) ? "busy" : undefined,
+  };
+  // The right-hand side in tabs (Shubham, 26 Nov): Status · Story · Work · History. `inCard`: the desktop card, with
+  // its own padding; the tablet card and the phone fold bring theirs.
+  const panelTabs = (inCard: boolean) => (
+    <PanelTabs
+      tab={openTab}
+      shown={shownTabs}
+      onTab={changeTab}
+      dots={tabDots}
+      // The desktop card's tab row is as tall as the chat's header (56 px), the pills centred in it, so the two line up.
+      listClassName={inCard ? "flex h-14 items-center px-4 [&>*]:w-full" : ""}
+      bodyClassName={inCard ? "px-4 pt-4 pb-4" : "pt-4"}
+      content={{
+        status: (
+          // Today's status, then what's been decided (Shubham, 26 Nov: both, the first thing you see).
+          <div className="flex flex-col gap-6 px-1">
+            <StatusPicker
+              status={state.status}
+              need={state.need}
+              turn={turn}
+              detail={pickerDetail}
+              dot={status.dot}
+              moves={statusMoveList}
+              // Not twice: while the decision is showing in the chat, the chat holds its button.
+              suggested={docked ? undefined : suggestedMove}
+              suggestedLabel={ask?.primary?.label}
+              locked={locked}
+              merger={mergerFirst === "you" ? "You" : mergerFirst}
+              onMove={changeStatus}
+              onGuide={() => setGuideOpen(true)}
+            />
+            <div className="border-t border-[var(--line)] pt-4">{decisionsPanel}</div>
+          </div>
+        ),
+        story: (
+          <div className="px-1">
+            <StoryOverview brief={brief} onReadAll={() => setDetailsOpen(true)} onSeeFiles={seeStoryFiles} />
+          </div>
+        ),
+        work: workEmpty ? (
+          <p className="m-0 px-1 text-sm text-pretty text-[var(--tx2)]">Nothing made yet. The plan, the preview and the code show here as they’re made.</p>
+        ) : (
+          // No side padding of its own: the rows reach the card's edges as before, so the Preview line keeps one row.
+          <div className="flex flex-col gap-6">
+            {rail(false)}
+            <FilesSection files={workFiles} onOpen={seeEntry} />
+          </div>
+        ),
+        history: (
+          <div className="px-1">
+            <HistoryList entries={entries} onSee={seeEntry} />
+          </div>
+        ),
+      }}
+    />
+  );
+  // The way back and ⋯ (one of each: they sit over the chat below 1024 px and at the top of the right-hand side from it).
+  const backLink = (
+    <Tip label="All stories">
+      <a href="/stories" aria-label="All stories" className={`${ICON_BTN} -ml-2`}>
+        <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.75} />
+      </a>
+    </Tip>
+  );
+  const moreMenu = (
+    // ⋯ (DESIGN.md §4.5): Story details, Previous, Next and Copy link, then the status moves. The everyday next step is
+    // the chat's decision.
+    <StatusMenu
+      links={[
+        { label: "Story details", icon: FileText, onSelect: () => setDetailsOpen(true) },
+        { label: smart ? "Previous that needs you" : "Previous story", icon: ChevronLeft, hint: prev ? storyRef(prev.id) : undefined, disabled: !prev, onSelect: () => prev && window.location.assign(`/stories/${storyRef(prev.id)}`) },
+        { label: smart ? "Next that needs you" : "Next story", icon: ChevronRight, hint: next ? storyRef(next.id) : undefined, disabled: !next, onSelect: () => next && window.location.assign(`/stories/${storyRef(next.id)}`) },
+        { label: "Copy link", icon: LinkIcon, onSelect: copyLink },
+      ]}
+      moves={statusMoveList}
+      locked={locked}
+      onMove={changeStatus}
+      onCatchUp={catchUp}
+      storyLabel={ref}
     />
   );
 
-  const navCurrent = {
-    id: story.id,
-    title: story.title,
-    status: state.status,
-    need: state.need,
-    waitingOn: state.waitingOn,
-    meta: story.meta,
-    outcome: story.outcome,
-    pr: pr === "none" ? undefined : { state: pr, number: prNo },
-    updated: story.updated,
-  };
 
   return (
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
       {/* Desktop: Ask PM's frame (Shubham, 25 Nov). A soft wash behind floating cards, cool at the top left and warm at
-          the bottom right; the chat with the agent is the main card and fills the rest of the screen (23 Nov). The
-          stories list can open on the left as a card of its own (1280 px and wider, from the header's first button).
-          The activity is always in view from 1024 px, a card on the right like Ask's side panel (Shubham, 25 Nov: "don't
+          the bottom right; the chat with the agent is the main card and fills the rest of the screen (23 Nov). No
+          stories list beside it (Shubham, 26 Nov): ← goes to the board, and ⋯ has Previous and Next. The activity is always in view from 1024 px, a card on the right like Ask's side panel (Shubham, 25 Nov: "don't
           hide it"); at 768–1023 px it opens from the icon in the header's corner, over the chat. The chat scrolls on
           its own, and the message box stays pinned under the conversation. `relative` makes the frame hold everything
           absolutely positioned inside it (screen-reader text too), so nothing can stretch the page past the window.
@@ -998,91 +1543,66 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         <p role="status" className="sr-only">
           {said}
         </p>
-        <StoryNav stories={data.queue} current={navCurrent} />
         {/* The builder: the conversation where the story is planned, built and changed. */}
-        <div className="px-4 pt-4 pb-6 md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col md:overflow-hidden md:rounded-[24px] md:bg-white md:p-0 md:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] md:ring-1 md:ring-black/[0.04]">
+        <div className="px-4 pt-4 pb-6 md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col md:overflow-hidden md:rounded-[24px] md:bg-white md:p-0 md:ring-1 md:ring-black/[0.06]">
           {/* One quiet row across the top of the card, like Ask PM's title row (Shubham, 25 Nov: simpler): the way back,
-              the story's name with its ID and its status (said once, here), then the people on it and ⋯, which also holds
-              Previous, Next and Copy link. Phones: the way back, the status and the buttons, then the name on its own row. */}
+              the story's name with its ID and its status (said once, here), then ⋯, which also holds Previous, Next and
+              Copy link. Phones: the way back, the status and the buttons, then the name on its own row. */}
+          {/* One quiet row across the top of the chat (Shubham, 26 Nov: the story's name, ID and status stay here, over
+              the chat, at every width): the way back, the name with its ID and status, then ⋯. Phones: the way back, the
+              status and ⋯, then the name on its own row. */}
           <header className="flex flex-none flex-wrap items-center gap-x-2 gap-y-1.5 md:px-5 md:py-3 lg:h-14 lg:flex-nowrap lg:py-0">
-            <StoryNavToggle />
-            <Tip label="All stories">
-              <a href="/stories" aria-label="All stories" className={`${ICON_BTN} max-xl:-ml-2`}>
-                <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.75} />
-              </a>
-            </Tip>
-            <h1
-              title={story.title}
-              className="order-3 m-0 basis-full text-[20px] leading-7 font-semibold tracking-[-0.015em] text-[var(--tx)] lg:order-none lg:min-w-0 lg:basis-auto lg:truncate lg:text-[15px] lg:leading-5 lg:font-medium lg:tracking-normal"
-            >
-              {story.title}
+            {backLink}
+            {/* The name opens Story details: the title in full and everything that was written (Shubham, 26 Nov). */}
+            <h1 className="order-3 m-0 flex min-w-0 basis-full text-xl font-semibold tracking-title text-[var(--tx)] lg:order-none lg:basis-auto">
+              {/* The full name stays in the tooltip, as wherever a title is cut (DESIGN.md §3.2). */}
+              <Tip
+                side="bottom"
+                label={
+                  <>
+                    {story.title}
+                    <span className="mt-0.5 block text-white/70">Open story details</span>
+                  </>
+                }
+              >
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setDetailsOpen(true)}
+                  className="min-w-0 rounded-[6px] text-left decoration-black/25 underline-offset-[3px] hover:underline lg:truncate"
+                >
+                  {story.title}
+                </button>
+              </Tip>
             </h1>
-            <span className="flex-none text-[13px] leading-[18px] text-[var(--tx2)] tabular-nums">{ref}</span>
+            <span className="inline-flex h-5 flex-none items-center rounded-md bg-field px-1.5 font-mono text-xs text-[var(--tx2)]">{ref}</span>
             <StatusBadge status={state.status} detail={status.detail ?? status.turn} dot={status.dot} />
             <span aria-hidden="true" className="hidden flex-1 lg:block" />
             <span className="ml-auto flex flex-none items-center gap-1 lg:ml-0">
-              {teamChip}
-              {/* Who's on the story (DESIGN.md §4.5: a facepile of members on the right); a teammate here now has a
-                  green dot. Clicking the faces opens Team. */}
-              <TeamButton
-                people={present && teammate && !members.some((m) => m.id === teammate.id) ? [teammate, ...members] : members}
-                viewerId={data.viewer.id}
-                present={present && teammate ? { id: teammate.id, note: `${mateFirst} is here · ${DOING[state.status]}` } : undefined}
-                unread={teamUnread}
-                open={teamOpen}
-                onOpen={() => (teamOpen ? closeTeam() : openTeam())}
-                about={(p) =>
-                  [
-                    p.initials === ownerInitials ? "Owner" : null,
-                    created?.kind === "created" && created.by.kind === "person" && created.by.initials === p.initials ? "Wrote this story" : null,
-                    teamPeople.some((t) => t.id === p.id) ? "In Team" : null,
-                    present && teammate?.id === p.id ? "Here now" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                }
-                onMention={(p) => openTeam(`@${p.name.split(" ")[0]} `)}
-                onMessage={messagePrivately}
-              />
-              {/* ⋯ (DESIGN.md §4.5): Previous, Next and Copy link, then the status moves. The everyday next step is the
-                  chat's decision. */}
-              <StatusMenu
-                links={[
-                  { label: "Previous story", icon: ChevronLeft, hint: prev ? storyRef(prev.id) : undefined, disabled: !prev, onSelect: () => prev && window.location.assign(`/stories/${storyRef(prev.id)}`) },
-                  { label: "Next story", icon: ChevronRight, hint: next ? storyRef(next.id) : undefined, disabled: !next, onSelect: () => next && window.location.assign(`/stories/${storyRef(next.id)}`) },
-                  { label: "Copy link", icon: LinkIcon, onSelect: copyLink },
-                ]}
-                moves={statusMoves(state.status, state.need === "stuck")}
-                locked={locked}
-                onMove={changeStatus}
-                onCatchUp={catchUp}
-                storyLabel={ref}
-              />
-              {/* 768–1023 px, where there's no room for the activity card beside the chat: one icon in the corner that
-                  lights up while something is happening and opens into the activity, over the chat. */}
+              {moreMenu}
+              {/* 768–1023 px, where there's no room for the card beside the chat: one icon in the corner that lights up
+                  while something is happening and opens into the same tabs, over the chat. */}
               <span className="ml-1 flex max-md:hidden lg:hidden">
                 <ActivityCorner
                   items={activity}
                   yours={yours}
                   open={cornerOpen}
-                  onOpenChange={(open) => {
-                    setCornerOpen(open);
-                    if (!open) setTeamOpen(false);
-                  }}
-                  title={tabs(true)}
+                  onOpenChange={setCornerOpen}
                 >
-                  {teamOpen ? teamBody(true, "h-[min(520px,calc(100dvh-var(--bar-h)-140px))]") : rail(false)}
+                  <div className="pt-1">{panelTabs(false)}</div>
                 </ActivityCorner>
               </span>
             </span>
           </header>
 
-          <details className="group peer mt-3 rounded-[12px] border border-[var(--card-line)] px-4 md:hidden">
-            <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 py-2 [&::-webkit-details-marker]:hidden">
-              <ActivitySummary items={activity} yours={yours} />
-            </summary>
-            {rail(false)}
-          </details>
+          {!wide && (
+            <details data-tour="fold" className="group peer mt-3 rounded-[12px] border border-[var(--card-line)] px-4 md:hidden">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 py-2 [&::-webkit-details-marker]:hidden">
+                <ActivitySummary items={activity} yours={yours} />
+              </summary>
+              <div className="pt-1 pb-4">{panelTabs(false)}</div>
+            </details>
+          )}
           {/* Phones, with Activity closed: a running preview's Stop stays one tap away. */}
           {runningPreview && (
             <div className="mt-2 flex h-12 items-center rounded-xl border border-[var(--card-line)] bg-white pr-1.5 pl-3 peer-open:hidden md:hidden">
@@ -1090,9 +1610,16 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
             </div>
           )}
 
-          {/* Under the header: the conversation. (Team is a tab in the card beside it; on phones, a full screen.) */}
+          {/* Under the header: the conversation with the agent. */}
           <div className="md:relative md:flex md:min-h-0 md:min-w-0 md:flex-1">
-          <section aria-label="Conversation" className="mt-3 flex min-w-0 flex-1 flex-col md:mt-0 md:min-h-0">
+          {/* data-tour: the first-visit tour (StoryTour) points at these parts. */}
+          <section aria-label="Conversation" data-tour="chat" className="mt-3 flex min-w-0 flex-1 flex-col md:mt-0 md:min-h-0">
+            {/* hq-35's demo: a slim strip at the top of the chat, covering nothing. */}
+            {story.id === 35 && (
+              <div className={`mb-1 flex-none md:pt-3 ${BOX_COLUMN}`}>
+                <MainDemo steps={demoSteps} at={demoAt} wait={demoWait} />
+              </div>
+            )}
             {/* A teammate changed this story: one banner, until you've seen it. */}
             {banner && (
               <div className={`mb-1 flex-none ${COLUMN}`}>
@@ -1122,13 +1649,19 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                   ask={ask}
                   refusal={askRefusal}
                   onAnswer={answer}
-                  onSkipQuestion={state.need === "decision" && !busy ? act.defaults : undefined}
+                  onSkipQuestion={skipQuestion}
+                  onReadMore={openWork}
                   highlight={highlight}
+                  storyCard={storyCard}
+                  onReadStory={() => setDetailsOpen(true)}
+                  docked={docked}
+                  onSaveDecision={saveDecision}
+                  savedIds={savedIds}
                 />
               </div>
             </div>
 
-            <div className={`sticky bottom-0 flex-none bg-white pt-2 pb-4 ${BOX_COLUMN}`}>
+            <div data-tour="box" className={`sticky bottom-0 flex-none bg-white pt-2 pb-4 ${BOX_COLUMN}`}>
               {/* Messages fade out as they pass under the box. */}
               <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 -top-10 h-10 ${chat.fade}`} />
               {!atBottom && (
@@ -1138,59 +1671,83 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                     setAtBottom(true);
                     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
                   }}
-                  className={`absolute -top-12 left-1/2 z-10 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--card-line)] bg-white px-3 text-[13px] font-medium shadow-[var(--shadow-card-h)] ${chat.enter}`}
+                  className={`absolute -top-12 left-1/2 z-10 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--card-line)] bg-white px-3 text-sm font-medium ${chat.enter}`}
                 >
                   <ArrowDown aria-hidden="true" size={14} strokeWidth={2} />
                   Jump to latest
                 </button>
               )}
+              {handedTo ? (
+                // Sent to a teammate: the message box gives way to who has it, until they act or you take it back.
+                <div>
+                  {/* Narrow screens: the words get the row, and Take it back goes under them, full width. */}
+                  <div className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2.5 rounded-[20px] border border-[var(--card-line)] bg-[#FAFAFA] py-2.5 pr-2.5 pl-4 max-sm:p-3">
+                    <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
+                      <PersonAvatar initials={handedTo.initials} size={24} />
+                      <p className="m-0 min-w-0 flex-1 text-sm text-[var(--tx)]">
+                        <span className="font-medium">With {handedTo.name}</span>
+                        <span className="text-[var(--tx2)]">
+                          {" "}
+                          · paused for you until {handedFirst} {HANDOFF[handedTo.need]?.until ?? "acts"}
+                        </span>
+                      </p>
+                    </div>
+                    <button type="button" onClick={act.takeBack} className={`${BTN_SECONDARY} max-sm:w-full`}>
+                      Take it back
+                    </button>
+                  </div>
+                </div>
+              ) : docked ? (
+                <DecisionDock ask={ask} question={openQuestion} refusal={askRefusal} onAnswer={answer} onSkip={skipQuestion} onWrite={actions.write} onReadMore={openWork} />
+              ) : (
               <div>
+                {/* Writing first, with a decision still waiting: the way back to it. */}
+                {decisionKey && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Back without writing: whatever "Ask for changes" switched on goes off again.
+                      setRebuild(false);
+                      setWritingFor(null);
+                    }}
+                    className="mb-2 inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/5 hover:text-[var(--tx)]"
+                  >
+                    <ArrowLeft aria-hidden="true" size={12} strokeWidth={2} />
+                    Back to the decision
+                  </button>
+                )}
                 <StoryComposer
                   storyId={story.id}
                   people={data.people}
                   stories={data.stories}
-                  canRebuild={state.status === "in_review" && !busy}
+                  canRebuild={(state.status === "in_review" || state.status === "pull_request") && !busy}
                   rebuild={rebuild}
                   onRebuildChange={setRebuild}
                   suggestions={suggestions}
                   hint={noteHint}
                   viewerName={data.viewer.name}
                   onSend={send}
-                  onWriteToTeam={openTeam}
                 />
               </div>
+              )}
             </div>
             </div>
           </section>
-          <AnimatePresence>
-            {isPhone && teamOpen && (
-              <StoryTeam key="team" title={privateWith ? `${privateWith.name} · Private` : "Team"} onClose={closeTeam}>
-                {teamBody(false, "flex-1")}
-              </StoryTeam>
-            )}
-          </AnimatePresence>
           </div>
         </div>
 
-        {/* Beside the chat from 1024 px: one card with Activity · Team tabs, like Ask PM's "Chats · Team" side panel and
-            as wide (300 px, 320 px from 1280). Team is a tab here, not a pane in the chat, so the chat with the agent
-            keeps its width and nothing slides over it (Shubham, 25 Nov). The faces in the header switch it to Team; Esc
-            in Team goes back to Activity. `relative` keeps the rows' screen-reader text inside the scroll area. */}
-        <aside
-          aria-label="Activity and Team"
-          className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_rgb(0_0_0/0.05)] ring-1 ring-black/[0.04] lg:ml-4 lg:flex xl:w-[320px]"
-        >
-          <div className="flex-none px-4 pt-4">{tabs(false)}</div>
-          {teamOpen ? (
-            <div role="tabpanel" aria-label="Team" className="flex min-h-0 flex-1 flex-col">
-              {teamBody(false, "flex-1")}
-            </div>
-          ) : (
-            <div role="tabpanel" aria-label="Activity" className="relative min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-4">
-              {rail(false)}
-            </div>
-          )}
-        </aside>
+        {/* Beside the chat from 1024 px: the story's activity, in a card like Ask PM's side panel and as wide (300 px,
+            320 px from 1280). Its title row is as tall as the chat's header, so the tops line up. No Team here (Shubham,
+            26 Nov): people talk in Messages. `relative` keeps the rows' screen-reader text inside the scroll area. */}
+        {wide && (
+          <aside
+            data-tour="panel"
+            aria-label="Status, story, work and history"
+            className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white ring-1 ring-black/[0.06] lg:ml-4 lg:flex xl:w-[320px]"
+          >
+            {panelTabs(true)}
+          </aside>
+        )}
       </main>
 
       <Toast toast={toast} onDismiss={dismissToast} offsetRight="0px" />
@@ -1200,6 +1757,19 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         onConfirm={cancelRunning}
         storyLabel={ref}
         consequence="Builder stops and this build is thrown away."
+      />
+      <StatusGuide open={guideOpen} onClose={() => setGuideOpen(false)} merger={mergerName === "you" ? "You" : mergerName} />
+      {/* A first visit, as a new person sees it (Shubham, 26 Nov): on hq-28, the first story in Planning, once a session. */}
+      <StoryTour storyId={story.id} storyRef={ref} wide={wide} need={state.need} onStart={() => changeTab("status")} />
+      <StoryDetails
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        brief={brief}
+        stories={data.stories}
+        onWriteNote={() => {
+          setDetailsOpen(false);
+          writeFirst();
+        }}
       />
       {demo && teammate && (
         <TeammateDemo

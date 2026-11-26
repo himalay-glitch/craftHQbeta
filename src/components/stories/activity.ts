@@ -1,5 +1,5 @@
 import type { NeedKind } from "@/types/dashboard";
-import type { ActivityItem, ActivityKind, Device, FileRef, PhaseKey, StoryFacts, StoryItem } from "@/types/stories";
+import type { ActivityItem, ActivityKind, Device, FileRef, MainState, PhaseKey, PrMerge, StoryFacts, StoryItem } from "@/types/stories";
 import { PHASE_LABEL } from "./phases";
 import { prNumberFor } from "./thread";
 
@@ -11,6 +11,25 @@ const item = (s: StoryItem, kind: ActivityKind, rest: Omit<ActivityItem, "id" | 
   kind,
   ...rest,
 });
+
+/** An open pull request's line in the outputs: waiting on the person who merges, or what the robots are doing to keep
+ *  it mergeable after another story merged first. */
+export const PR_DETAIL: Record<PrMerge, (conflictWith?: number) => string> = {
+  ready: () => "Ready to merge on GitHub",
+  updating: () => "Bringing in the latest main",
+  checks: () => "Checks running",
+  conflict: (other) => (other ? `Conflicts with hq-${other} · Builder is fitting both in` : "Conflicts · Builder is fixing them"),
+  failing: () => "A check failed · Builder is fixing it",
+  blocked: () => "Couldn’t update · CraftHQ can’t write to GitHub",
+};
+
+const refs = (ids: number[]) => ids.map((id) => `hq-${id}`).join(", ");
+
+/** The "Latest main" line in the outputs: up to date, or what's being brought in. Built stories only. */
+export function mainDetail(m: MainState): { state: ActivityItem["state"]; detail: string } {
+  if (m.behind.length) return { state: "working", detail: `${refs(m.behind)} merged · bringing it in` };
+  return { state: "done", detail: m.settled ? `Up to date · ${m.settled} clashes, both sides kept` : `Up to date · checked ${m.checked}` };
+}
 
 /** Newest first, from where the story is now. */
 /** How far a build is, by its phase: the same four steps the story page's own build ticks through. */
@@ -36,7 +55,7 @@ export function buildActivity(s: StoryItem, facts: StoryFacts, now?: number): Ac
   if (planReady) a.push(item(s, "engineering", { title: "Engineering page", state: "done", detail: status === "planning" ? "Draft ready for your OK" : "Approved", at: "Nov 11" }));
   if (status === "planning") return a.reverse();
 
-  a.push(item(s, "stage", { title: "Plan approved", state: "info", detail: "", move: { from: "Planning", to: "Ready to build" }, at: "Nov 11" }));
+  a.push(item(s, "stage", { title: "Plan approved", state: "info", detail: "", move: { from: "Planning", to: "Building" }, at: "Nov 11" }));
   const stuck = s.need === "stuck";
   if (status === "approved" && !stuck) return a.reverse();
 
@@ -62,12 +81,28 @@ export function buildActivity(s: StoryItem, facts: StoryFacts, now?: number): Ac
   a.push(item(s, "checks", { title: "Checks", state: "done", detail: facts.checks.line, at: "Nov 12" }));
   // A second agent, not the builder, checks the work before it reaches review (statuses guide §4).
   a.push(item(s, "checks", { title: "Independent check", state: "done", detail: "Passed · does what the story asks", at: "Nov 12" }));
-  // The pull request opens with the move to review, before the preview, so the preview stays the newest card.
-  a.push(item(s, "pr", { title: `Pull request #${prNumberFor(s.id)}`, state: "done", detail: "Ready to merge", at: "Nov 12" }));
   a.push(item(s, "preview", { title: "Preview · Web", state: "done", detail: "Ready to try", device: "web", run: "off", at: "Nov 12" }));
+  // The pull request exists only once someone creates it from In review (Shubham, 26 Nov).
+  const n = s.pr?.number ?? prNumberFor(s.id);
+  const merged = status === "done" && (s.outcome === "merged" || s.pr?.state === "merged");
+  const closed = status === "done" && !merged && (s.outcome === "closed" || s.pr?.state === "closed");
+  if (status === "pull_request" || merged || closed)
+    a.push(item(s, "stage", { title: "Pull request created", state: "info", detail: "", move: { from: "In review", to: "Pull request" }, at: "Nov 13" }));
+  // Back in review with its pull request open: the pull request has the version before this one.
+  if (status === "in_review" && s.pr?.state === "open")
+    a.push(item(s, "pr", { title: `Pull request #${n}`, state: "done", detail: "Has the version before this · update it from the review", at: "Nov 24" }));
+  if (status === "pull_request") {
+    const merge = s.pr?.merge ?? "ready";
+    a.push(item(s, "pr", { title: `Pull request #${n}`, state: merge === "blocked" ? "failed" : "done", detail: PR_DETAIL[merge](s.pr?.conflictWith), at: "Nov 13" }));
+  }
+  // Built work waiting for a person: where its branch stands against main, so nobody has to ask (hq-35, 18–25 Nov).
+  if (status === "in_review" || status === "pull_request") {
+    const m = mainDetail(s.main ?? { behind: [], checked: "5m ago" });
+    a.push(item(s, "main", { title: "Latest main", ...m, at: "Just now" }));
+  }
   if (status === "done") {
-    a.push(item(s, "pr", { title: `Pull request #${prNumberFor(s.id)}`, state: "done", detail: "Merged into main", at: "Nov 14" }));
-    a.push(item(s, "stage", { title: "Marked Done", state: "info", detail: "", move: { from: "In review", to: "Done" }, at: "Nov 14" }));
+    if (merged || closed) a.push(item(s, "pr", { title: `Pull request #${n}`, state: "done", detail: merged ? "Merged into main" : "Closed without merging", at: "Nov 14" }));
+    a.push(item(s, "stage", { title: merged ? "Merged" : closed ? "Closed" : "Marked Done", state: "info", detail: "", move: { from: merged || closed ? "Pull request" : "In review", to: "Done" }, at: "Nov 14" }));
   }
   return a.reverse();
 }
@@ -185,6 +220,7 @@ export const OPENS: Partial<Record<ActivityKind, string>> = {
   screenshots: "Screenshots open full size once they come from the build service.",
   markup: "The markup opens here once it comes from the CraftHQ API.",
   pr: "Pull requests open on GitHub once GitHub is connected.",
+  main: "The comparison with main opens on GitHub once GitHub is connected.",
 };
 
 /** Happening now, shown on top as a notification: work under way, waiting on a person, failed, a preview starting,
@@ -195,7 +231,7 @@ export const isNow = (i: ActivityItem) =>
 
 /** One of each: a story has one specification page, one engineering page, one preview and one pull request, and
  *  a rebuild's build and checks replace the last ones. Each is keyed by what it is, so only its newest version counts. */
-const SINGLE: ActivityKind[] = ["spec", "engineering", "preview", "pr"];
+const SINGLE: ActivityKind[] = ["spec", "engineering", "preview", "pr", "main"];
 const sameThing = (it: ActivityItem) => (SINGLE.includes(it.kind) ? it.kind : `${it.kind}:${it.title}`);
 
 /** The newest version of each thing, newest first: an older version (a page since rewritten, last build's checks)
@@ -236,7 +272,7 @@ export function readyOf(items: ActivityItem[]) {
 // ---- Outputs: one short list, in a fixed order ----
 
 /** The thing you'd open first goes first; then the order they finished. */
-const KIND_ORDER: ActivityKind[] = ["spec", "engineering", "preview", "screenshots", "markup", "pr", "build", "checks"];
+const KIND_ORDER: ActivityKind[] = ["spec", "engineering", "preview", "screenshots", "markup", "pr", "main", "build", "checks"];
 
 export function orderOutputs(ready: ActivityItem[]) {
   return ready

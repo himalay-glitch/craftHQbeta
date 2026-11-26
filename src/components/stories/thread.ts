@@ -4,7 +4,7 @@ import type { Author, Segment, StoryFacts, StoryItem, StoryThreadData, ThreadEnt
 // Front end only: writes a believable conversation for any story from its stage, until the CraftHQ API
 // sends the real one. Hand-written conversations (src/pages/stories/_threads.ts) take precedence.
 
-const STAGE_ORDER = ["new", "planning", "approved", "in_progress", "in_review", "done"] as const;
+const STAGE_ORDER = ["new", "planning", "approved", "in_progress", "in_review", "pull_request", "done"] as const;
 const reached = (s: StoryItem, stage: (typeof STAGE_ORDER)[number]) =>
   s.status !== "cancelled" && STAGE_ORDER.indexOf(s.status as (typeof STAGE_ORDER)[number]) >= STAGE_ORDER.indexOf(stage);
 
@@ -18,15 +18,26 @@ export function personFor(initials: string | undefined, people: Person[], viewer
   return { kind: "person", name: p.name, initials: p.initials };
 }
 
+/** The first message when only a title was written (the sample's stand-in), so Story details can leave it out. */
+export const titleOnlyAsk = (title: string) => `${title}. The screens are attached.`;
+
 /** The ask, as the first message: the why, then the detail, or the title when nothing else was written. */
 function askText(s: StoryItem): Segment[] {
   const parts = [s.why, s.detail].filter(Boolean) as string[];
-  return [parts.length ? parts.join("\n\n") : `${s.title}. The screens are attached.`];
+  return [parts.length ? parts.join("\n\n") : titleOnlyAsk(s.title)];
+}
+
+/** "Today" for a day that is today, else "Nov 26": the chat's day words. */
+export function dayLabel(ts: number, now = Date.now()) {
+  const d = new Date(ts);
+  return d.toDateString() === new Date(now).toDateString() ? "Today" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function buildFacts(s: StoryItem, owner?: string): StoryFacts {
-  const review = s.status === "in_review";
+  // Built and checked: in review, or past it with its pull request.
+  const review = s.status === "in_review" || s.status === "pull_request";
   const done = s.status === "done";
+  const closed = done && (s.outcome === "closed" || s.pr?.state === "closed");
   return {
     preview:
       s.need === "stuck"
@@ -41,31 +52,40 @@ export function buildFacts(s: StoryItem, owner?: string): StoryFacts {
           ? { state: "running", line: "Running with the build" }
           : { state: "none", line: "Written from the plan" },
     plan: s.status === "new" ? "Being written" : "Written",
-    // Opened by the agent when the work passes its check; merged by a person, never by the agent.
-    pullRequest: done
-      ? { state: "merged", line: "Merged into main" }
-      : review
-        ? { state: "open", line: `Open · #${prNumberFor(s.id)} · waiting for you to merge` }
-        : { state: "none", line: "Opens when the work passes its check" },
+    // Created from In review once the work is right; merged on GitHub by the one person with access, never by a robot.
+    pullRequest: closed
+      ? { state: "closed", line: "Closed without merging" }
+      : done && s.outcome !== "done"
+        ? { state: "merged", line: "Merged into main" }
+        : done
+          ? { state: "none", line: "Nothing to merge" }
+          : s.status === "pull_request" || s.pr?.state === "open"
+            ? { state: "open", line: `Open · #${s.pr?.number ?? prNumberFor(s.id)} · waiting to be merged` }
+            : { state: "none", line: "Created from In review, once the work is right" },
     ownerName: owner,
-    source: "Typed in CraftHQ",
+    source: s.importedFrom ? `Imported from ${s.importedFrom.tool} · ${s.importedFrom.key}` : "Typed in CraftHQ",
     repository: "we-pop",
-    created: s.updatedMinutes !== undefined && s.updatedMinutes < 60 ? "Today" : "Nov 10",
+    created: s.createdAt ? dayLabel(s.createdAt) : s.updatedMinutes !== undefined && s.updatedMinutes < 60 ? "Today" : "Nov 10",
   };
 }
 
-export function buildThread(s: StoryItem, people: Person[], viewer: Viewer): StoryThreadData {
+/** `madeOn`: the day words for a story created in this browser before it kept its time ("Earlier"). */
+export function buildThread(s: StoryItem, people: Person[], viewer: Viewer, madeOn?: string): StoryThreadData {
   const owner = personFor(s.owner, people, viewer);
   const ownerName = owner.kind === "person" ? owner.name : undefined;
   const first = ownerName?.split(" ")[0] ?? "the owner";
   const e: ThreadEntry[] = [];
   const id = (n: string) => `${s.id}-${n}`;
 
-  e.push({ kind: "created", id: id("created"), at: "Nov 10", by: owner });
+  // When it was written: today for a story just created here (it was "Nov 10" for every story, 26 Nov bug).
+  const made = s.createdAt ? dayLabel(s.createdAt) : (madeOn ?? "Nov 10");
+  e.push({ kind: "created", id: id("created"), at: made, by: owner });
+  // Imported: where it came from, said once beside who created it.
+  if (s.importedFrom) e.push({ kind: "stage", id: id("imported"), at: made, text: `Imported from ${s.importedFrom.tool} · ${s.importedFrom.key}` });
   e.push({
     kind: "message",
     id: id("ask"),
-    at: "Nov 10",
+    at: made,
     author: owner,
     text: askText(s),
     files: s.files?.map((name) => ({ name, kind: /\.(png|jpe?g|webp|gif)$/i.test(name) ? "image" : "file" })),
@@ -145,7 +165,6 @@ export function buildThread(s: StoryItem, people: Person[], viewer: Viewer): Sto
   if (reached(s, "in_review")) {
     e.push({ kind: "stage", id: id("started"), at: "Nov 12", text: "Builder started building" });
     e.push({ kind: "stage", id: id("verified"), at: "Nov 12", text: "Verified by Checker · it does what the story asks" });
-    e.push({ kind: "stage", id: id("pr"), at: "Nov 12", text: `Pull request #${prNumberFor(s.id)} opened` });
     e.push({ kind: "stage", id: id("review"), at: "Nov 12", text: "Moved to In review" });
     e.push({
       kind: "message",
@@ -155,7 +174,7 @@ export function buildThread(s: StoryItem, people: Person[], viewer: Viewer): Sto
       report: {
         outcome: "Ready for your review. All 214 automated checks passed, and Checker verified it against the story.",
         means: `“${s.title}” works as the story asks, in the preview.`,
-        next: `${first}: try the preview and read pull request #${prNumberFor(s.id)}. To accept, merge it and mark the story Done; to change it, write a note and rebuild.`,
+        next: `${first}: try the preview. When it’s right, create the pull request, and it goes to the person who merges. To change it, write a note and rebuild.`,
         details: ["Checked on web and Android sizes", "Used the sample events for empty states", "No other screens were changed"],
       },
       // The build's phases, folded under the reply: 38 minutes in all.
@@ -170,9 +189,26 @@ export function buildThread(s: StoryItem, people: Person[], viewer: Viewer): Sto
     });
   }
 
-  if (s.status === "done") {
-    e.push({ kind: "stage", id: id("accepted"), at: "Nov 13", text: `Pull request merged · marked Done by ${ownerName ?? "the owner"}` });
+  // The pull request: created from In review by a person, opened on GitHub by the PM, merged there by one person.
+  const merged = s.status === "done" && (s.outcome === "merged" || s.pr?.state === "merged");
+  const closed = s.status === "done" && !merged && (s.outcome === "closed" || s.pr?.state === "closed");
+  const n = s.pr?.number ?? prNumberFor(s.id);
+  if (s.status === "pull_request" || merged || closed) {
+    e.push({ kind: "stage", id: id("pr"), at: "Nov 13", text: `Pull request created by ${ownerName ?? "the owner"} · the PM opened #${n} on GitHub` });
+    // After another story merged first: what the PM asked Builder to do about it.
+    if (s.pr?.merge === "conflict")
+      e.push({ kind: "stage", id: id("pr-sync"), at: "Today", text: `hq-${s.pr.conflictWith ?? "?"} merged first and changed the same lines · the PM asked Builder to fit both in` });
+    if (s.pr?.merge === "updating") e.push({ kind: "stage", id: id("pr-sync"), at: "Today", text: "Main moved on · the PM asked Builder to bring in the latest code" });
   }
+  // Back in review with its pull request already open (a rebuild after it was created): the pull request keeps the
+  // version before it until someone updates it from the review.
+  if (s.status === "in_review" && s.pr?.state === "open") {
+    e.push({ kind: "stage", id: id("pr"), at: "Nov 13", text: `Pull request created by ${ownerName ?? "the owner"} · the PM opened #${n} on GitHub` });
+    e.push({ kind: "stage", id: id("pr-rebuilt"), at: "Nov 24", text: `Rebuilt with your note · back in review · #${n} keeps the version before it until you update it` });
+  }
+  if (merged) e.push({ kind: "stage", id: id("accepted"), at: "Nov 14", text: `Pull request #${n} merged on GitHub · Done` });
+  else if (closed) e.push({ kind: "stage", id: id("accepted"), at: "Nov 14", text: `Pull request #${n} closed without merging · Done` });
+  else if (s.status === "done") e.push({ kind: "stage", id: id("accepted"), at: "Nov 13", text: `Marked Done by ${ownerName ?? "the owner"} · nothing to merge` });
 
   if (s.status === "cancelled") {
     e.push({ kind: "stage", id: id("cancelled"), at: "Nov 9", text: `Cancelled by ${ownerName ?? "the owner"}` });

@@ -20,7 +20,7 @@ export const ICON_BTN =
   "inline-flex size-8 flex-none items-center justify-center rounded-full text-[var(--tx2)] transition-colors " +
   "duration-[120ms] hover:bg-black/5 hover:text-[var(--tx)]";
 
-export const MENU_CONTENT = `${styles.tokens} ${styles.menu} z-50 min-w-[220px] rounded-[8px] bg-white py-1 shadow-[var(--shadow-menu)]`;
+export const MENU_CONTENT = `${styles.tokens} ${styles.menu} z-50 min-w-[220px] rounded-[8px] bg-white py-1 ring-1 ring-black/[0.08]`;
 
 export const MENU_ITEM =
   "mx-1 flex h-9 cursor-pointer items-center gap-2 rounded-[6px] px-3 text-[14px] leading-5 text-[var(--tx)] " +

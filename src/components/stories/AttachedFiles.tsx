@@ -31,14 +31,14 @@ export function AttachedFiles({ files, onRemove }: { files: Attachment[]; onRemo
               <img src={preview} alt="" width={32} height={32} className="size-8 flex-none rounded-[4px] object-cover" />
             ) : (
               <span className="flex size-8 flex-none items-center justify-center rounded-[4px] bg-[var(--av-bg)] text-[var(--tx2)]">
-                <Icon aria-hidden="true" size={16} strokeWidth={1.5} />
+                <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
               </span>
             )}
             <span className="min-w-0">
-              <span className="block truncate text-[13px] leading-4 text-[var(--tx)]" title={file.name}>
+              <span className="block truncate text-xs font-medium text-[var(--tx)]" title={file.name}>
                 {file.name}
               </span>
-              <span className="block text-[12px] leading-4 text-[var(--tx2)]">{fileSize(file.size)}</span>
+              <span className="block text-xs text-[var(--tx2)] tabular-nums">{fileSize(file.size)}</span>
             </span>
             <button
               type="button"

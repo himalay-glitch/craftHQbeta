@@ -4,7 +4,7 @@ import { BTN_SECONDARY, ICON_BTN } from "@/components/dashboard/classes";
 
 // A confirm (DESIGN.md §7.9): a native <dialog>, 384 px, fading and scaling in; a bottom sheet on phones.
 const DIALOG =
-  "m-auto w-full max-w-sm flex-col overflow-hidden rounded-2xl border-0 bg-white p-0 text-[var(--tx)] shadow-overlay open:flex backdrop:bg-scrim " +
+  "m-auto w-full max-w-sm flex-col overflow-hidden rounded-2xl border-0 bg-white p-0 text-[var(--tx)] ring-1 ring-black/[0.08] open:flex backdrop:bg-scrim " +
   "opacity-0 scale-98 transition-all transition-discrete duration-200 ease-out " +
   "open:opacity-100 open:scale-100 starting:open:opacity-0 starting:open:scale-98 " +
   "backdrop:opacity-0 backdrop:transition-all backdrop:transition-discrete backdrop:duration-200 " +
@@ -13,7 +13,7 @@ const DIALOG =
   "max-sm:mb-0 max-sm:max-w-none max-sm:rounded-b-none";
 
 const BTN_DANGER =
-  "inline-flex h-8 items-center justify-center rounded-full bg-danger px-3.5 text-[14px] leading-5 font-medium whitespace-nowrap " +
+  "inline-flex h-8 items-center justify-center rounded-full bg-danger px-3.5 text-sm font-medium whitespace-nowrap " +
   "text-white transition-colors duration-[120ms] hover:bg-danger-hover active:translate-y-px";
 
 interface CancelStoryDialogProps {
@@ -72,14 +72,14 @@ export function CancelStoryDialog({ open, onClose, onConfirm, storyLabel, conseq
       className={DIALOG}
     >
       <header className="flex items-start gap-3 px-6 pt-6">
-        <h2 id={titleId} className="m-0 min-w-0 flex-1 text-[16px] leading-6 font-semibold">
+        <h2 id={titleId} className="m-0 min-w-0 flex-1 text-base font-semibold">
           Cancel {storyLabel}?
         </h2>
         <button type="button" aria-label="Close" onClick={onClose} className={`${ICON_BTN} -mt-1 -mr-2`}>
           <X aria-hidden="true" size={16} strokeWidth={1.75} />
         </button>
       </header>
-      <p id={bodyId} className="m-0 px-6 pt-2 pb-6 text-[14px] leading-5 text-[var(--tx2)]">
+      <p id={bodyId} className="m-0 px-6 pt-2 pb-6 text-sm text-[var(--tx2)]">
         {consequence}
       </p>
       <footer className="flex justify-end gap-2 px-6 pb-4">

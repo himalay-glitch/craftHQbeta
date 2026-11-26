@@ -1,7 +1,7 @@
 // Content model of the dashboard, taken from the manager's prototype (crafthq-re.html, Dashboard view).
 
 /** A story's stage. Shown in the story panel. */
-export type StoryStatus = "new" | "planning" | "approved" | "in_progress" | "in_review" | "done" | "cancelled";
+export type StoryStatus = "new" | "planning" | "approved" | "in_progress" | "in_review" | "pull_request" | "done" | "cancelled";
 
 /** Why a story needs a person: the prototype's groups, in its order. */
 export type NeedKind = "stuck" | "review" | "decision" | "planning" | "triage" | "next";

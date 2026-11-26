@@ -1,4 +1,4 @@
-import { CircleCheck, CircleSlash, GitMerge } from "lucide-react";
+import { CircleCheck, CircleSlash, GitMerge, GitPullRequestClosed } from "lucide-react";
 import type { Stage } from "./stage";
 
 // The dashboard's chip pairs (docs/design/dashboard-plan.md §3), each at least 5.7:1. Chips are only for
@@ -19,16 +19,16 @@ export function StageLabel({ stage }: { stage: Stage }) {
   const chip = CHIP[stage.tone];
   if (chip) {
     return (
-      <span className={`inline-flex h-[22px] max-w-full items-center rounded-full px-2 text-[13px] leading-4 font-medium ${chip}`}>
+      <span className={`inline-flex h-5 max-w-full items-center rounded-full px-2 text-xs font-medium ${chip}`}>
         <span className="truncate">{stage.text}</span>
       </span>
     );
   }
   if (stage.tone === "done") {
     const merged = stage.outcome === "merged";
-    const Icon = merged ? GitMerge : stage.outcome === "cancelled" ? CircleSlash : CircleCheck;
+    const Icon = merged ? GitMerge : stage.outcome === "closed" ? GitPullRequestClosed : stage.outcome === "cancelled" ? CircleSlash : CircleCheck;
     return (
-      <span className="inline-flex max-w-full items-center gap-1.5 text-[13px] leading-[18px] text-[var(--tx2)]">
+      <span className="inline-flex max-w-full items-center gap-1.5 text-sm text-[var(--tx2)]">
         <Icon aria-hidden="true" size={14} strokeWidth={1.75} className={`flex-none ${merged ? "text-success" : ""}`} />
         <span className={`truncate ${merged ? "font-medium text-success-ink" : ""}`}>{stage.text}</span>
         {stage.when && <span className="flex-none tabular-nums">· {stage.when}</span>}
@@ -37,7 +37,7 @@ export function StageLabel({ stage }: { stage: Stage }) {
   }
   // A robot is on it with no live run reported (a filled ink dot), or it's waiting (an empty one).
   return (
-    <span className="inline-flex max-w-full items-center gap-2 text-[13px] leading-[18px] text-[var(--tx)]">
+    <span className="inline-flex max-w-full items-center gap-2 text-sm text-[var(--tx)]">
       <span
         aria-hidden="true"
         className={`size-2 flex-none rounded-full ${stage.tone === "agent" ? "bg-[var(--tx)]" : "border-[1.5px] border-[var(--tx2)]"}`}

@@ -11,6 +11,7 @@ import {
   CircleCheck,
   FileText,
   GitMerge,
+  GitBranch,
   GitPullRequest,
   Hammer,
   ListChecks,
@@ -25,7 +26,7 @@ import { anyWorking, isProof, nowOf, OPENS, orderOutputs, readyOf, reasonOf, typ
 import chat from "./chat.module.css";
 import { elapsed, useNow } from "./clock";
 import { PreviewButtons, PreviewInline } from "./PreviewControl";
-import { COLUMNS } from "./stage";
+import { COLUMNS, type ColumnKey } from "./stage";
 
 // The activity column, kept minimal. On top, one small card with only what's running now, a slim row each: the
 // Builder's ring while it works, the time so far, "Finished" for a moment, then the row goes down. Nothing running:
@@ -43,6 +44,7 @@ export const ICON: Record<ActivityKind, LucideIcon> = {
   screenshots: Camera,
   markup: PenTool,
   pr: GitPullRequest,
+  main: GitBranch,
 };
 
 export interface ActivityProps {
@@ -55,6 +57,8 @@ export interface ActivityProps {
   epoch: number;
   preview: PreviewActions;
   onSoon: (message: string) => void;
+  /** The column the story is in: what that stage needs comes first in the outputs (Shubham, 26 Nov). */
+  stage?: ColumnKey;
 }
 
 // ---- Words ----
@@ -98,9 +102,9 @@ const TILE = {
   32: { box: "size-8 rounded-[10px]", bot: 24, ring: 38, rx: 10.8 },
 } as const;
 
-/** A raised, neutral tile: soft top light, a hairline and a small shadow, so it reads as an object, not an outline. */
-const RAISED =
-  "border border-black/[0.07] bg-[linear-gradient(180deg,#ffffff_0%,#f2f2f0_100%)] text-[var(--tx)] shadow-[0_1px_2px_rgb(0_0_0/0.06),inset_0_1px_0_rgb(255_255_255/0.9)]";
+/** A neutral tile: white with a hairline, flat (Shubham, 26 Nov: no shadows anywhere, a clean layout). */
+export const RAISED =
+  "border border-black/[0.08] bg-white text-[var(--tx)]";
 
 /** `badge`: false in the outputs, where everything is finished, so a tick on each would only be noise. */
 export function Tile({ item, size = 32, badge = true }: { item: ActivityItem; size?: 24 | 28 | 32; badge?: boolean }) {
@@ -248,10 +252,9 @@ function NowRow({
 
 /**
  * What's running now, in one small card: a slim row for each thing under way, and for a moment each thing that
- * has just finished, before it goes down to the outputs. Nothing running: one quiet line, no box.
+ * has just finished, before it goes down to the outputs. Nothing running: nothing shown.
  */
 export function NowArea({ items, yours, restartInChat, epoch, preview, onSoon }: ActivityProps) {
-  const reduce = useReducedMotion();
   // Under way first, then what's passing through on its way down.
   const now = nowOf(items);
   const rows = [...now.filter((i) => !i.settling), ...now.filter((i) => i.settling)];
@@ -277,18 +280,9 @@ export function NowArea({ items, yours, restartInChat, epoch, preview, onSoon }:
             </AnimatePresence>
           </ul>
         </motion.div>
-      ) : (
-        <motion.p
-          key="idle"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1, transition: { duration: 0.2, delay: reduce ? 0 : 0.25 } }}
-          exit={{ opacity: 0, transition: { duration: 0.1 } }}
-          className="m-0 flex h-6 items-center gap-2 text-xs text-[var(--tx2)]"
-        >
-          <span aria-hidden="true" className="size-1.5 flex-none rounded-full bg-[var(--ctl-h)]" />
-          Nothing running right now
-        </motion.p>
-      )}
+      ) : null}
+      {/* Nothing running: no line at all. The Status section above already says what's happening (Shubham, 26 Nov:
+          "a very minimal way"). */}
     </AnimatePresence>
   );
 }
@@ -415,31 +409,37 @@ function ChecksRow({ items, proof }: { items: ActivityItem[]; proof: boolean }) 
  * on, the lines fade back so the card on top is the one thing in focus; hover or keyboard focus brings them back.
  */
 /** The outputs in parts (Shubham, 25 Nov), each under its own small heading, in the order you'd open them. */
-const SECTIONS: { label: string; kinds: ActivityKind[] }[] = [
-  { label: "Pages", kinds: ["spec", "engineering"] },
-  { label: "Preview", kinds: ["preview", "screenshots", "markup"] },
-  { label: "Code", kinds: ["pr", "build", "checks"] },
+const SECTIONS: { key: "plan" | "preview" | "code"; label: string; kinds: ActivityKind[] }[] = [
+  { key: "plan", label: "Plan", kinds: ["spec", "engineering"] },
+  { key: "preview", label: "Preview", kinds: ["preview", "screenshots", "markup"] },
+  { key: "code", label: "Code", kinds: ["pr", "main", "build", "checks"] },
 ];
 
-export function Outputs({ items, yours, preview, onSoon }: ActivityProps) {
+/** What each stage needs first: the plan while planning and building, the preview in review, the code (the pull
+ *  request, the latest main) from the pull request on. */
+const ORDER: Record<ColumnKey, ("plan" | "preview" | "code")[]> = {
+  planning: ["plan", "preview", "code"],
+  building: ["plan", "code", "preview"],
+  review: ["preview", "plan", "code"],
+  pr: ["code", "preview", "plan"],
+  done: ["code", "preview", "plan"],
+};
+
+export function Outputs({ items, yours, preview, onSoon, stage = "planning" }: ActivityProps) {
   const ready = orderOutputs(readyOf(items));
   const dim = anyWorking(items);
   const checks = ready.filter((it) => it.kind === "build" || it.kind === "checks");
   const folded = checks.length > 1;
   const lines = folded ? ready.filter((it) => !checks.includes(it)) : ready;
 
-  if (ready.length === 0) {
-    return (
-      <section aria-label="Outputs" className={chat.tray}>
-        <p className="m-0 text-xs text-[var(--tx2)]">Finished pages, previews and code land here.</p>
-      </section>
-    );
-  }
+  // Nothing made yet: nothing shown. Each part appears when it exists.
+  if (ready.length === 0) return null;
+  const sections = ORDER[stage].map((key) => SECTIONS.find((x) => x.key === key)).filter((x) => x !== undefined);
 
   return (
     // A size container: the Preview line lays out by the width it's given (the card, or the phone's Activity).
     <section aria-label="Outputs" className={`${chat.tray} @container flex flex-col gap-4`}>
-      {SECTIONS.map(({ label, kinds }) => {
+      {sections.map(({ label, kinds }) => {
         const rows = lines.filter((it) => kinds.includes(it.kind));
         const fold = folded && kinds.includes("checks");
         const count = rows.length + (fold ? 1 : 0);

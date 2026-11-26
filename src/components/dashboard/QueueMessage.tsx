@@ -9,7 +9,7 @@ type QueueMessageProps =
 /** What the table area shows when there's nothing to list: nothing waiting, no matches, or a load error. */
 export function QueueMessage(props: QueueMessageProps) {
   return (
-    <div className="flex flex-col items-center rounded-[12px] border border-[var(--card-line)] px-4 py-16 text-center">
+    <div className="flex flex-col items-center rounded-[12px] border border-[var(--card-line)] bg-white px-4 py-16 text-center">
       {props.kind === "clear" && (
         <>
           <CircleCheck aria-hidden="true" size={20} strokeWidth={1.5} className="text-[var(--green)]" />

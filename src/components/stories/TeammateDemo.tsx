@@ -31,7 +31,7 @@ export function TeammateDemo({ who, present, onPresence, onMove, waiting, canPla
     "h-7 w-full rounded-full border border-[var(--ctl)] bg-white px-3 text-left text-xs text-[var(--tx)] transition-colors duration-[120ms] hover:border-[var(--ctl-h)] hover:bg-[var(--ctl-bg-h)] disabled:opacity-50";
 
   return (
-    <aside aria-label="Demo controls" className="fixed top-1/2 right-4 z-50 w-64 -translate-y-1/2 rounded-xl max-md:top-auto max-md:bottom-4 max-md:translate-y-0 border border-dashed border-[var(--ctl-h)] bg-white/95 p-2 shadow-[0_8px_24px_rgb(0_0_0/0.12)] backdrop-blur">
+    <aside aria-label="Demo controls" className="fixed top-1/2 right-4 z-50 w-64 -translate-y-1/2 rounded-xl max-md:top-auto max-md:bottom-4 max-md:translate-y-0 border border-dashed border-[var(--ctl-h)] bg-white/95 p-2 backdrop-blur">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-xs font-medium text-[var(--tx2)]">
         <Users aria-hidden="true" size={14} strokeWidth={1.75} />
         <span className="flex-1 text-left">Demo · a teammate</span>

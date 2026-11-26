@@ -14,15 +14,18 @@ function tintFor(key: string) {
   return TINTS[hash % TINTS.length];
 }
 
-const SIZE = { 20: "size-5 text-[9px]", 24: "size-6 text-[10px]", 28: "size-7 text-[11px]" } as const;
+const SIZE = { 20: "size-5 text-[9px]", 24: "size-6 text-[10px]", 28: "size-7 text-[11px]", 32: "size-8 text-xs" } as const;
 
-export function PersonAvatar({ initials, size = 20 }: { initials: string; size?: keyof typeof SIZE }) {
+/** `online`: a calm green dot at the bottom right (no pulse: a person online isn't a robot at work). The avatar is
+ *  decorative, so whoever shows it says "online" in words too (an aria-label or screen-reader text). */
+export function PersonAvatar({ initials, size = 20, online }: { initials: string; size?: keyof typeof SIZE; online?: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex flex-none items-center justify-center rounded-full font-semibold tracking-[0.02em] ${SIZE[size]} ${tintFor(initials)}`}
+      className={`relative inline-flex flex-none items-center justify-center rounded-full font-semibold tracking-[0.02em] ${SIZE[size]} ${tintFor(initials)}`}
     >
       {initials}
+      {online && <span className={`absolute -right-0.5 -bottom-0.5 rounded-full bg-success ring-2 ring-white ${size === 32 ? "size-2.5" : "size-2"}`} />}
     </span>
   );
 }

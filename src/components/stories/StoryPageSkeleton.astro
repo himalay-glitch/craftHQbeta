@@ -1,8 +1,8 @@
 ---
 // Shown at once while a story's page loads (its island renders in the browser only): the page's outline, with the
 // trail and the story's name already in place, and the mascot opening the story. Same layout as the page
-// (StoryPage.tsx), so nothing jumps when it arrives: on desktop the stories list on the left when this viewer left it
-// open, then the white builder filling the rest, with the activity icon at the end of its header (the activity opens
+// (StoryPage.tsx), so nothing jumps when it arrives: on desktop the white builder filling the width (no stories list
+// beside it, 26 Nov), with the activity icon at the end of its header (the activity opens
 // as a card over the chat). Still under reduced motion.
 interface Props {
   /** "hq-21": known from the address, so the trail is always real. */
@@ -12,7 +12,7 @@ interface Props {
 }
 
 const { storyRef, title } = Astro.props;
-// Placeholders are the field wash (DESIGN.md §6.8), so they show on the white builder and the grey stories list alike.
+// Placeholders are the field wash (DESIGN.md §6.8), so they show on the white builder.
 const bar = "rounded-[8px] bg-field animate-pulse motion-reduce:animate-none";
 // The builder's reading column (StoryPage.tsx `COLUMN`).
 const column = "md:mx-auto md:w-full md:max-w-[min(100%,max(1200px,70%))] md:px-4 lg:px-6";
@@ -22,39 +22,14 @@ const column = "md:mx-auto md:w-full md:max-w-[min(100%,max(1200px,70%))] md:px-
   id="main"
   aria-busy="true"
   aria-label="Opening the story"
-  class="group/sk md:relative md:flex md:h-[calc(100dvh-var(--bar-h))] md:overflow-hidden md:border-t md:border-[var(--line)]"
+  class="md:relative md:flex md:h-[calc(100dvh-var(--bar-h))] md:overflow-hidden md:border-t md:border-[var(--line)]"
 >
-  <!-- Whether this viewer left the stories list open (panels.ts), read before anything below is drawn. Blocked storage
-       or nothing saved: put away, as the page does. -->
-  <script is:inline>
-    try {
-      if (JSON.parse(localStorage.getItem("crafthq:story-panels") || "null")?.stories === true)
-        document.currentScript.parentElement.setAttribute("data-stories", "");
-    } catch {}
-  </script>
-
-  <!-- The stories list (1280 px and wider), only when it was left open (StoryNav). -->
-  <div class="hidden xl:flex-none xl:bg-[var(--bar)] xl:group-data-[stories]/sk:flex" data-sk="nav">
-    <div class="flex w-[260px] flex-none flex-col border-r border-[var(--line)]">
-      <div class="flex h-14 flex-none items-center px-4">
-        <div class:list={[bar, "h-3.5 w-20"]}></div>
-      </div>
-      <div class="flex flex-col gap-2.5 px-4">
-        <div class:list={[bar, "h-3 w-24 opacity-70"]}></div>
-        {[0, 1, 2, 3, 4].map(() => <div class:list={[bar, "h-5 w-full"]}></div>)}
-      </div>
-    </div>
-  </div>
-
   <!-- The builder. -->
   <div data-sk="builder" class="px-4 pt-4 pb-6 md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col md:bg-white md:p-0">
-    <!-- The header row, as the page's: the stories list's button (1280 px and wider), the trail and the story's name
+    <!-- The header row, as the page's: the trail and the story's name
          (real text, with the page's classes, so it wraps where the page's does), then Team, the page's buttons and the
          activity icon (768 px and wider) as placeholders of their size. -->
     <div class="flex flex-none flex-wrap items-center gap-x-3 gap-y-1.5 md:px-4 md:py-3 lg:h-14 lg:flex-nowrap lg:px-6 lg:py-0">
-      <div class="-ml-2 hidden size-8 flex-none items-center justify-center xl:flex">
-        <div class:list={[bar, "size-4 rounded-[4px]"]}></div>
-      </div>
       <nav aria-label="Breadcrumb" data-sk="trail" class="flex flex-none items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
         <a href="/stories" class="inline-flex items-center gap-1.5 rounded-[4px] hover:text-[var(--tx)]">
           <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">

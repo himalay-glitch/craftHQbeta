@@ -111,7 +111,7 @@ export function SuggestionList({ items, active, label, onHover, onChoose }: Sugg
     <ul
       role="listbox"
       aria-label={label}
-      className="absolute bottom-full left-3 z-20 m-0 mb-2 w-80 max-w-[calc(100%-24px)] list-none rounded-[12px] bg-white p-1 text-[var(--tx)] shadow-[var(--shadow-menu)]"
+      className="absolute bottom-full left-3 z-20 m-0 mb-2 w-80 max-w-[calc(100%-24px)] list-none rounded-[12px] bg-white p-1 text-[var(--tx)] ring-1 ring-black/[0.08]"
     >
       {items.map((s, i) => (
         <li
@@ -123,12 +123,12 @@ export function SuggestionList({ items, active, label, onHover, onChoose }: Sugg
             onChoose(s);
           }}
           onMouseEnter={() => onHover(i)}
-          className={`flex h-9 cursor-pointer items-center gap-2 rounded-[8px] px-2.5 text-[14px] leading-5 ${i === active ? "bg-[var(--menu-h)]" : ""}`}
+          className={`flex h-9 cursor-pointer items-center gap-2 rounded-[8px] px-2.5 text-sm ${i === active ? "bg-[var(--menu-h)]" : ""}`}
         >
           {s.icon}
-          {s.meta && !s.icon && <span className="w-11 flex-none text-[12px] text-[var(--tx2)] tabular-nums">{s.meta}</span>}
+          {s.meta && !s.icon && <span className="w-11 flex-none text-xs text-[var(--tx2)] tabular-nums">{s.meta}</span>}
           <span className="min-w-0 flex-1 truncate">{s.label}</span>
-          {s.meta && s.icon && <span className="flex-none text-[12px] text-[var(--tx2)]">{s.meta}</span>}
+          {s.meta && s.icon && <span className="flex-none text-xs text-[var(--tx2)]">{s.meta}</span>}
         </li>
       ))}
     </ul>

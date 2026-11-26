@@ -24,10 +24,16 @@ const { title, viewer, search } = Astro.props;
       if (localStorage.getItem("crafthq.sidebar") === "expanded") document.documentElement.dataset.sidebar = "expanded";
     } catch {}
   </script>
-  <div class:list={[tokens.tokens, tokens.page, "min-h-dvh"]}>
+  {/* From 1024 px the app is a canvas with a sheet on it (DESIGN.md §3.4): the top bar and the sidebar are the canvas,
+      and the page beside them is one sheet whose top-left corner curves where the two meet (Shubham, 26 Nov: the cards
+      are rounded, so the frame shouldn't end in a sharp corner). Each page paints the sheet: white, or Ask PM's wash. */}
+  {/* The canvas behind the sheet's corner is white, the sidebar's colour (Shubham, 26 Nov: the sidebar went white, the
+      top bar stays grey), so the curve is cut out beside the sidebar and the top bar stays one straight band. Utilities,
+      not the `.page` class: that class isn't in a CSS layer and would beat the `lg:` one. */}
+  <div class:list={[tokens.tokens, "min-h-dvh bg-[var(--page)] text-[var(--tx)] lg:bg-white"]}>
     <a
       href="#main"
-      class="sr-only z-50 rounded-full bg-white px-4 py-2 text-[14px] font-medium shadow-[var(--shadow-menu)] focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      class="sr-only z-50 rounded-full bg-white px-4 py-2 text-[14px] font-medium ring-1 ring-black/[0.08] focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
     >
       Skip to content
     </a>
@@ -35,7 +41,9 @@ const { title, viewer, search } = Astro.props;
     <div class="flex">
       {/* Plain links in the HTML; it hydrates when idle for its tooltips and the `[` toggle. */}
       <Sidebar client:idle current={Astro.url.pathname} />
-      <div class="min-w-0 flex-1">
+      {/* `overflow-clip` (not hidden) rounds what the page paints without making a scroll box, so sticky parts still stick. */}
+      {/* 40 px = the cards' 24 px corner + the 16 px gap around them, so the two curves run parallel (concentric). */}
+      <div class="min-w-0 flex-1 lg:overflow-clip lg:rounded-tl-[40px] lg:bg-[var(--page)] lg:ring-1 lg:ring-black/[0.08]">
         <slot />
       </div>
     </div>

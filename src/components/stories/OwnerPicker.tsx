@@ -3,6 +3,7 @@ import { Check, UserRound, UserRoundX } from "lucide-react";
 import type { Person } from "@/types/dashboard";
 import { MENU_CONTENT, MENU_ITEM, MENU_SEPARATOR } from "@/components/dashboard/classes";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
+import { isOnline, seenText } from "./presence";
 
 interface OwnerPickerProps {
   /** The owner's initials; none shows the dotted "no owner" circle. */
@@ -29,16 +30,18 @@ export function OwnerPicker({ owner, people, viewerInitials, onChange, storyLabe
   const ordered = [...people].sort((a, b) => Number(b.initials === viewerInitials) - Number(a.initials === viewerInitials));
   const current = people.find((p) => p.initials === owner);
   const name = current ? (current.initials === viewerInitials ? `${current.name} (you)` : current.name) : undefined;
+  // Online now (the green dot), for the owner and for everyone in the menu, so an owner who's around is easy to pick.
+  const ownerOnline = isOnline(owner);
   const dim = size === 20 ? "size-5" : "size-6";
 
   return (
     <DropdownMenu.Root modal={false} onOpenChange={onOpenChange}>
       <DropdownMenu.Trigger
-        aria-label={owner ? `Owner of ${storyLabel}: ${name ?? owner}. Change owner` : `Add an owner to ${storyLabel}`}
+        aria-label={owner ? `Owner of ${storyLabel}: ${name ?? owner}${ownerOnline ? ", online now" : ""}. Change owner` : `Add an owner to ${storyLabel}`}
         className={`group inline-flex max-w-full items-center gap-2 ${withName ? "-mx-1 rounded-[6px] px-1 py-0.5 hover:bg-[var(--ctl-bg-h)] data-[state=open]:bg-[var(--ctl-bg-h)]" : RING}`}
       >
         {owner ? (
-          <PersonAvatar initials={owner} size={size} />
+          <PersonAvatar initials={owner} size={size} online={ownerOnline} />
         ) : (
           <span
             aria-hidden="true"
@@ -48,20 +51,25 @@ export function OwnerPicker({ owner, people, viewerInitials, onChange, storyLabe
           </span>
         )}
         {withName && (
-          <span className={`truncate text-[14px] leading-5 ${owner ? "text-[var(--tx)]" : "text-[var(--tx2)]"}`}>{name ?? owner ?? "Add an owner"}</span>
+          <span className={`truncate text-sm ${owner ? "text-[var(--tx)]" : "text-[var(--tx2)]"}`}>{name ?? owner ?? "Add an owner"}</span>
         )}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content align="start" sideOffset={6} collisionPadding={8} className={MENU_CONTENT}>
-          <DropdownMenu.Label className="px-4 pt-1.5 pb-1 text-[12px] leading-4 text-[var(--tx2)]">Owner</DropdownMenu.Label>
+          <DropdownMenu.Label className="px-4 pt-1.5 pb-1 text-xs text-[var(--tx2)]">Owner</DropdownMenu.Label>
           <DropdownMenu.RadioGroup value={owner ?? ""} onValueChange={(v) => onChange(v || null)}>
             {ordered.map((p) => (
               <DropdownMenu.RadioItem key={p.id} value={p.initials} className={MENU_ITEM}>
-                <PersonAvatar initials={p.initials} />
+                <PersonAvatar initials={p.initials} online={isOnline(p.initials)} />
                 <span className="min-w-0 flex-1 truncate">
                   {p.name}
                   {p.initials === viewerInitials && <span className="text-[var(--tx2)]"> (you)</span>}
                 </span>
+                {p.initials !== viewerInitials && seenText(p.initials) && (
+                  <span className={`flex-none text-xs ${isOnline(p.initials) ? "text-success-ink" : "text-[var(--tx2)]"}`}>
+                    {isOnline(p.initials) ? "Online" : seenText(p.initials)?.replace("Last here ", "")}
+                  </span>
+                )}
                 <span className="flex size-4 items-center justify-center">
                   <DropdownMenu.ItemIndicator>
                     <Check aria-hidden="true" size={16} strokeWidth={1.75} />

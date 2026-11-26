@@ -22,10 +22,10 @@ export const dashboardData: DashboardData = {
   ],
   version: "v3.0.77",
   about: "Plan, approve and watch work. You decide what gets built; CraftHQ builds it and shows you the result.",
-  nextStoryId: 58,
+  nextStoryId: 59,
   done: 6,
   totalStories: 43,
-  queued: 0,
+  queued: 1,
   loopTick: "just now",
   running: [
     { id: 35, title: "Tell the host when you’ll arrive", status: "In review", updated: "just now" },
@@ -120,15 +120,16 @@ export const dashboardData: DashboardData = {
     // Decision
     {
       id: 28,
-      title: "Crew size and check-in",
+      // The live product's hq-73, as the example of a first decision (Shubham, 26 Nov).
+      title: "Create a login screen",
       status: "planning",
       need: "decision",
       waitingOn: "You",
-      owner: "MS",
-      action: "Answer decision #19 or let the default stand, then press Approve. The build starts once hq-6 merges.",
+      owner: "J",
+      action: "Pick an option on decision #148, or let the default apply.",
       meta: "1 open question",
-      updated: "8d ago",
-      updatedMinutes: 8 * 1440,
+      updated: "1h ago",
+      updatedMinutes: 60,
     },
     {
       id: 7,
@@ -244,5 +245,7 @@ export const dashboardData: DashboardData = {
     { id: 24, title: "Invite-only gate and waitlist form", status: "in_review" },
     { id: 57, title: "Test Story-add sample demo text on login page", status: "in_progress" },
     { id: 54, title: "Your calendar: see your upcoming plans", status: "in_progress" },
+    // Approved and queued: Builder picks it up after hq-54 (the Developer's page says "Next: hq-58, dark mode").
+    { id: 58, title: "Dark mode for the calendar", status: "approved", updated: "4m ago", updatedMinutes: 4 },
   ],
 };

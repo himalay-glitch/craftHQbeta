@@ -12,9 +12,9 @@ const PANEL_ID = "story-activity";
 /** The card's width once open; its content is laid out at this width from the start, so it never reflows. */
 const OPEN_W = 320;
 
-// DESIGN.md §3.5 shadow-popover, written out so it can grow from nothing as the icon opens.
-const SHADOW_OPEN = "0 0 0 1px rgba(17, 17, 18, 0.06), 0 8px 24px rgba(17, 17, 18, 0.1)";
-const SHADOW_SHUT = "0 0 0 0px rgba(17, 17, 18, 0), 0 0px 0px rgba(17, 17, 18, 0)";
+// A hairline edge, no shadow (Shubham, 26 Nov: a clean layout), written out so it can grow from nothing as the icon opens.
+const SHADOW_OPEN = "0 0 0 1px rgba(0, 0, 0, 0.08)";
+const SHADOW_SHUT = "0 0 0 0px rgba(0, 0, 0, 0)";
 
 type Signal = { kind: "working" | "running" | "waiting" | "failed" | "finished" | "quiet"; words: string };
 
@@ -121,14 +121,14 @@ export function ActivityCorner({ items, yours, open, onOpenChange, title, childr
               </div>
             ) : (
               <h2 id={titleId} className="m-0 mr-auto pl-3.5 text-sm font-medium text-[var(--tx)]">
-                Activity
+                This story
               </h2>
             ))}
-          <Tip label={open ? "Close activity" : `Activity: ${signal.words}`}>
+          <Tip label={open ? "Close" : `Status, story, work and history: ${signal.words}`}>
             <button
               ref={button}
               type="button"
-              aria-label={`Activity: ${signal.words}`}
+              aria-label={`Status, story, work and history: ${signal.words}`}
               aria-expanded={open}
               aria-controls={PANEL_ID}
               onClick={() => setOpen(!open)}
@@ -150,7 +150,7 @@ export function ActivityCorner({ items, yours, open, onOpenChange, title, childr
             <motion.div
               key="activity"
               id={PANEL_ID}
-              aria-label="Activity and Team"
+              aria-label="Status, story, work and history"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { delay: reduce ? 0 : 0.12, duration: reduce ? 0 : 0.15 } }}
               exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.1 } }}

@@ -33,7 +33,7 @@ export function QueueTable({ stories, sort, onSort }: QueueTableProps) {
     // without making a scroll container, so the header still sticks under the top bar.
     // The Action column gives way when the table is under 1000 px (a window under about 1120 px beside the rail, 1240 px with the
     // sidebar open), where it would be too narrow to read; Story then takes its space. The story's page says it too.
-    <div className="@container overflow-clip rounded-[12px] border border-[var(--card-line)]">
+    <div className="@container overflow-clip rounded-[12px] border border-[var(--card-line)] bg-white">
       <table className="w-full table-fixed border-separate border-spacing-0 text-left">
         <thead>
           <tr>

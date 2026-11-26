@@ -61,18 +61,3 @@ export function useIsWide() {
     () => true,
   );
 }
-
-const PHONE = "(max-width: 767.98px)";
-
-/** Under 768 px: the story's Team opens as a full screen (wider, it's a tab beside the chat). */
-export function useIsPhone() {
-  return useSyncExternalStore(
-    (onChange) => {
-      const mq = window.matchMedia(PHONE);
-      mq.addEventListener("change", onChange);
-      return () => mq.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia(PHONE).matches,
-    () => false,
-  );
-}

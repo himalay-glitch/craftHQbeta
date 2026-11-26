@@ -44,7 +44,7 @@ export function Toast({ toast, onDismiss, offsetRight }: { toast: ToastMessage |
             onMouseLeave={() => setPaused(false)}
             onFocus={() => setPaused(true)}
             onBlur={() => setPaused(false)}
-            className="pointer-events-auto flex min-h-11 max-w-[min(560px,100%)] items-center gap-4 rounded-[8px] bg-[var(--ink)] py-2 pr-2 pl-4 text-[14px] leading-5 text-white shadow-[0_8px_24px_rgb(0_0_0/0.16)]"
+            className="pointer-events-auto flex min-h-11 max-w-[min(560px,100%)] items-center gap-4 rounded-[8px] bg-[var(--ink)] py-2 pr-2 pl-4 text-[14px] leading-5 text-white"
           >
             <span className="min-w-0 flex-1">{toast.message}</span>
             {toast.action && (

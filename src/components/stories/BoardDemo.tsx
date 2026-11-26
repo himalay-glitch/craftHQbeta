@@ -71,9 +71,14 @@ export function BoardDemo({ stories, onEvent, landing, onLanding, onStop }: Boar
       run: () => onEvent(54, { status: "planning", need: "decision", waitingOn: "You", meta: "1 open question", clear: ["live"], ...now() }, "move"),
     },
     {
-      label: "Merge hq-43 (as you, on GitHub)",
+      label: "Create hq-43’s pull request",
       can: s43?.status === "in_review",
-      run: () => onEvent(43, { status: "done", outcome: "merged", pr: { state: "merged", number: 172 }, clear: ["need", "waitingOn", "live"], ...now() }, "merge"),
+      run: () => onEvent(43, { status: "pull_request", pr: { state: "open", number: 229, merge: "ready" }, clear: ["need", "waitingOn", "live"], ...now() }, "move"),
+    },
+    {
+      label: "Deepak merges hq-43 on GitHub",
+      can: s43?.status === "pull_request",
+      run: () => onEvent(43, { status: "done", outcome: "merged", pr: { state: "merged", number: 229 }, ...now() }, "merge"),
     },
   ];
 
@@ -112,7 +117,7 @@ export function BoardDemo({ stories, onEvent, landing, onLanding, onStop }: Boar
   return (
     <aside
       aria-label="Demo controls"
-      className="fixed right-4 bottom-4 z-50 w-64 rounded-xl border border-dashed border-[var(--ctl-h)] bg-white/95 p-2 shadow-[0_8px_24px_rgb(0_0_0/0.12)] backdrop-blur"
+      className="fixed right-4 bottom-4 z-50 w-64 rounded-xl border border-dashed border-[var(--ctl-h)] bg-white/95 p-2 backdrop-blur"
     >
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-xs font-medium text-[var(--tx2)]">
         <Cpu aria-hidden="true" size={14} strokeWidth={1.75} />
