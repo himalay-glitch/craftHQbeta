@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { BotId } from "@/types/ask";
-import { TEAM } from "./team";
+import { TEAM, currentId, type FormerBotId } from "./team";
 
 /**
  * A bot's face in a soft circle of its own colour. The posters are composited on white, so they sit on the
@@ -26,7 +26,8 @@ export function BotAvatar({
   animate = false,
   className = "",
 }: {
-  id: BotId;
+  /** An agent's id; its first id (builder, checker, fixer) still works. */
+  id: BotId | FormerBotId;
   size?: number;
   /** No tinted circle: the bot on its own (welcome cards, the PM hero). */
   bare?: boolean;
@@ -34,7 +35,7 @@ export function BotAvatar({
   animate?: boolean;
   className?: string;
 }) {
-  const bot = TEAM[id];
+  const bot = TEAM[currentId(id)];
   const reduced = useReducedMotion();
   // The loop is composited on white like the stills, so it melts into what's behind it the same way (multiply).
   // Each screen gets a clip about twice its size (288 px, or 144 px on 1x screens), so it stays crisp.
@@ -59,7 +60,7 @@ export function BotAvatar({
       </span>
     );
   }
-  return <Still id={id} size={size} bare={bare} className={className} />;
+  return <Still id={bot.id} size={size} bare={bare} className={className} />;
 }
 
 function Still({ id, size, bare, className }: { id: BotId; size: number; bare: boolean; className: string }) {

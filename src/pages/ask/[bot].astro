@@ -2,15 +2,18 @@
 import AppLayout from "@/layouts/AppLayout.astro";
 import { AskPM } from "@/components/ask/AskPM";
 import { askData, askSearch, askViewer } from "@/components/ask/askData";
-import { TEAM } from "@/components/ask/team";
+import { FORMER_IDS, TEAM, isFormerId } from "@/components/ask/team";
 import type { BotId } from "@/types/ask";
 
-// A chat with one bot (demo): /ask/builder, /ask/designer, /ask/checker, /ask/fixer. The PM's own chat is /ask.
+// One agent's page (demo): /ask/developer, /ask/designer, /ask/tester, /ask/debugger. The PM answers there; its own chat is /ask.
 // Rendered on request so `?state=new` (the first-time view: nothing on yet) is known before the page paints.
 export const prerender = false;
 
-const BOTS: BotId[] = ["builder", "designer", "checker", "fixer"];
-const bot = Astro.params.bot as BotId;
+const BOTS: BotId[] = ["developer", "designer", "tester", "debugger"];
+// Old links (/ask/builder …) land on the renamed agent's page.
+const asked = Astro.params.bot ?? "";
+if (isFormerId(asked)) return Astro.redirect(`/ask/${FORMER_IDS[asked]}${Astro.url.search}`, 301);
+const bot = asked as BotId;
 // A bot's page: its welcome and workbench (Shubham, 25 Nov: keep "the bot's first look"). You still only talk to the
 // PM: what you ask here is about this bot, and the PM answers for it or hands it the work.
 if (!BOTS.includes(bot)) return Astro.redirect("/ask");

@@ -209,7 +209,8 @@ export function AskPanel({
                     type="button"
                     onClick={() => onAskAbout(id)}
                     title={id === "pm" ? undefined : `Open ${bot.name}’s page`}
-                    className="flex w-full gap-3 rounded-[16px] px-2.5 py-2.5 text-left transition-colors duration-[120ms] hover:bg-[#F6F6F7]"
+                    aria-current={id === currentBot ? "page" : undefined}
+                    className={`flex w-full gap-3 rounded-[16px] px-2.5 py-2.5 text-left transition-colors duration-[120ms] ${id === currentBot ? "bg-[#F1F1F3]" : "hover:bg-[#F6F6F7]"}`}
                   >
                     {/* Working: a ring in the bot's colour; idle: a grey dot. */}
                     <span className="relative size-10 flex-none self-start">

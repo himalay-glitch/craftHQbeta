@@ -3,7 +3,7 @@
 // handoff and activity lines, and as results credited "by <bot>".
 import type { TicketStatus } from "@/types/status";
 
-export type BotId = "pm" | "builder" | "designer" | "checker" | "fixer";
+export type BotId = "pm" | "developer" | "designer" | "tester" | "debugger";
 
 export interface Bot {
   id: BotId;
