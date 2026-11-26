@@ -348,9 +348,9 @@ function topicOf(q: string, verbs: string[]) {
   return "";
 }
 
-// ---------- A bot's own chat: not on this branch ----------
-// himalay's per-bot chats (/ask/builder …) meet Shubham's rule here: you only talk to the PM (25 Nov). The bot pages
-// redirect to /ask?about=<bot>, so the PM answers everything. Each bot's quick asks stay, for its workbench.
+// ---------- A bot's page (/ask/builder …): its workbench, with the PM answering ----------
+// himalay's bot pages meet Shubham's rule here: you only talk to the PM (25 Nov). On a bot's page, a question that
+// doesn't name another bot is about that bot: the PM says what it's doing, explains its job, or hands it the work.
 
 /** Each bot's quick asks, under its workbench. */
 export const BOT_ASKS: Record<Exclude<BotId, "pm">, string[]> = {
@@ -368,9 +368,33 @@ export const BOT_FIRST_ASKS: Record<Exclude<BotId, "pm">, string[]> = {
   fixer: ["What can you do?", "What do you do when a build fails?", "How do I know something’s stuck?"],
 };
 
-/** Whose chat a question came from doesn't change who answers: the PM, who brings in whichever bot the work needs. */
+const ASKING_STATUS = /\b(what are you|doing|working on|up to|busy)\b/i;
+const INTRO = /\b(what can you do|who are you|how do you|what do you (check|do)|how do i)\b/i;
+
+/** The PM on a bot's job, for "What can you do?" on its page. */
+const JOB: Record<Exclude<BotId, "pm">, string> = {
+  builder:
+    "Builder writes the code. Tell me what you need and I hand it over: Builder makes the change, runs the tests and opens a pull request. Checker tests it on web and phones before it reaches you, and Fixer steps in if a build fails.",
+  designer:
+    "Designer sketches screens and flows. Tell me what you need and I’ll bring you a few directions to pick from; the one you pick becomes a story for Builder.",
+  checker:
+    "Checker tests every change against what the story asked for, on web, Android and iOS. When everything passes, I bring it to you: open it, try it, then accept it or ask for changes.",
+  fixer:
+    "Fixer picks up anything that fails: a preview that won’t start, a check that breaks, a stuck build. It retries, fixes what it can, and I tell you what it found.",
+};
+
+/**
+ * Who answers on a bot's page: always the PM (Shubham, 25 Nov). A question that doesn't name another bot is about
+ * this one, so "What are you building?" on Builder's page gets the PM's word on what Builder is building, and "Build
+ * dark mode" goes to Builder through the PM.
+ */
 export function answerAs(bot: BotId, question: string, d: AskData, fresh = false): Turn[] {
-  void bot;
-  void fresh;
-  return answer(question, d);
+  const q = question.trim();
+  if (bot === "pm" || named(q)) return answer(q, d);
+  const name = bot.charAt(0).toUpperCase() + bot.slice(1);
+  if (INTRO.test(q)) return [pm([{ kind: "text", text: JOB[bot] }, { kind: "suggest", items: BOT_FIRST_ASKS[bot].filter((a) => !INTRO.test(a)) }])];
+  if (fresh && ASKING_STATUS.test(q)) {
+    return [pm([{ kind: "text", text: `${name} has nothing on yet. Tell me what you need and I’ll hand it over.` }, { kind: "suggest", items: BOT_FIRST_ASKS[bot] }])];
+  }
+  return answer(`@${name} ${q}`, d);
 }

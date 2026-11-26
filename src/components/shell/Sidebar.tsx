@@ -81,7 +81,7 @@ function Item({ item, current }: { item: NavItem; current: boolean }) {
 
 /**
  * A bot under the links: its face (24 px), a green dot while it's working, its name and what it's on in the hover
- * label. It asks the PM what that bot is doing (/ask?about=builder): you only talk to the PM; the PM's is Ask PM.
+ * label. It opens that bot's page (/ask/builder …): its workbench and what it's doing. You still talk to the PM there.
  */
 function BotItem({ id, current }: { id: BotId; current: boolean }) {
   const bot = TEAM[id];
@@ -89,7 +89,7 @@ function BotItem({ id, current }: { id: BotId; current: boolean }) {
   return (
     <li className="relative">
       <a
-        href={id === "pm" ? "/ask" : `/ask?about=${id}`}
+        href={id === "pm" ? "/ask" : `/ask/${id}`}
         aria-label={`${bot.name}, ${bot.now}`}
         aria-current={current ? "page" : undefined}
         className={`${ITEM} ${current ? "bg-black/[0.06] font-medium" : "hover:bg-black/[0.04]"}`}

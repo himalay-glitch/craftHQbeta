@@ -107,12 +107,13 @@ function nowFor(bot: Worker, checks: number): Now {
   }
 }
 
-// First time, nothing on yet (?state=new): what the empty strip says, in the bot's own words.
+// First time, nothing on yet (?state=new): what the empty strip says. In the PM's terms, since you talk to the PM
+// (Shubham, 25 Nov): what this bot takes on, and that the PM hands it over.
 const FIRST: Record<Worker, { title: string; text: string }> = {
-  builder: { title: "Nothing on the bench yet", text: "Give me a story and I’ll write the change, run the tests and open the pull request." },
-  designer: { title: "The drawing board is empty", text: "Ask me to sketch a screen or a flow, and I’ll come back with a few directions to pick from." },
-  checker: { title: "Nothing to test yet", text: "When the Builder finishes a change, I test it on web and phones against what the story asked for." },
-  fixer: { title: "Nothing’s broken", text: "If a build or a check fails, I pick it up, retry it and tell you what I found." },
+  builder: { title: "Nothing on the bench yet", text: "Tell the PM what to build: Builder writes the change, runs the tests and opens the pull request." },
+  designer: { title: "The drawing board is empty", text: "Ask the PM for a screen or a flow: Designer sketches a few directions for you to pick from." },
+  checker: { title: "Nothing to test yet", text: "When Builder finishes a change, Checker tests it on web and phones against what the story asked for." },
+  fixer: { title: "Nothing’s broken", text: "If a build or a check fails, Fixer picks it up, retries it, and the PM tells you what it found." },
 };
 
 /**

@@ -416,7 +416,15 @@ export function AskPM({
           </div>
 
           <div className="px-4 pt-2 pb-4 sm:px-6">
-            <Composer value={input} onChange={setInput} onSend={send} onStop={stop} busy={busy} fieldRef={field} />
+            <Composer
+              value={input}
+              onChange={setInput}
+              onSend={send}
+              onStop={stop}
+              busy={busy}
+              fieldRef={field}
+              placeholder={bot === "pm" ? undefined : `Tell PM what you need from ${TEAM[bot].name}…`}
+            />
             <p className="mt-2 text-center text-[12px] leading-4 text-[var(--tx2)]">PM answers from {data.project}’s stories and hands the work to the team · demo</p>
           </div>
         </section>
@@ -427,8 +435,8 @@ export function AskPM({
           onOpenChat={openChat}
           onDeleteChat={removeChat}
           activity={activity}
-          // You only talk to the PM (Shubham, 25 Nov): a bot here asks the PM what it's doing, in this chat.
-          onAskAbout={(id) => ask(id === "pm" ? "What’s happening right now?" : `What is ${TEAM[id].name} doing?`)}
+          // A bot opens its page (its workbench); you still talk to the PM there (Shubham, 25 Nov).
+          onAskAbout={(id) => window.location.assign(id === "pm" ? "/ask" : `/ask/${id}`)}
           currentBot={bot}
           onNewChat={reset}
         />

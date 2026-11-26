@@ -192,7 +192,7 @@ export function AskPanel({
             );
           })}
           {shownChats.length === 0 && (
-            <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">{q ? `No chat matches “${query}”.` : `Your chats${currentBot === "pm" ? "" : ` with the ${TEAM[currentBot].name}`} will show up here.`}</li>
+            <li className="px-3 py-6 text-center text-[13px] text-[var(--tx2)]">{q ? `No chat matches “${query}”.` : `Your chats${currentBot === "pm" ? "" : ` about the ${TEAM[currentBot].name}`} will show up here.`}</li>
           )}
         </ul>
       ) : (
@@ -208,7 +208,7 @@ export function AskPanel({
                   <button
                     type="button"
                     onClick={() => onAskAbout(id)}
-                    title={id === "pm" ? undefined : `Ask PM what ${bot.name} is doing`}
+                    title={id === "pm" ? undefined : `Open ${bot.name}’s page`}
                     className="flex w-full gap-3 rounded-[16px] px-2.5 py-2.5 text-left transition-colors duration-[120ms] hover:bg-[#F6F6F7]"
                   >
                     {/* Working: a ring in the bot's colour; idle: a grey dot. */}

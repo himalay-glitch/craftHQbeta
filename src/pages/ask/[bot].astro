@@ -11,9 +11,9 @@ export const prerender = false;
 
 const BOTS: BotId[] = ["builder", "designer", "checker", "fixer"];
 const bot = Astro.params.bot as BotId;
-// You only talk to the PM (Shubham, 25 Nov): a bot's page asks the PM about that bot instead of opening its own chat.
+// A bot's page: its welcome and workbench (Shubham, 25 Nov: keep "the bot's first look"). You still only talk to the
+// PM: what you ask here is about this bot, and the PM answers for it or hands it the work.
 if (!BOTS.includes(bot)) return Astro.redirect("/ask");
-return Astro.redirect(`/ask?about=${bot}`);
 const fresh = Astro.url.searchParams.get("state") === "new";
 ---
 
