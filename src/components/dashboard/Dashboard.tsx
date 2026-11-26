@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Tooltip } from "radix-ui";
-import { Plus } from "lucide-react";
+import { CircleExclamationPoint, CircleX, Clock, GitPullRequest, LoaderCircle, Plus } from "lucide-react";
 import { ConnectAccountsModal } from "@/components/connect-accounts";
 import type { DashboardData, DashboardStateOverride, NeedKind, Story, StoryStatus } from "@/types/dashboard";
 import { BTN_SECONDARY } from "./classes";
@@ -17,7 +17,8 @@ import { SetupBanner } from "./SetupBanner";
 import { useConnectionSetup } from "./setup";
 import { ShippedRibbon } from "./ShippedRibbon";
 import { StoryPanel, type StoryAction } from "./StoryPanel";
-import { SummaryCards } from "./SummaryCards";
+import { Indicator } from "./Indicator";
+import { StatPanel } from "./StatPanel";
 import { Toast, type ToastMessage } from "./Toast";
 
 // ---- Browser state read without effects (server render uses the fallback, then React switches) ----
@@ -63,12 +64,10 @@ const visibleStoryButton = (id: number) =>
 
 type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | null;
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 /**
- * The dashboard island (DESIGN.md §5.6: what needs me, what's moving, what shipped): a headline that counts down
- * the decisions waiting for you, the five stats, a deck of those decisions one at a time (or the all clear), and
- * this week's merges on a line.
+ * The dashboard island (DESIGN.md §5.6: what needs me, what's moving, what shipped), in three columns that fill
+ * the width: Ready to review and Stuck on the left, Needs you in the middle (a deck of decisions, one at a time, or
+ * the all clear), Running and Queued on the right; this week's merges on a line below.
  */
 export function Dashboard({ data }: { data: DashboardData }) {
   const override = useStateOverride();
@@ -82,6 +81,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const [answered, setAnswered] = useState(0);
   // Ready to review and Stuck filter the deck; Needs you shows it all again.
   const [need, setNeed] = useState<"all" | NeedKind>("all");
+  // A story picked in Ready to review or Stuck, for the deck to bring to the top.
+  const [jump, setJump] = useState<{ id: number; key: number } | null>(null);
   const [localPanel, setLocalPanel] = useState<LocalPanel>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [nextId, setNextId] = useState(data.nextStoryId);
@@ -107,10 +108,10 @@ export function Dashboard({ data }: { data: DashboardData }) {
     needing.filter((s) => s.waitingOn === "You" || s.need === "stuck"),
     "group",
   );
-  const youCount = needing.filter((s) => s.waitingOn === "You").length;
   const othersWaiting = needing.filter((s) => s.need !== "stuck" && s.waitingOn !== "You").length;
   const reviewCount = mine.filter((s) => s.need === "review").length;
-  const stuckCount = mine.filter((s) => s.need === "stuck").length;
+  const stuck = mine.filter((s) => s.need === "stuck");
+  const stuckCount = stuck.length;
   // The agents' side, as on the live app's "Agent's turn" card: what they're running now, by stage.
   const running = {
     inProgress: data.running.filter((r) => r.status === "In progress").length,
@@ -277,6 +278,13 @@ export function Dashboard({ data }: { data: DashboardData }) {
     else if (answer.option.choice.kind === "act") act(story, answer.option.choice.action);
   };
 
+  // A story picked in Ready to review or Stuck: show the whole deck and bring that card to the top.
+  const pick = (id: number) => {
+    setNeed("all");
+    setJump((j) => ({ id, key: (j?.key ?? 0) + 1 }));
+    if (!isWide) document.getElementById("needs-title")?.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+  };
+
   const createStory = ({ title }: { title: string; why: string; detail: string; ownerId: string }) => {
     const id = nextId;
     setNextId(id + 1);
@@ -298,20 +306,12 @@ export function Dashboard({ data }: { data: DashboardData }) {
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
       {/* Panels float over the page from the right; the page keeps its full width underneath. */}
       <main id="main" className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-20 md:px-8">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 id="dashboard-title" tabIndex={-1} className="text-[14px] leading-5 font-medium text-[var(--tx2)] outline-none">
-              {/* The project's name, not "Dashboard": the nav already says which page this is. */}
-              {data.project}
-            </h1>
-            {override !== "loading" && override !== "error" && (
-              // The headline counts down as you answer.
-              <p className="mt-1 text-[24px] leading-8 font-semibold tracking-[-0.015em] text-[var(--tx)]">
-                {allClear ? "You’re all caught up" : `${plural(mine.length, "decision is", "decisions are")} waiting for you`}
-              </p>
-            )}
-          </div>
-          <button type="button" className={`${BTN_SECONDARY} mt-1 flex-none`} onClick={() => openLocal({ kind: "new" })}>
+        <div className="flex items-center justify-between gap-4">
+          <h1 id="dashboard-title" tabIndex={-1} className="text-[21px] leading-7 font-medium tracking-[-0.01em] text-[var(--tx)] outline-none">
+            {/* The project's name, not "Dashboard": the nav already says which page this is. */}
+            {data.project}
+          </h1>
+          <button type="button" className={`${BTN_SECONDARY} flex-none`} onClick={() => openLocal({ kind: "new" })}>
             <Plus aria-hidden="true" size={16} strokeWidth={2} />
             New story
           </button>
@@ -323,48 +323,126 @@ export function Dashboard({ data }: { data: DashboardData }) {
           <DashboardSkeleton />
         ) : (
           <>
-            <div className="mt-2">
-              <SummaryCards
-                needsYou={youCount}
-                othersWaiting={othersWaiting}
-                readyToReview={reviewCount}
-                stuck={stuckCount}
-                running={running}
-                queued={data.queued}
-                loopTick={data.loopTick}
-                active={need === "review" ? "review" : need === "stuck" ? "stuck" : allClear ? null : "mine"}
-                onNeedsYou={() => setNeed("all")}
-                onReview={() => setNeed((n) => (n === "review" ? "all" : "review"))}
-                onAgent={() => openLocal({ kind: "details", tab: "agent" })}
-                onStuck={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
-              />
+            {/* Three columns that fill the width: what to review and what's stuck, Needs you with its deck in the
+                middle, what's running and queued. The side cards stretch to the deck's height. */}
+            <div className="mt-6 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
+              <section aria-labelledby="needs-title" className="min-w-0 lg:order-2">
+                <header className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Indicator icon={CircleExclamationPoint} tone="attention" on={mine.length > 0} />
+                  <h2 id="needs-title" className="text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
+                    Needs you
+                  </h2>
+                  <span className="rounded-full bg-[#FCEFD6] px-2 py-px text-[13px] leading-[18px] font-medium text-[#7A4A00] tabular-nums">
+                    {visible.length}
+                  </span>
+                  {need === "all" ? (
+                    othersWaiting > 0 && <span className="text-[13px] leading-[18px] text-[var(--tx2)]">· {othersWaiting} more waiting on others</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setNeed("all")}
+                      className="text-[13px] leading-[18px] text-[var(--tx2)] underline-offset-2 hover:text-[var(--tx)] hover:underline"
+                    >
+                      · {need === "review" ? "Ready to review" : "Stuck"} only · Show all {mine.length}
+                    </button>
+                  )}
+                </header>
+
+                <div className="mt-4">
+                  {override === "error" ? (
+                    <QueueMessage kind="error" onRetry={() => window.location.assign(window.location.pathname)} />
+                  ) : (
+                    // The deck, or, once it's empty, the all clear. They cross-fade.
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={allClear ? "clear" : visible.length ? "deck" : "filtered"}
+                        initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.2, 0, 0, 1] } }}
+                        exit={{ opacity: 0, transition: { duration: 0.15, ease: [0.4, 0, 1, 1] } }}
+                      >
+                        {allClear ? (
+                          <AllClear answered={answered} />
+                        ) : visible.length ? (
+                          <NeedsDeck stories={visible} onDecide={decide} onOpen={open} jump={jump} />
+                        ) : (
+                          <QueueMessage kind="filtered" onClear={() => setNeed("all")} />
+                        )}
+                      </motion.div>
+                    </AnimatePresence>
+                  )}
+                </div>
+              </section>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:order-1 lg:flex lg:flex-col">
+                <StatPanel
+                  label="Ready to review"
+                  value={reviewCount}
+                  sub="waiting on you"
+                  icon={GitPullRequest}
+                  tone="attention"
+                  items={mine.filter((s) => s.need === "review").map((s) => ({ id: s.id, title: s.title, meta: s.updated }))}
+                  max={5}
+                  onItem={pick}
+                  onOpen={() => setNeed((n) => (n === "review" ? "all" : "review"))}
+                  pressed={need === "review"}
+                  action={need === "review" ? "Show everything" : "Review them one by one"}
+                  empty="Nothing to review."
+                  className="lg:flex-[3]"
+                />
+                <StatPanel
+                  label="Stuck"
+                  value={stuckCount}
+                  sub="not being picked up"
+                  icon={CircleX}
+                  tone="negative"
+                  ring
+                  items={stuck.map((s) => ({ id: s.id, title: s.title }))}
+                  max={3}
+                  onItem={pick}
+                  onOpen={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
+                  pressed={need === "stuck"}
+                  action={need === "stuck" ? "Show everything" : "Unstick them one by one"}
+                  empty="Nothing is stuck."
+                  className="lg:flex-[2]"
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:order-3 lg:flex lg:flex-col">
+                <StatPanel
+                  label="Running"
+                  value={data.running.length}
+                  sub={`${running.inProgress} building, ${running.inReview} checking`}
+                  icon={LoaderCircle}
+                  tone="active"
+                  spin
+                  items={[...data.running]
+                    .sort((a, b) => Number(b.status === "In progress") - Number(a.status === "In progress"))
+                    .map((r) => ({ id: r.id, title: r.title, meta: r.status === "In progress" ? "Building" : "Checking" }))}
+                  max={6}
+                  onItem={open}
+                  onOpen={() => openLocal({ kind: "details", tab: "agent" })}
+                  action="See what the agents are doing"
+                  empty="The agents are idle."
+                  className="lg:flex-[3]"
+                />
+                <StatPanel
+                  label="Queued"
+                  value={data.queued}
+                  sub={`checked ${data.loopTick}`}
+                  icon={Clock}
+                  tone="neutral"
+                  items={[]}
+                  max={3}
+                  onItem={open}
+                  onOpen={() => openLocal({ kind: "details", tab: "agent" })}
+                  action="Open the queue"
+                  empty="Nothing is waiting to start. New work starts as soon as it’s approved."
+                  className="lg:flex-[2]"
+                />
+              </div>
             </div>
 
-            {/* The stage, centred: the deck of tall cards, or, once it's empty, the all clear. They cross-fade. */}
-            <div className="mx-auto mt-10 w-full max-w-[480px]">
-              {override === "error" ? (
-                <QueueMessage kind="error" onRetry={() => window.location.assign(window.location.pathname)} />
-              ) : (
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={allClear ? "clear" : visible.length ? "deck" : "filtered"}
-                    initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.2, 0, 0, 1] } }}
-                    exit={{ opacity: 0, transition: { duration: 0.15, ease: [0.4, 0, 1, 1] } }}
-                  >
-                    {allClear ? (
-                      <AllClear answered={answered} />
-                    ) : visible.length ? (
-                      <NeedsDeck stories={visible} onDecide={decide} onOpen={open} />
-                    ) : (
-                      <QueueMessage kind="filtered" onClear={() => setNeed("all")} />
-                    )}
-                  </motion.div>
-                </AnimatePresence>
-              )}
-            </div>
-
-            <div className="mt-14 border-t border-[var(--line)] pt-6">
+            <div className="mt-12 border-t border-[var(--line)] pt-6">
               <ShippedRibbon shipped={data.shipped} done={data.done + answered} />
             </div>
           </>

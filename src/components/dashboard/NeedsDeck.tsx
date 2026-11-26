@@ -109,6 +109,8 @@ interface NeedsDeckProps {
   stories: Story[];
   onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
   onOpen: (id: number) => void;
+  /** A story picked beside the deck; each new key brings it to the top. */
+  jump?: { id: number; key: number } | null;
 }
 
 const ICON_BTN =
@@ -120,7 +122,7 @@ const ICON_BTN =
  * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same, and 1–3 answer.
  * Under the deck, who's next, and All, to jump to any decision.
  */
-export function NeedsDeck({ stories, onDecide, onOpen }: NeedsDeckProps) {
+export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
   const reduced = useReducedMotion();
   const [seq, setSeq] = useState<number[]>([]);
   const [move, setMove] = useState<Move>("answered");
@@ -137,6 +139,16 @@ export function NeedsDeck({ stories, onDecide, onOpen }: NeedsDeckProps) {
   const decision = top ? decisionFor(top) : null;
   const next = order.slice(1).map((id) => byId.get(id)!);
   const topId = top?.id ?? null;
+
+  // A story picked beside the deck (Ready to review, Stuck) comes to the top, entering from the left.
+  const [lastJump, setLastJump] = useState(jump?.key ?? 0);
+  if (jump && jump.key !== lastJump) {
+    setLastJump(jump.key);
+    if (ids.includes(jump.id) && jump.id !== topId && !sent) {
+      setMove("back");
+      setSeq([jump.id, ...order.filter((x) => x !== jump.id)]);
+    }
+  }
 
   // If the keyboard was on the card that left, it moves to the new one.
   useEffect(() => {
