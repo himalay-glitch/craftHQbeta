@@ -36,6 +36,18 @@ export interface Story {
   updated?: string;
   /** The same, in minutes, for sorting. */
   updatedMinutes?: number;
+  /** In review: the last check run, the evidence on its decision card. */
+  checks?: { passed: number; total: number };
+  /** A decision: the open question it waits on, and the answer that stands if you keep the default. */
+  question?: { text: string; fallback: string };
+}
+
+/** A story that merged recently ("Shipped this week"). */
+export interface ShippedItem {
+  id: number;
+  title: string;
+  /** "2h ago", "yesterday", "Tuesday". */
+  when: string;
 }
 
 /** A story the agent is working on ("With the agent"). */
@@ -74,6 +86,8 @@ export interface DashboardData {
   /** "just now": when the agent's loop last checked in. */
   loopTick: string;
   activity: ActivityItem[];
+  /** This week's merges, newest first. */
+  shipped: ShippedItem[];
   done: number;
   totalStories: number;
   about: string;
