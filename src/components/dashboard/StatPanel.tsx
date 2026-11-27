@@ -144,7 +144,9 @@ export function StatPanel(p: StatPanelProps) {
             aria-hidden="true"
             size={16}
             strokeWidth={1.75}
-            className="flex-none opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-visible:opacity-100"
+            className={`flex-none opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-visible:opacity-100 ${
+              pages > 1 ? "hidden @min-[300px]:block" : ""
+            }`}
           />
         </span>
         <span className="mt-3 text-[30px] leading-9 font-medium tracking-[-0.02em] text-[var(--tx)] tabular-nums">{p.value}</span>
