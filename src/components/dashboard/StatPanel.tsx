@@ -125,7 +125,7 @@ export function StatPanel(p: StatPanelProps) {
   return (
     <section
       aria-label={p.label}
-      className={`relative flex min-h-0 flex-col rounded-[12px] border bg-white p-4 transition-[border-color,box-shadow] duration-[120ms] ${
+      className={`@container relative flex min-h-0 flex-col rounded-[12px] border bg-white p-4 transition-[border-color,box-shadow] duration-[120ms] ${
         p.pressed ? "border-[var(--cta)] shadow-[0_0_0_3px_rgb(47_111_237/0.12)]" : "border-[var(--card-line)]"
       } ${p.className ?? ""}`}
     >
@@ -136,8 +136,8 @@ export function StatPanel(p: StatPanelProps) {
         aria-label={`${p.label}: ${p.value}. ${p.openLabel}`}
         className="group -m-2 flex flex-col rounded-[8px] p-2 text-left transition-colors duration-[120ms] hover:bg-[#FAFAFA]"
       >
-        {/* With a pager, the label leaves it room. */}
-        <span className={`flex items-center gap-2 text-[13px] leading-5 text-[var(--tx2)] ${pages > 1 ? "pr-28" : ""}`}>
+        {/* With a pager, the label leaves it room (less in a narrow tile, where the pager is just its arrows). */}
+        <span className={`flex items-center gap-2 text-[13px] leading-5 text-[var(--tx2)] ${pages > 1 ? "pr-14 @min-[300px]:pr-28" : ""}`}>
           <Indicator icon={p.icon} tone={p.tone} on={p.value > 0} spin={p.spin} ring={p.ring} size={20} />
           <span className="min-w-0 truncate">{p.label}</span>
           <ChevronRight
@@ -197,7 +197,8 @@ export function StatPanel(p: StatPanelProps) {
       {/* More than fit: page through them here, a tile's worth at a time, from the tile's top right. */}
       {total > 0 && pages > 1 && (
         <div className="absolute top-3 right-3 flex items-center">
-          <p aria-live="polite" className="mr-1 text-[12px] leading-4 text-[var(--tx2)] tabular-nums">
+          {/* In a narrow tile the count is for screen readers only, so the label keeps its room. */}
+          <p aria-live="polite" className="sr-only mr-1 text-[12px] leading-4 text-[var(--tx2)] tabular-nums @min-[300px]:not-sr-only">
             {shown.length > 1 ? `${at * per + 1}–${at * per + shown.length}` : at * per + 1} of {total}
           </p>
           <Tip label="Previous">
