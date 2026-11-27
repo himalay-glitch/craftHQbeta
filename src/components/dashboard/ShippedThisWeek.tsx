@@ -15,8 +15,8 @@ interface ShippedThisWeekProps {
 /**
  * What shipped (DESIGN.md §5.6, the third question): proof the work is moving, and the way to check it. On the
  * columns' grid: under the left tiles, this week's number as a KPI with the project's progress; beside it, what
- * merged, newest first, in two columns under the deck and the right tiles, each opening its story. No timeline: the merges aren't evenly spaced in time, so points on
- * a line would say something false.
+ * merged, newest first, in two columns under the deck and the right tiles, each opening its story. No timeline:
+ * the merges aren't evenly spaced in time, so points on a line would say something false.
  */
 export function ShippedThisWeek({ shipped, done, total, onOpen }: ShippedThisWeekProps) {
   return (

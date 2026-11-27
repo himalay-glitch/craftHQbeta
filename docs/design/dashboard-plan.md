@@ -39,8 +39,8 @@ What the dashboard is, where its look and content come from, and how it behaves.
 │    │ └─────────────────────┘  └──────────────────────────────┘    └─────────────────────┘    │
 │    │                               ‹   See all ⌄   ›                                         │
 │ ⚙  │ ─────────────────────────────────────────────────────────────────────────────────────── │
-│ ◫  │ Shipped this week                                                       6 done in all   │
-│    │ ●──────────────────●──────────────────●──────────────────●──────→                       │
+│ ◫  │ (✓) Shipped this week     ⑂ Home feed: upcoming events…  2h ago  ⑂ Invite friends…  Yest. │
+│    │ 4 · 6 of 43 stories done  ⑂ Profile photo upload        Tuesday ⑂ RSVP with a gu… Monday │
 └────┴─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -89,8 +89,8 @@ One decision at a time: the stories waiting on you, plus Stuck, in the prototype
 ### All clear (`AllClear`)
 `DESIGN.md` §6.7: the PM (64 px, blinking), "Nothing needs you", "The agents will ask here when they need you.", centred, at most 360 px wide, no action; plus "You answered 14 decisions" when you cleared it yourself.
 
-### Shipped this week (`ShippedRibbon`)
-What shipped, as one line: the week's merges as points, oldest on the left, each with its title, when and ID; the line runs on past the newest to now. The project's done count sits on the right of the heading. It scrolls sideways on phones.
+### Shipped this week (`ShippedThisWeek`)
+`DESIGN.md` §5.6's third question, what shipped: proof the work is moving, and the way to check it. It sits under a hairline, unboxed, on the columns' grid. Under the left tiles: a still, dark green check (`Indicator` tone `done`, so it never reads as running), "Shipped this week", the week's merges as a KPI number, and the project's progress ("6 of 43 stories done"). Beside it, under the deck and the right tiles: what merged, newest first, in two columns, each with a merge mark, its title and when; each opens its story. There's no timeline: the merges aren't evenly spaced in time, so points on a line would say something false. On phones it's one column, with no sideways scroll. With nothing merged: 0 and "Nothing has merged this week yet."
 
 ### Indicators (`Indicator`)
 A white icon in a solid circle, in the status pills' tones (`DESIGN.md` §7.12): agents at work green `#16A34A` (turning), waiting grey `#8E8F94`, a person's turn amber `#D97706`, stuck red `#DC2626`; grey and still at 0. Every fill keeps the icon above 3:1. Values are never coloured.
