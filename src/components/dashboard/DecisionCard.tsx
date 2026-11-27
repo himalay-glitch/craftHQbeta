@@ -32,8 +32,8 @@ const RADIO =
 /**
  * One decision, on a tall card: its status, the question as the headline, the story it's about and the facts in
  * one line (DESIGN.md §2.2). Then the answers as a radio list (§6.2): three to pick, the recommended one first and
- * chosen to start with, and the fourth, Other, a box to write your own; then the one button, which says what
- * sending does ("Try again", "Send note").
+ * chosen to start with, and the fourth, Other, a box to write your own; then the one button, Submit, which sends
+ * whichever is chosen.
  */
 export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose, onReply, onOpen }: DecisionCardProps) {
   const [text, setText] = useState("");
@@ -41,7 +41,6 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
   const qId = `deck-q-${story.id}`;
   const group = `deck-a-${story.id}`;
   const otherKey = decision.options.length + 1;
-  const chosen = choice === "other" ? null : decision.options[choice];
 
   return (
     <article aria-labelledby={qId} className="relative">
@@ -73,7 +72,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
       </p>
 
       {/* The answers, as one radio list: three to pick, the recommended one first and chosen to start with, then Other
-          to write your own. Nothing happens until you send, with the button that says what will happen. */}
+          to write your own. Nothing happens until you press Submit. */}
       <form
         data-deck-form
         onSubmit={(e) => {
@@ -163,11 +162,10 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
           </div>
         </fieldset>
 
-        {/* The one button: it says what sending does. */}
+        {/* The one button, Submit: it sends whichever answer is chosen. */}
         <div className="mt-4 flex justify-end [@media(max-height:820px)]:mt-3">
           <button type="submit" disabled={choice === "other" && !text.trim()} className={`${BTN_PRIMARY} h-10 px-4`}>
-            {chosen ? chosen.label : "Send note"}
-            {chosen?.choice.kind === "open" && <ArrowUpRight aria-hidden="true" size={16} strokeWidth={2} />}
+            Submit
             <kbd aria-hidden="true" className="hidden font-sans text-white/70 [@media(pointer:fine)]:inline">
               ↵
             </kbd>
