@@ -37,6 +37,9 @@ export function DashboardSkeleton() {
                 </span>
               ))}
             </span>
+            <span className="mt-4 flex justify-end">
+              <span className={`${SKELETON} block h-10 w-28 rounded-full`} />
+            </span>
           </div>
         </div>
       </div>
