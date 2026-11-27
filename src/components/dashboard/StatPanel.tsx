@@ -198,7 +198,7 @@ export function StatPanel(p: StatPanelProps) {
       {total > 0 && pages > 1 && (
         <div className="absolute top-3 right-3 flex items-center">
           <p aria-live="polite" className="mr-1 text-[12px] leading-4 text-[var(--tx2)] tabular-nums">
-            {at * per + 1}–{at * per + shown.length} of {total}
+            {shown.length > 1 ? `${at * per + 1}–${at * per + shown.length}` : at * per + 1} of {total}
           </p>
           <Tip label="Previous">
             <button type="button" onClick={() => turn(-1)} disabled={at === 0} aria-label={`Previous ${p.label}`} className={PAGE_BTN}>
