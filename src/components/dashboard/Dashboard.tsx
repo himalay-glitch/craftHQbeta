@@ -9,7 +9,7 @@ import { clearStoryParam, readStoryParam, sortQueue, storyRef, URL_EVENT, writeS
 import { ActivityPanel, type DetailsTab } from "./ActivityPanel";
 import { AllClear } from "./AllClear";
 import { DashboardSkeleton } from "./DashboardSkeleton";
-import type { DecisionOption, DecisionReply } from "./decisions";
+import { stuckReason, type DecisionOption, type DecisionReply } from "./decisions";
 import { NeedsDeck } from "./NeedsDeck";
 import { NeedsPanel } from "./NeedsPanel";
 import { NewStoryPanel } from "./NewStoryPanel";
@@ -416,7 +416,14 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   sub="waiting on you"
                   icon={GitPullRequest}
                   tone="attention"
-                  items={mine.filter((s) => s.need === "review")}
+                  items={mine
+                    .filter((s) => s.need === "review")
+                    .map((s) => ({
+                      id: s.id,
+                      title: s.title,
+                      time: s.updated,
+                      detail: s.checks ? `${s.checks.passed} of ${s.checks.total} checks passed` : "Preview ready",
+                    }))}
                   onItem={pick}
                   onOpen={() => setNeed((n) => (n === "review" ? "all" : "review"))}
                   openLabel={need === "review" ? "Show everything in the deck" : "Show only these in the deck"}
@@ -431,7 +438,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   icon={CircleX}
                   tone="negative"
                   ring
-                  items={stuck}
+                  items={stuck.map((s) => ({ id: s.id, title: s.title, time: s.updated, detail: stuckReason(s) }))}
                   onItem={pick}
                   onOpen={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
                   openLabel={need === "stuck" ? "Show everything in the deck" : "Show only these in the deck"}
@@ -449,7 +456,15 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   icon={LoaderCircle}
                   tone="active"
                   spin
-                  items={[...data.running].sort((a, b) => Number(b.status === "In progress") - Number(a.status === "In progress"))}
+                  items={[...data.running]
+                    .sort((a, b) => Number(b.status === "In progress") - Number(a.status === "In progress"))
+                    .map((r) => ({
+                      id: r.id,
+                      title: r.title,
+                      time: r.updated,
+                      detail: r.status === "In progress" ? "Building" : "In checks",
+                      live: r.status === "In progress",
+                    }))}
                   onItem={open}
                   onOpen={() => openLocal({ kind: "details", tab: "agent" })}
                   openLabel="See what the agents are doing"
