@@ -1,0 +1,56 @@
+---
+// The Docs contents (Shubham, 26 Nov: the Reader design). One quiet list like the app's sidebar, no boxes: the four
+// articles, and under the one you're reading, its sections. The section in view is marked as you scroll (the script in
+// GuidePage.astro). Where you are reads as the app's current item: the pressed fill, the foreground and a medium weight
+// for the article, a dark rule beside the section, never blue (DESIGN.md §3.1).
+import type { DocArticle } from "./articles";
+
+interface Props {
+  articles: DocArticle[];
+  current: DocArticle;
+  /** The "Docs" caption above the list; the folded copy on narrow screens has its own "Contents" button instead. */
+  caption?: boolean;
+}
+
+const { articles, current, caption = true } = Astro.props;
+---
+
+<nav aria-label="Docs">
+  {caption && <p class="px-2 pb-2 text-xs font-medium text-muted-foreground">Docs</p>}
+  <ol class="flex list-none flex-col gap-0.5">
+    {
+      articles.map((a) => {
+        const open = a.slug === current.slug;
+        return (
+          <li>
+            <a
+              href={`/docs/${a.slug}`}
+              aria-current={open ? "page" : undefined}
+              class:list={[
+                "block rounded-lg px-2 py-1.5 text-sm transition-colors duration-100",
+                open ? "bg-pressed font-medium" : "hover:bg-hover",
+              ]}
+            >
+              {a.title}
+            </a>
+            {open && (
+              <ol class="my-1 ml-3 flex list-none flex-col border-l border-border">
+                {a.sections.map((s) => (
+                  <li>
+                    <a
+                      href={`#${s.id}`}
+                      data-docs-toc={s.id}
+                      class="-ml-px block border-l border-transparent py-1 pr-2 pl-3 text-sm text-muted-foreground transition-colors duration-100 hover:text-foreground aria-[current=true]:border-foreground aria-[current=true]:text-foreground"
+                    >
+                      {s.title}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </li>
+        );
+      })
+    }
+  </ol>
+</nav>

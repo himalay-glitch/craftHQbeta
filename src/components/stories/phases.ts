@@ -43,3 +43,21 @@ export function runLine(phases: RunPhase[]) {
 
 /** The run's whole time: "15s", "38m" (whole minutes drop the "0s"). */
 export const runTime = (phases: RunPhase[]) => elapsed(phases.reduce((t, p) => t + p.ms, 0)).replace(/m 0s$/, "m");
+
+/**
+ * What the robot is doing inside each phase, a few plain steps, for the faint trail under the chat's live line
+ * (RunTrail). Sample words until the CraftHQ API streams a run's real steps; they play once, in order, and the
+ * last one stays. Robots by name, never "agent" (DESIGN.md §9.2).
+ */
+export const PHASE_STEPS: Record<PhaseKey, string[]> = {
+  plan: ["Making the story’s branch", "Reading the plan", "Reading the engineering page", "Listing the files it will change"],
+  implement: ["Opening the files it will change", "Writing the change", "Saving the changed files", "Running the app’s own tests"],
+  "ui-check": ["Starting the app", "Opening the screens at phone size", "Opening the screens at web size", "Comparing them with the specification"],
+  review: ["Running every check", "Reading its own change line by line", "Looking for screens it didn’t mean to change"],
+  verify: ["Checker is reading the story", "Checker is trying the change", "Checker is comparing it with the plan"],
+  resume: ["Finding where it stopped", "Picking up the story’s branch", "Carrying on with the change"],
+  reply: ["Gathering what it found", "Writing the reply", "Reading it over once more"],
+};
+
+/** The same, while the robot reads a message before it answers. */
+export const THINKING_STEPS = ["Reading your message", "Looking back over the story", "Checking what changed since the last build", "Working out what to do"];

@@ -27,6 +27,7 @@ const refs = (ids: number[]) => ids.map((id) => `hq-${id}`).join(", ");
 
 /** The "Latest main" line in the outputs: up to date, or what's being brought in. Built stories only. */
 export function mainDetail(m: MainState): { state: ActivityItem["state"]; detail: string } {
+  if (m.behind.length && m.onPush) return { state: "waiting", detail: `${refs(m.behind)} merged · compared when you create the pull request` };
   if (m.behind.length) return { state: "working", detail: `${refs(m.behind)} merged · bringing it in` };
   return { state: "done", detail: m.settled ? `Up to date · ${m.settled} clashes, both sides kept` : `Up to date · checked ${m.checked}` };
 }
@@ -41,6 +42,10 @@ export function buildActivity(s: StoryItem, facts: StoryFacts, now?: number): Ac
   const status = s.status;
   // New is not a plan being written (statuses guide §2): until the agent picks it up, nothing is happening.
   const untouched = status === "new" && !s.need;
+  // The whole app, every screen from A to Z, is there at every stage (Shubham, 27 Nov): with this story in it once
+  // it's built, and before that the app as it is now. One machine runs at a time, this story's preview or this.
+  const built = s.need !== "stuck" && (status === "in_review" || status === "pull_request" || status === "done");
+  a.push(item(s, "preview", { title: "Whole app · Web", scope: "app", withStory: built, state: "done", detail: "Ready to try", device: "web", run: "off", at: "Nov 10" }));
   a.push(item(s, "read", { title: "Story", state: untouched ? "info" : "done", detail: untouched ? "Not planned yet" : "Read", at: "Nov 10" }));
   if (status === "new" || status === "cancelled") {
     if (status === "cancelled") a.push(item(s, "stage", { title: "Cancelled", state: "info", detail: "", move: { from: "Planning", to: "Cancelled" }, at: "Nov 12" }));
@@ -118,6 +123,8 @@ export interface Task {
   files?: FileRef[];
   count?: number;
   device?: Device;
+  /** Previews: this story's own, or the whole app. */
+  scope?: ActivityItem["scope"];
   ms: number;
 }
 
@@ -159,10 +166,26 @@ export function taskFor(text: string, story: StoryItem, built: boolean): Task | 
       title: `Markup · ${DEVICE_NAME[device]}`,
       doing: "Drawing the markup",
       done: "2 screens, from the plan",
-      reply: "The markup is ready: two screens, drawn from the plan. It’s in Activity on the right.",
+      reply: "The markup is ready: two screens, drawn from the plan. It’s under Preview.",
       count: 2,
       device,
       ms: 3000,
+    };
+  }
+  // The whole app, every screen: there before the build too, as the app is now. "app" here isn't the mobile app.
+  if (has(text, /\b(whole|entire|full) (app|product)\b|\ba to z\b/)) {
+    const device = deviceIn(text.replace(/\b(whole|entire|full) (app|product)\b/gi, ""), "web");
+    return {
+      kind: "preview",
+      scope: "app",
+      title: `Whole app · ${DEVICE_NAME[device]}`,
+      doing: `Starting the whole app on ${device}`,
+      done: `Running on ${device}`,
+      reply: built
+        ? `The whole app is running on ${device}, with this story in it: every screen, from the first one. Open it under Preview, and stop it there when you’re done.`
+        : `The whole app is running on ${device}, as it is now: this story isn’t in it yet, it comes with the build. Open it under Preview, and stop it there when you’re done.`,
+      device,
+      ms: 2400,
     };
   }
   if (has(text, /preview/)) {
@@ -173,7 +196,7 @@ export function taskFor(text: string, story: StoryItem, built: boolean): Task | 
         title: `Preview · ${DEVICE_NAME[device]}`,
         doing: "Checking the preview",
         done: "Made after the build",
-        reply: "There’s nothing to preview yet: it’s built after the plan is approved. I’ll start it as soon as the build finishes.",
+        reply: "There’s nothing of this story to preview yet: it comes with the build, once the plan is approved. Meanwhile the whole app, as it is now, is under Preview.",
         device,
         ms: 1200,
       };
@@ -183,7 +206,7 @@ export function taskFor(text: string, story: StoryItem, built: boolean): Task | 
       title: `Preview · ${DEVICE_NAME[device]}`,
       doing: `Starting the preview on ${device}`,
       done: `Running on ${device}`,
-      reply: `The preview is running on ${device}. Open it from Activity, and stop it there when you’re done.`,
+      reply: `The preview is running on ${device}: just what this story makes. Open it under Preview, and stop it there when you’re done.`,
       device,
       ms: 2400,
     };
@@ -204,7 +227,7 @@ export function taskFor(text: string, story: StoryItem, built: boolean): Task | 
       title: "Specification page",
       doing: "Editing the specification page",
       done: "Edited with your note",
-      reply: "I’ve updated the specification page with that. The changes are in Activity on the right.",
+      reply: "I’ve updated the specification page with that. The changes are under Pages.",
       ms: 2800,
     };
   }
@@ -229,10 +252,12 @@ export const isNow = (i: ActivityItem) =>
   i.state === "working" || i.state === "waiting" || i.state === "failed" || i.run === "starting" || Boolean(i.settling);
 
 
-/** One of each: a story has one specification page, one engineering page, one preview and one pull request, and
- *  a rebuild's build and checks replace the last ones. Each is keyed by what it is, so only its newest version counts. */
+/** One of each: a story has one specification page, one engineering page, one preview of its own, one of the whole
+ *  app and one pull request, and a rebuild's build and checks replace the last ones. Each is keyed by what it is, so
+ *  only its newest version counts. */
 const SINGLE: ActivityKind[] = ["spec", "engineering", "preview", "pr", "main"];
-const sameThing = (it: ActivityItem) => (SINGLE.includes(it.kind) ? it.kind : `${it.kind}:${it.title}`);
+const sameThing = (it: ActivityItem) =>
+  it.kind === "preview" && it.scope === "app" ? "preview:app" : SINGLE.includes(it.kind) ? it.kind : `${it.kind}:${it.title}`;
 
 /** The newest version of each thing, newest first: an older version (a page since rewritten, last build's checks)
  *  is never on top and never in the Ready list. */
@@ -253,10 +278,10 @@ export const nowOf = (items: ActivityItem[]) => newestVersions(items).filter(isN
 /** Something is being worked on right now (the Ready list fades back while it is). */
 export const anyWorking = (items: ActivityItem[]) => nowOf(items).some((i) => i.state === "working" || i.run === "starting");
 
-/** Finished things, as buttons at the bottom of the column, in the order they finished: the newest lands last.
- *  Only the newest version of each thing counts, so a page being reworked leaves the list while it's on top and
- *  comes back down when it's ready. Reading the story and stage changes aren't things you open: never here. */
-export function readyOf(items: ActivityItem[]) {
+/** Finished things, in the order they finished: the newest lands last. Only the newest version of each thing counts, so
+ *  a page being reworked isn't here while it's being rewritten. Reading the story and stage changes aren't things you
+ *  open: never here. `justNow`: with what finished a moment ago and is still "settling". */
+function finished(items: ActivityItem[], justNow: boolean) {
   const seen = new Set<string>();
   const newest: { it: ActivityItem; index: number }[] = [];
   items.forEach((it, index) => {
@@ -264,33 +289,43 @@ export function readyOf(items: ActivityItem[]) {
     const key = sameThing(it);
     if (seen.has(key)) return; // an older version of something newer
     seen.add(key);
-    if (it.state === "done" && !it.settling) newest.push({ it, index });
+    if (it.state === "done" && (justNow || !it.settling)) newest.push({ it, index });
   });
   return newest.sort((a, b) => (a.it.doneAt ?? 0) - (b.it.doneAt ?? 0) || b.index - a.index).map(({ it }) => it);
 }
+
+/** Finished and settled: what the phone's one-line summary counts as ready (what has just finished is its news then). */
+export const readyOf = (items: ActivityItem[]) => finished(items, false);
+
+/** Everything that was made, with what finished a moment ago: each part of the Output shows its own things in place. */
+export const madeOf = (items: ActivityItem[]) => finished(items, true);
+
+/** Being made, waiting on someone or stopped: the newest version of each thing that isn't finished. Each shows in its
+ *  own part (Shubham, 27 Nov: every part a box of its own), where it becomes a finished line when it's done. */
+export const activeOf = (items: ActivityItem[]) =>
+  newestVersions(items).filter((i) => i.kind !== "read" && i.kind !== "stage" && (i.state === "working" || i.state === "waiting" || i.state === "failed"));
 
 // ---- Outputs: one short list, in a fixed order ----
 
 /** The thing you'd open first goes first; then the order they finished. */
 const KIND_ORDER: ActivityKind[] = ["spec", "engineering", "preview", "screenshots", "markup", "pr", "main", "build", "checks"];
 
+/** This story's preview before the whole app's. */
+const rank = (it: ActivityItem) => KIND_ORDER.indexOf(it.kind) + (it.scope === "app" ? 0.5 : 0);
+
 export function orderOutputs(ready: ActivityItem[]) {
   return ready
     .map((it, i) => ({ it, i }))
-    .sort((a, b) => KIND_ORDER.indexOf(a.it.kind) - KIND_ORDER.indexOf(b.it.kind) || a.i - b.i)
+    .sort((a, b) => rank(a.it) - rank(b.it) || a.i - b.i)
     .map(({ it }) => it);
 }
 
 /** The newest thing working, else the newest thing (the phone summary falls back to it). Items are newest first. */
 export const spotOf = (items: ActivityItem[]) => items.find((i) => i.state === "working") ?? items[0];
 
-export const currentPreview = (items: ActivityItem[]) => items.find((i) => i.kind === "preview" && i.state !== "info");
-
-/** The preview machine, while it's starting or running. */
-export const livePreview = (items: ActivityItem[]) => {
-  const p = currentPreview(items);
-  return p && (p.run === "starting" || p.run === "on") ? p : undefined;
-};
+/** The preview machine, while it's starting or running: this story's preview or the whole app (one runs at a time). */
+export const livePreview = (items: ActivityItem[]) =>
+  items.find((i) => i.kind === "preview" && i.state !== "info" && (i.run === "starting" || i.run === "on"));
 
 /** The evidence for the viewer's open decision (DESIGN.md §2.2): marked "Waiting on you" in the ready list. */
 const PROOF: Partial<Record<NeedKind, ActivityKind[]>> = { review: ["preview", "checks"], planning: ["spec", "engineering"], decision: ["spec"], triage: ["read"] };

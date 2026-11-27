@@ -17,13 +17,17 @@ const ICON_SMALL_BTN =
 
 const OPEN_SOON = "Previews open in a new tab once the build service is connected.";
 
+/** What a button acts on, in its label: this story's preview, or the whole app (Shubham, 27 Nov: "see all your product
+ *  from A to Z"). */
+const nameOf = (item: ActivityItem) => (item.scope === "app" ? "the whole app" : "preview");
+
 const DEVICES: { value: Device; label: string }[] = [
   { value: "web", label: "Web" },
   { value: "mobile", label: "Mobile" },
 ];
 
 /** Web or Mobile, picked before the preview starts. Arrow keys move between the two. `compact`: 24 px, for a row. */
-export function DeviceSwitch({ device, onChange, compact }: { device: Device; onChange: (d: Device) => void; compact?: boolean }) {
+export function DeviceSwitch({ device, onChange, compact, label = "Preview on" }: { device: Device; onChange: (d: Device) => void; compact?: boolean; label?: string }) {
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
     e.preventDefault();
@@ -34,7 +38,7 @@ export function DeviceSwitch({ device, onChange, compact }: { device: Device; on
   return (
     // On touch screens each choice is at least 44 px square (DESIGN.md §3.3): the group drops its inset there, so it's
     // 44 px tall like the buttons beside it and a row keeps its height whichever buttons it shows.
-    <div role="radiogroup" aria-label="Preview on" onKeyDown={onKeyDown} className={`ml-auto flex rounded-full bg-field p-0.5 pointer-coarse:h-11 pointer-coarse:p-0 ${compact ? "h-6" : "h-7"}`}>
+    <div role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className={`ml-auto flex rounded-full bg-field p-0.5 pointer-coarse:h-11 pointer-coarse:p-0 ${compact ? "h-6" : "h-7"}`}>
       {DEVICES.map(({ value, label }) => (
         <button
           key={value}
@@ -62,16 +66,19 @@ interface PreviewButtonsProps {
 /** The card's preview buttons: Start (or Start again), Cancel while it starts, Open and Stop while it runs. */
 export function PreviewButtons({ item, failed, preview, onSoon }: PreviewButtonsProps) {
   const where = item.device ?? "web";
+  const name = nameOf(item);
+  // "Open preview" or "Open whole app": a button's words read without "the".
+  const word = item.scope === "app" ? "whole app" : "preview";
   if (item.run === "on") {
     return (
       <>
-        <button type="button" aria-label={`Open preview on ${where}, opens in a new tab`} onClick={() => onSoon(OPEN_SOON)} className={SMALL_BTN}>
-          Open preview
+        <button type="button" aria-label={`Open ${name} on ${where}, opens in a new tab`} onClick={() => onSoon(OPEN_SOON)} className={SMALL_BTN}>
+          Open {word}
           <ArrowUpRight aria-hidden="true" size={14} strokeWidth={2} />
         </button>
-        <button type="button" aria-label={`Stop preview on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
+        <button type="button" aria-label={`Stop ${name} on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
           <Square aria-hidden="true" size={12} strokeWidth={2} />
-          Stop preview
+          Stop {word}
         </button>
         <p className="m-0 w-full text-xs text-[var(--tx2)]">It stops by itself after 30 minutes unused.</p>
       </>
@@ -79,7 +86,7 @@ export function PreviewButtons({ item, failed, preview, onSoon }: PreviewButtons
   }
   if (item.run === "starting") {
     return (
-      <button type="button" aria-label={`Cancel preview on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
+      <button type="button" aria-label={`Cancel ${name} on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
         Cancel
       </button>
     );
@@ -87,7 +94,7 @@ export function PreviewButtons({ item, failed, preview, onSoon }: PreviewButtons
   return (
     <button type="button" onClick={() => preview.start(item.id)} className={SMALL_BTN}>
       <Play aria-hidden="true" size={12} strokeWidth={2} />
-      {failed ? "Start again" : "Start preview"}
+      {failed ? "Start again" : `Start ${word}`}
     </button>
   );
 }
@@ -97,12 +104,16 @@ export function PreviewButtons({ item, failed, preview, onSoon }: PreviewButtons
  *  makes Open an icon with a tooltip, so the words still fit. */
 export function PreviewRow({ item, preview, onSoon, compact }: { item: ActivityItem; preview: PreviewActions; onSoon: (message: string) => void; compact?: boolean }) {
   const where = item.device ?? "web";
+  const name = nameOf(item);
+  const app = item.scope === "app";
   if (item.run === "starting") {
     return (
       <div className="flex min-h-7 w-full items-center gap-2 text-sm">
         <LoaderCircle aria-hidden="true" size={14} strokeWidth={1.75} className="flex-none animate-spin text-[var(--tx2)] [animation-duration:0.8s] motion-reduce:animate-none" />
-        <span className="min-w-0 flex-1 truncate">Starting the preview on {where}…</span>
-        <button type="button" onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
+        <span className="min-w-0 flex-1 truncate">
+          Starting {app ? "the whole app" : "the preview"} on {where}…
+        </span>
+        <button type="button" aria-label={`Cancel ${name} on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
           Cancel
         </button>
       </div>
@@ -111,7 +122,7 @@ export function PreviewRow({ item, preview, onSoon, compact }: { item: ActivityI
   const open = (
     <button
       type="button"
-      aria-label={`Open preview on ${where}, opens in a new tab`}
+      aria-label={`Open ${name} on ${where}, opens in a new tab`}
       onClick={() => onSoon(OPEN_SOON)}
       className={compact ? ICON_SMALL_BTN : SMALL_BTN}
     >
@@ -123,10 +134,10 @@ export function PreviewRow({ item, preview, onSoon, compact }: { item: ActivityI
     <div className="flex min-h-7 w-full items-center gap-2 text-sm">
       <span aria-hidden="true" className="size-2 flex-none rounded-full bg-[var(--green)]" />
       <span className="min-w-0 flex-1 truncate">
-        Preview running<span className="text-[var(--tx2)]"> on {where}</span>
+        {app ? "Whole app" : "Preview"} running<span className="text-[var(--tx2)]"> on {where}</span>
       </span>
-      {compact ? <Tip label="Open preview">{open}</Tip> : open}
-      <button type="button" aria-label={`Stop preview on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
+      {compact ? <Tip label={`Open ${name}`}>{open}</Tip> : open}
+      <button type="button" aria-label={`Stop ${name} on ${where}`} onClick={() => preview.stop(item.id)} className={SMALL_BTN}>
         <Square aria-hidden="true" size={12} strokeWidth={2} />
         Stop
       </button>
@@ -140,16 +151,17 @@ export function PreviewRow({ item, preview, onSoon, compact }: { item: ActivityI
  */
 export function PreviewInline({ item, preview, onSoon }: { item: ActivityItem; preview: PreviewActions; onSoon: (message: string) => void }) {
   const where = item.device ?? "web";
+  const name = nameOf(item);
   if (item.run === "on") {
     return (
       <span className="relative flex flex-none items-center gap-1.5">
-        <Tip label="Open preview">
-          <button type="button" aria-label={`Open preview on ${where}, opens in a new tab`} onClick={() => onSoon(OPEN_SOON)} className={ICON_SMALL_BTN}>
+        <Tip label={`Open ${name}`}>
+          <button type="button" aria-label={`Open ${name} on ${where}, opens in a new tab`} onClick={() => onSoon(OPEN_SOON)} className={ICON_SMALL_BTN}>
             <ArrowUpRight aria-hidden="true" size={14} strokeWidth={2} />
           </button>
         </Tip>
-        <Tip label="Stop preview · it stops by itself after 30 minutes unused">
-          <button type="button" aria-label={`Stop preview on ${where}`} onClick={() => preview.stop(item.id)} className={ICON_SMALL_BTN}>
+        <Tip label={`Stop ${name} · it stops by itself after 30 minutes unused`}>
+          <button type="button" aria-label={`Stop ${name} on ${where}`} onClick={() => preview.stop(item.id)} className={ICON_SMALL_BTN}>
             <Square aria-hidden="true" size={12} strokeWidth={2} />
           </button>
         </Tip>
@@ -162,7 +174,7 @@ export function PreviewInline({ item, preview, onSoon }: { item: ActivityItem; p
         <LoaderCircle aria-hidden="true" size={14} strokeWidth={1.75} className="animate-spin text-[var(--tx2)] [animation-duration:0.8s] motion-reduce:animate-none" />
         <button
           type="button"
-          aria-label={`Cancel preview on ${where}`}
+          aria-label={`Cancel ${name} on ${where}`}
           onClick={() => preview.stop(item.id)}
           className="h-7 rounded-full px-2 text-xs text-[var(--tx2)] hover:bg-black/[0.05] hover:text-[var(--tx)] pointer-coarse:h-11 pointer-coarse:px-3"
         >
@@ -173,9 +185,9 @@ export function PreviewInline({ item, preview, onSoon }: { item: ActivityItem; p
   }
   return (
     <span className="relative flex flex-none items-center gap-1.5">
-      <DeviceSwitch compact device={where} onChange={(d) => preview.device(item.id, d)} />
-      <Tip label={`Start preview on ${where}`}>
-        <button type="button" aria-label={`Start preview on ${where}`} onClick={() => preview.start(item.id)} className={ICON_SMALL_BTN}>
+      <DeviceSwitch compact device={where} onChange={(d) => preview.device(item.id, d)} label={item.scope === "app" ? "Whole app on" : "Preview on"} />
+      <Tip label={`Start ${name} on ${where}`}>
+        <button type="button" aria-label={`Start ${name} on ${where}`} onClick={() => preview.start(item.id)} className={ICON_SMALL_BTN}>
           <Play aria-hidden="true" size={12} strokeWidth={2} className="translate-x-px" />
         </button>
       </Tip>

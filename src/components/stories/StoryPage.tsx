@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Tooltip } from "radix-ui";
 import { ArrowDown, ArrowLeft, ChevronLeft, ChevronRight, FileText, Link as LinkIcon } from "lucide-react";
 import type { NeedKind, Person, StoryStatus } from "@/types/dashboard";
-import type { ActivityItem, AskCard, AskRefusal, Author, Decision, FileRef, LiveState, MainState, PhaseKey, PrMerge, PreviewActions, PullRequest, RunPhase, Segment, StoryItem, StoryNavItem, StoryPageData, ThreadEntry } from "@/types/stories";
+import type { ActivityItem, AskCard, AskRefusal, Author, Decision, Device, FileRef, LiveState, MainState, PhaseKey, PrMerge, PreviewActions, PullRequest, RunPhase, Segment, StoryItem, StoryNavItem, StoryPageData, ThreadEntry } from "@/types/stories";
 import { BTN_SECONDARY, ICON_BTN } from "@/components/dashboard/classes";
 import { sortQueue, storyRef } from "@/components/dashboard/format";
 import { Tip } from "@/components/dashboard/Tip";
 import { Toast } from "@/components/dashboard/Toast";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
-import { anyWorking, buildActivity, DEVICE_NAME, livePreview, mainDetail, nowOf, PR_DETAIL, readyOf, restoreActivity, taskFor, type Task } from "./activity";
+import { anyWorking, buildActivity, DEVICE_NAME, livePreview, mainDetail, PR_DETAIL, restoreActivity, taskFor, type Task } from "./activity";
 import { ActivitySummary } from "./ActivitySummary";
 import chat from "./chat.module.css";
 import { CancelStoryDialog } from "./CancelStoryDialog";
@@ -16,7 +17,7 @@ import { findCreated } from "./created";
 import { LIVE_WORDS } from "./LiveLine";
 import { PHASE_LABEL } from "./phases";
 import { PreviewRow } from "./PreviewControl";
-import { COLUMNS, columnLabel, prStage, statusMoves, type StatusMove } from "./stage";
+import { columnLabel, prStage, statusMoves, type StatusMove } from "./stage";
 import { DecisionDock } from "./DecisionDock";
 import { MainDemo, type MainDemoStep } from "./MainDemo";
 import { MORE_BUTTON_ID, StatusBadge, StatusMenu } from "./StatusMenu";
@@ -27,13 +28,15 @@ import { StoryRail } from "./StoryRail";
 import { StoryDetails, storyCardFor, type StoryBrief } from "./StoryDetails";
 import { StatusGuide } from "./StatusGuide";
 import { StatusPicker, type Turn } from "./StatusPicker";
+import type { RobotRun } from "./estimate";
 import { addDecision, decisionsFrom, removeDecision, useSavedDecisions } from "./decisions";
 import { StoryDecisions } from "./StoryDecisions";
 import { HistoryList } from "./StoryHistory";
+import { openSection, PanelSection } from "./PanelSection";
 import { PanelTabs, type PanelTab } from "./PanelTabs";
-import { StoryOverview } from "./StoryOverview";
 import { useIsWide } from "./hooks";
-import { FilesSection, type ChatFile } from "./StoryMore";
+import type { ChatFile } from "./StoryMore";
+import { writeMs } from "./stream";
 import { StoryThread } from "./StoryThread";
 import { StoryTour } from "./StoryTour";
 import { ago, TeammateBanner, type TeammateChange } from "./TeammateBanner";
@@ -78,6 +81,19 @@ function restingLive(s: State, run?: { phase: PhaseKey; since?: number }, ship?:
  *  agent's check. While the agent holds the build or the check, the status menu is locked. */
 type Job = "starting" | "building" | "verifying";
 
+/** The message box and what takes its place: in, a fade and a 6 px rise over 200 ms; out, a fade over 120 ms
+ *  (DESIGN.md §3.7: exits are faster). Under reduced motion, a fade only. */
+const SWAP = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.2, 0, 0, 1] } },
+  exit: { opacity: 0, transition: { duration: 0.12, ease: [0.4, 0, 1, 1] } },
+} as const;
+const SWAP_FADE = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.15 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+} as const;
+
 const SUGGESTIONS: Partial<Record<NeedKind | "working", string[]>> = {
   review: ["Take mobile screenshots", "Start the preview on mobile", "What changed since last time?"],
   planning: ["Show me the markup", "Add a note to the spec", "Explain the plan simply"],
@@ -87,14 +103,14 @@ const SUGGESTIONS: Partial<Record<NeedKind | "working", string[]>> = {
 };
 
 // The phases of the build the agent runs after an approval, a restart or a change request (front end only),
-// with how long each takes here. They show one at a time while it works, then fold under its reply.
+// with how long each takes here. They show one at a time while it works, then fold under its reply. There's no
+// "writing a reply" phase: the report writes itself into the chat (Shubham, 27 Nov).
 const BUILD_PHASES: RunPhase[] = [
   { key: "plan", ms: 2400 }, // makes the story's branch and reads the plan
   { key: "implement", ms: 3600 },
   { key: "ui-check", ms: 2400 }, // opens the running app and looks at the screens
   { key: "review", ms: 2400 }, // runs every check and reviews its own work
   { key: "verify", ms: 2600 }, // a second agent, not the builder, checks it against the story
-  { key: "reply", ms: 1600 }, // opens or updates the pull request and writes the report
 ];
 
 /** How long something that just finished stays on top of the activity column before it goes down. */
@@ -110,6 +126,9 @@ const BOX_COLUMN = "md:mx-auto md:w-full md:max-w-[768px] md:px-6";
 
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now()}-${(seq += 1)}`;
+
+/** What one of the robot's replies carries: its words or its report, the files it made, the run behind it. */
+type Reply = Pick<Extract<ThreadEntry, { kind: "message" }>, "text" | "report" | "files" | "run">;
 
 /** A note about main or the pull request on built work ("does it clash with main?", "update the pr", "merge main
  *  in"): answered with where it stands, and an update started if main moved on. Never "move it back to Approved":
@@ -170,6 +189,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const [state, setState] = useState<State>({ status: story.status, need: story.need, waitingOn: story.waitingOn });
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState<LiveState | null>(null);
+  const reduce = useReducedMotion();
   const [rebuild, setRebuild] = useState(false);
   // The activity's corner card (768–1023 px), open.
   const [cornerOpen, setCornerOpen] = useState(false);
@@ -183,6 +203,8 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   // Where the branch stands against main; the PM brings main in by itself when another story merges.
   const [main, setMain] = useState<MainState>(story.main ?? { behind: [], checked: "5m ago" });
   const updatingMain = useRef(false);
+  // Creating the pull request compared the story with main and found a conflict: the card that says so is open.
+  const [pushConflict, setPushConflict] = useState(false);
   // A question about main open in the chat (main removed something this story needs), and a rebuild that brings
   // main in along with the change, so "Latest main" turns up to date when the build ends.
   const [mainQuestion, setMainQuestion] = useState<string | null>(null);
@@ -205,8 +227,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const holdScroll = useRef(0);
   // The one screen-reader line for the activity column: finishes, a preview running or stopped, the build's end.
   const [said, setSaid] = useState("");
-  // Bumped by Undo, so the restored activity card appears without motion.
-  const [epoch, setEpoch] = useState(0);
   // A preview's start timer, by item id; written only in handlers.
   const previewTimers = useRef(new Map<string, number>());
   // Teammates on the same story. Until the CraftHQ API sends presence and changes, `?demo=teammate` plays them.
@@ -224,12 +244,15 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   // Story details: the whole story as it was written, to read (Shubham, 26 Nov).
   const [detailsOpen, setDetailsOpen] = useState(false);
-  // "How statuses work", from the Status tab and the status box's menu.
+  // "How statuses work", from the Status box (or the Status tab below 1024 px).
   const [guideOpen, setGuideOpen] = useState(false);
   // The right-hand side's tab (Shubham, 26 Nov), from ?tab= so a link opens the same one; Status when there's none.
   const [tab, setTab] = useState<PanelTab>(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    return t === "story" || t === "work" || t === "history" ? t : "status";
+    // ?tab=work: the Output tab's name until 27 Nov, so an older link still opens it. ?tab=story (no Story tab since
+    // 27 Nov) opens Status.
+    if (t === "work") return "output";
+    return t === "output" || t === "history" ? t : "status";
   });
   // From 1024 px the tabs sit in a card beside the chat; below it they open from the header's corner icon (tablets) or
   // the fold under the header (phones), so only one set is mounted where it shows.
@@ -263,7 +286,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   // The board's run on this story (StoryItem.live), until this page changes the status: same words, same start.
   const seed = story.live && !changed ? { phase: story.live.phase, since: story.live.startedAt ?? openedAt - (story.live.minutesAgo ?? 0) * 60_000 } : undefined;
   const live = busy ?? restingLive(state, seed, { pr, merger: mergerFirst, merge: prNow?.merge });
-  const working = live?.kind === "working" || live?.kind === "thinking";
+  const working = live?.kind === "working" || live?.kind === "thinking" || live?.kind === "writing";
   // The robot's one current phase, by its name: the same words as the chat's live line and the board.
   const phase = live?.kind === "working" ? live.phase : undefined;
   const status: { dot: string; detail?: string; turn?: string } = (() => {
@@ -325,6 +348,48 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     el.scrollTo({ top: el.scrollHeight, behavior: firstScroll.current ? "auto" : "smooth" });
     firstScroll.current = false;
   }, [entries, busy, atBottom]);
+  // A reply writing itself in grows the chat with no new message: keep its newest words in view, as long as you were at
+  // the bottom before it grew (scrolled up to read, it stays put, as with new messages). The chat glides down after
+  // the words, a little of the way each frame, instead of jumping a line each time one starts (Shubham, 27 Nov: "one
+  // line and the second line is coming", smoothly). Scrolling yourself stops the glide at once; under reduced motion
+  // it keeps up without gliding.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const content = el?.firstElementChild;
+    if (!el || !content) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let height = el.scrollHeight;
+    let frame = 0;
+    const glide = () => {
+      const gap = el.scrollHeight - el.clientHeight - el.scrollTop;
+      if (gap <= 0.5) {
+        frame = 0;
+        return;
+      }
+      el.scrollTop += Math.max(1, gap * 0.2);
+      frame = requestAnimationFrame(glide);
+    };
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    };
+    const follow = new ResizeObserver(() => {
+      const before = height;
+      height = el.scrollHeight;
+      if (!(height > before && before - el.scrollTop - el.clientHeight < 80 && Date.now() >= holdScroll.current)) return;
+      if (still.matches) el.scrollTop = height;
+      else if (!frame) frame = requestAnimationFrame(glide);
+    });
+    follow.observe(content);
+    el.addEventListener("wheel", stop, { passive: true });
+    el.addEventListener("touchstart", stop, { passive: true });
+    return () => {
+      follow.disconnect();
+      stop();
+      el.removeEventListener("wheel", stop);
+      el.removeEventListener("touchstart", stop);
+    };
+  }, []);
 
   const later = (ms: number, fn: () => void) => {
     const t = window.setTimeout(fn, ms);
@@ -339,6 +404,14 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
   const add = (...more: ThreadEntry[]) => {
     const ts = Date.now();
     setEntries((es) => [...es, ...more.map((e) => ({ ...e, fresh: true, ts }))]);
+  };
+  /** The robot's reply: it writes itself into the chat word by word, with no "Builder is writing a reply" line first
+   *  (Shubham, 27 Nov: the words come straight away). Until its words are out, nothing waits on you yet (no decision
+   *  card, no question), and `then` (a second message) waits for it. With reduced motion it's all there at once. */
+  const post = (message: Reply, then?: () => void) => {
+    add({ kind: "message", id: nextId("agent"), at: "Just now", author: AGENT, ...message });
+    setBusy({ kind: "writing" });
+    later(reduce ? 0 : writeMs(message), () => (then ? then() : setBusy(null)));
   };
   // The activity log, newest first, in step with the chat. What's under way shows on top; when something
   // finishes (or the stage moves, or a preview starts running) it stays on top for a moment ("settling"), then
@@ -365,29 +438,47 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     setActivity((a) =>
       a.map((x) => ((x.kind === "spec" || x.kind === "engineering") && /^(Draft|Writing|Waiting|Updating)/.test(x.detail) ? { ...x, state: "done", detail: "Approved" } : x)),
     );
-  // The preview machine: started and stopped from the activity card, timed here.
+  // The preview machine: started and stopped from the activity card, timed here. Two previews use it, this story's own
+  // and the whole app (Shubham, 27 Nov), and one runs at a time: starting one stops the other.
+  const previewTitle = (app: boolean, d: Device) => `${app ? "Whole app" : "Preview"} · ${DEVICE_NAME[d]}`;
   const preview: PreviewActions = {
-    start: (id) => {
-      const where = activity.find((x) => x.id === id)?.device ?? "web";
-      patch(id, { run: "starting", startedAt: Date.now(), detail: `Starting the preview on ${where}` });
+    start: (id, d) => {
+      const it = activity.find((x) => x.id === id);
+      const where = d ?? it?.device ?? "web";
+      const app = it?.scope === "app";
+      const other = activity.find((x) => x.kind === "preview" && x.id !== id && (x.run === "on" || x.run === "starting"));
+      if (other) {
+        window.clearTimeout(previewTimers.current.get(other.id));
+        previewTimers.current.delete(other.id);
+        patch(other.id, { run: "off", detail: "Stopped" });
+        if (other.run === "on") showToast(other.scope === "app" ? "The whole app preview stopped: one runs at a time." : "This story’s preview stopped: one runs at a time.");
+      }
+      patch(id, {
+        run: "starting",
+        startedAt: Date.now(),
+        device: where,
+        title: previewTitle(app, where),
+        detail: app ? `Starting the whole app on ${where}` : `Starting the preview on ${where}`,
+      });
       const t = later(2400, () => {
         previewTimers.current.delete(id);
         patch(id, { run: "on", startedAt: Date.now(), detail: `Running on ${where}` });
-        say(`Preview running on ${where}.`);
+        say(app ? `Whole app running on ${where}.` : `Preview running on ${where}.`);
       });
       previewTimers.current.set(id, t);
     },
     stop: (id) => {
       window.clearTimeout(previewTimers.current.get(id));
       previewTimers.current.delete(id);
-      const wasOn = activity.find((x) => x.id === id)?.run === "on";
+      const it = activity.find((x) => x.id === id);
+      const wasOn = it?.run === "on";
       patch(id, { run: "off", detail: wasOn ? "Stopped" : "Ready to try" });
-      if (wasOn) showToast("Preview stopped.");
+      if (wasOn) showToast(it?.scope === "app" ? "The whole app preview stopped." : "Preview stopped.");
     },
     device: (id, d) => {
-      const run = activity.find((x) => x.id === id)?.run;
-      if (run === "on" || run === "starting") return;
-      patch(id, { device: d, title: `Preview · ${DEVICE_NAME[d]}` });
+      const it = activity.find((x) => x.id === id);
+      if (it?.run === "on" || it?.run === "starting") return;
+      patch(id, { device: d, title: previewTitle(it?.scope === "app", d) });
     },
   };
   /** One live preview per story: a new preview or a new build stops the old one. */
@@ -460,11 +551,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         setJob("verifying");
         log({ id: verifyId, kind: "checks", title: "Independent check", state: "working", detail: "Checker checks it against the story" });
       },
-      reply: () => {
-        setJob("building");
-        patch(verifyId, { state: "done", detail: "Passed · does what the story asks" });
-        add({ kind: "stage", id: nextId("stage"), at: "Just now", text: "Verified by Checker · it does what the story asks" });
-      },
     };
     phases.forEach((p, i) => {
       if (i === 0) return;
@@ -473,39 +559,38 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         enter(i);
       });
     });
-    // A pull request that's already open gets the new build too, and waits for the story to be reviewed again.
-    if (updating)
-      later(picked + starts[of - 1] + 700, () => log({ kind: "pr", title: `Pull request #${prNo}`, state: "done", detail: "Updated with the new build · review it again" }));
     later(end, () => {
+      patch(verifyId, { state: "done", detail: "Passed · does what the story asks" });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: "Verified by Checker · it does what the story asks" });
+      // A pull request that's already open gets the new build too, and waits for the story to be reviewed again.
+      if (updating) log({ kind: "pr", title: `Pull request #${prNo}`, state: "done", detail: "Updated with the new build · review it again" });
       log({ kind: "preview", title: "Preview · Web", device: "web", run: "off", state: "done", detail: "Ready to try" });
-      add({
-        kind: "message",
-        id: nextId("agent"),
-        at: "Just now",
-        author: AGENT,
-        report: {
-          outcome: "Done. Checker verified it: it does what the story asks, and every check passed.",
-          next: updating
-            ? `Try the preview. When it’s right, update pull request #${prNo}, and it goes back to ${mergerName} to merge. To change something, write a note and rebuild.`
-            : `Try the preview. When it’s right, create the pull request, and it goes to ${mergerName} to check and merge on GitHub. To change something, write a note and rebuild.`,
+      // The whole app has this story in it now.
+      setActivity((a) => a.map((x) => (x.kind === "preview" && x.scope === "app" ? { ...x, withStory: true } : x)));
+      // Notes written during the round are read now; they never redirected the build under way. That reply follows the
+      // report once its words are out.
+      const notes = notesDuringJob.current > 0;
+      notesDuringJob.current = 0;
+      post(
+        {
+          report: {
+            outcome: "Done. Checker verified it: it does what the story asks, and every check passed.",
+            next: updating
+              ? `Try the preview. When it’s right, update pull request #${prNo}, and it goes back to ${mergerName} to merge. To change something, write a note and rebuild.`
+              : `Try the preview. When it’s right, create the pull request, and it goes to ${mergerName} to check and merge on GitHub. To change something, write a note and rebuild.`,
+          },
+          // The phases, folded into one line under the reply.
+          run: phases,
         },
-        // The phases, folded into one line under the reply.
-        run: phases,
-      });
-      // Notes written during the round are read now; they never redirected the build under way.
-      if (notesDuringJob.current > 0) {
-        add({
-          kind: "message",
-          id: nextId("agent"),
-          at: "Just now",
-          author: AGENT,
-          text: ["I’ve read your note now that this round is over. It didn’t change the build that was running. To have it built, choose Approved in the status menu: the next build is given every note since this one."],
-        });
-        notesDuringJob.current = 0;
-      }
+        notes
+          ? () =>
+              post({
+                text: ["I’ve read your note now that this round is over. It didn’t change the build that was running. To have it built, pick Building under Status: the next build is given every note since this one."],
+              })
+          : undefined,
+      );
       move({ status: "in_review", need: "review", waitingOn: "You" });
       setJob(null);
-      setBusy(null);
       // Main came in with this build (the answer to a question about main): it's up to date now.
       if (mainWithBuild.current) {
         mainWithBuild.current = false;
@@ -524,14 +609,10 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     const specId = nextId("act");
     const engId = nextId("act");
     const fresh = from === "story";
-    // After an answer, the agent first picks up where it left off; then it plans, then it replies.
+    // After an answer, the agent first picks up where it left off; then it plans, and its reply writes itself in.
     const lead = from === "answers" ? 1100 : 0;
     const replyAt = 6200;
-    const phases: RunPhase[] = [
-      ...(lead ? [{ key: "resume" as const, ms: lead }] : []),
-      { key: "plan", ms: replyAt - lead },
-      { key: "reply", ms: 800 },
-    ];
+    const phases: RunPhase[] = [...(lead ? [{ key: "resume" as const, ms: lead }] : []), { key: "plan", ms: replyAt - lead }];
     const of = phases.length;
     const since = Date.now();
     const enter = (i: number) => setBusy({ kind: "working", label: LIVE_WORDS[phases[i].key], phase: phases[i].key, step: i + 1, of, since });
@@ -549,14 +630,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     });
     later(replyAt, () => {
       patch(engId, { state: "done", detail: fresh ? "Draft ready for your OK" : "Updated to match" });
-      enter(of - 1);
-    });
-    later(replyAt + 800, () => {
-      add({
-        kind: "message",
-        id: nextId("agent"),
-        at: "Just now",
-        author: AGENT,
+      post({
         report: {
           outcome: fresh ? "The plan is ready." : from === "note" ? "I’ve updated the plan with your note." : "Thanks, that settles it. The plan is ready.",
           next: "Read it, then approve it to start the build. Nothing is built until you do.",
@@ -564,18 +638,13 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         run: phases,
       });
       move({ status: "planning", need: "planning", waitingOn: "You" });
-      setBusy(null);
     });
   };
 
-  /** A plain reply: the agent thinks, reads, then answers. */
+  /** A plain reply: the agent reads your message, then its answer writes itself in. */
   const reply = (text: string) => {
     setBusy({ kind: "thinking" });
-    later(1300, () => setBusy({ kind: "working", label: LIVE_WORDS.reply, phase: "reply", since: Date.now() }));
-    later(2700, () => {
-      add({ kind: "message", id: nextId("agent"), at: "Just now", author: AGENT, text: [text] });
-      setBusy(null);
-    });
+    later(1300, () => post({ text: [text] }));
   };
 
   // ---- Keeping built work up to date with main (Shubham, 26 Nov, from hq-35) ----
@@ -670,6 +739,61 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     });
   };
 
+  // ---- A conflict found when you create the pull request (Shubham, 27 Nov: hq-26 against Deepak's merged hq-25) ----
+
+  /**
+   * Create pull request on a story that main moved on under: it's compared with main first. Nothing conflicts and the
+   * pull request is created straight away (actions.createPr). Something does, and the story stays In review while one
+   * card says who merged first, what it touches and what happens next, with one button to settle it and carry on.
+   */
+  const checkBeforePr = () => {
+    const who = refsOf(main.behind);
+    const n = main.clashes ?? 0;
+    const mainId = rowOf("main");
+    setBusy({ kind: "working", label: "Comparing this story with the latest main", since: Date.now() });
+    if (mainId) patch(mainId, { state: "working", detail: `Comparing with ${who}` });
+    later(1800, () => {
+      setBusy(null);
+      setPushConflict(true);
+      if (mainId) patch(mainId, { state: "waiting", detail: `${n} conflicts with ${who} · waiting for your OK` });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Compared with main before creating the pull request · ${who} merged first and changed the same lines in ${n} places` });
+      say(`${n} conflicts with ${who}. Nothing was sent to GitHub.`);
+    });
+  };
+
+  /** The card's one button: main is merged in (never a rebase), both sides of every conflict are kept, the checks run
+   *  again, and only then is the pull request created. A step that can't be settled this way would stop and ask. */
+  const createPrNow = useRef(() => {});
+  useEffect(() => {
+    createPrNow.current = () => actions.createPr();
+  });
+  const settleThenPr = () => {
+    const who = refsOf(main.behind);
+    const n = main.clashes ?? 0;
+    const mainId = rowOf("main");
+    const since = Date.now();
+    const step = (label: string, detail: string) => {
+      setBusy({ kind: "working", label, since });
+      if (mainId) patch(mainId, { state: "working", detail });
+    };
+    setPushConflict(false);
+    add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Settling the conflicts with ${who}, asked by you · main is merged in, not rebased` });
+    step(`Developer is bringing in ${who}`, `Bringing in ${who} · merging main in, not rebasing`);
+    later(1800, () => step(`Developer is keeping both sides of ${n} conflicts`, `${n} conflicts with ${who} · keeping both sides`));
+    later(4000, () => step("Tester is running the checks again", "Conflicts settled · checks running"));
+    later(6000, () => {
+      setMain({ behind: [], checked: "just now", settled: n || undefined });
+      if (mainId) patch(mainId, { state: "done", detail: `Up to date · ${n} conflicts, both sides kept` });
+      add({ kind: "stage", id: nextId("stage"), at: "Just now", text: `Brought in ${who} · ${n} conflicts settled, both sides kept · all checks passed` });
+      setBusy({ kind: "working", label: "Creating the pull request", since });
+    });
+    // A beat later, so the page has the settled state when the pull request is created.
+    later(6900, () => {
+      setBusy(null);
+      createPrNow.current();
+    });
+  };
+
   // A story opened while main is being brought in (another story merged first): the update plays on from where it
   // was, without anyone asking. The latest function is kept in a ref so the effect runs once, on open.
   const resumeUpdate = useRef(() => {});
@@ -677,7 +801,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     resumeUpdate.current = () => updateFromMain({ at: story.pr?.merge === "conflict" ? "clashes" : "start" });
   });
   useEffect(() => {
-    if (!story.main?.behind.length || (story.status !== "pull_request" && story.status !== "in_review")) return;
+    if (!story.main?.behind.length || story.main.onPush || (story.status !== "pull_request" && story.status !== "in_review")) return;
     const t = window.setTimeout(() => resumeUpdate.current(), 1200);
     return () => window.clearTimeout(t);
   }, [story]);
@@ -741,7 +865,8 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       return;
     }
     if (updatingMain.current) {
-      reply(`I’m bringing in ${refsOf(main.behind)} right now. It’s in Activity on the right, and this story stays where it is.`);
+      openSection("code");
+      reply(`I’m bringing in ${refsOf(main.behind)} right now. It’s under Code, and this story stays where it is.`);
       return;
     }
     if (main.behind.length) {
@@ -763,6 +888,20 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
 
   /** A job from a message: in the log and the chat while it works, then done, with the agent's reply. */
   const runTask = (task: Task, built: boolean) => {
+    // What was asked for shows where it lands: its box opens if it was folded.
+    openSection(task.kind === "spec" || task.kind === "engineering" ? "pages" : "preview");
+    // The whole app, asked for in a message ("show me the whole app"): started on its own line, as its play button does,
+    // so it never leaves the Preview part while it starts.
+    const wholeApp = task.kind === "preview" && task.scope === "app" ? activity.find((x) => x.kind === "preview" && x.scope === "app") : undefined;
+    if (wholeApp) {
+      setBusy({ kind: "thinking" });
+      later(700, () => {
+        if (wholeApp.run !== "on") preview.start(wholeApp.id, task.device);
+        setBusy({ kind: "working", label: `Builder is ${task.doing.charAt(0).toLowerCase()}${task.doing.slice(1)}`, since: Date.now() });
+      });
+      later(700 + task.ms, () => post({ text: [task.reply] }));
+      return;
+    }
     const id = nextId("act");
     const notYet = task.kind === "preview" && !built;
     const startsPreview = task.kind === "preview" && !notYet;
@@ -780,8 +919,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         count: task.count,
         ...(startsPreview ? { run: "on" as const, startedAt: Date.now() } : {}),
       });
-      add({ kind: "message", id: nextId("agent"), at: "Just now", author: AGENT, text: [task.reply], files: task.files });
-      setBusy(null);
+      post({ text: [task.reply], files: task.files });
       say(startsPreview ? `Preview running on ${task.device ?? "web"}.` : `${task.title}: done. ${task.done}.`);
     });
   };
@@ -796,7 +934,6 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
         setEntries(before.entries);
         // The story goes back; a running preview keeps running.
         setActivity((now) => restoreActivity(before.activity, now));
-        setEpoch((e) => e + 1);
         setSaid("");
         setState(before.state);
         setChanged(before.changed);
@@ -843,6 +980,8 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     // The review is done: the PM opens the pull request on GitHub (or updates the open one), and it goes to the one
     // person with GitHub access to check and merge. Robots never merge.
     createPr: () => {
+      // Main moved on under a story still in review: compare first, and say so if something conflicts.
+      if (main.onPush && main.behind.length) return checkBeforePr();
       const updating = pr === "open";
       const number = pr === "merged" || pr === "closed" ? prNo + 1 : prNo;
       withUndo(`Pull request #${number} ${updating ? "updated" : "created"}. It’s with ${mergerFirst} to check and merge.`);
@@ -1062,6 +1201,8 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     showToast(`${ref} cancelled. The build was stopped.`);
   };
 
+  // The story that merged first, by name ("hq-25 (Phone sign-up and verification code)"), for the conflict card.
+  const mergedFirst = main.behind.map((id) => `hq-${id}${data.stories.some((x) => x.id === id) ? ` (${data.stories.find((x) => x.id === id)?.title})` : ""}`).join(", ");
   // Who a decision can be sent to: everyone on the team but you.
   const teammates = data.people.filter((p) => p.id !== data.viewer.id);
   // "Needs your OK": what's waiting on the viewer, as the conversation's last card.
@@ -1082,6 +1223,15 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
             title: `Couldn’t update pull request #${prNo}`,
             meta: `GitHub refused it: CraftHQ can’t write to the repository. ${unsent} ${unsent === 1 ? "update is" : "updates are"} saved here (the latest main brought in, checks passed), but GitHub still shows the older version. Reconnect GitHub with write access and they’re sent straight away.`,
             primary: { label: "Reconnect GitHub", onClick: sendToGitHub },
+          }
+      : pushConflict && state.status === "in_review"
+        ? {
+            label: "Conflict with main",
+            title: `${refsOf(main.behind)} changed the same lines`,
+            meta: `${mergedFirst} was merged into main while this story was in review, and it changes ${main.clashes ?? 0} places this story changes too. Nothing was sent to GitHub. Both changes can stay: Developer keeps both, Tester runs every check again, then the pull request is created and goes to ${mergerFirst} to merge.`,
+            move: { from: "In review", to: "Pull request" },
+            primary: { label: "Settle and create pull request", onClick: settleThenPr },
+            secondary: { label: "Not now", onClick: () => setPushConflict(false) },
           }
       : !isYours(state)
         ? null
@@ -1179,7 +1329,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     }
     reply(
       state.status === "in_review" || state.status === "pull_request"
-        ? "Thanks, I’ve read it. A note here never changes the code. To have it built, switch on “Rebuild after sending” and send it again, or choose Approved in the status menu."
+        ? "Thanks, I’ve read it. A note here never changes the code. To have it built, switch on “Rebuild after sending” and send it again, or pick Building under Status."
         : state.need === "stuck"
           ? "Thanks, noted. To build again with it, choose Try again: a new build reads the story as it is now."
           : "Thanks, noted. I’ll take it into account and reply here if I need anything from you.",
@@ -1327,6 +1477,14 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
             : working || job === "building" || job === "verifying"
               ? { kind: "working" }
               : { kind: "none" };
+  // For the Status tab's rough estimate of how long the robots still need: their run under way (the live line's phase
+  // and start), or the queue before Builder picks it up.
+  const robotRun: RobotRun | undefined =
+    live?.kind === "working" && live.phase
+      ? { phase: live.phase, since: live.since }
+      : job === "starting" || (state.status === "approved" && !job && state.need !== "stuck")
+        ? { queued: true }
+        : undefined;
   const pickerDetail =
     // A finished story says how it ended; otherwise what's happening, or what the stage is waiting for.
     state.status === "done"
@@ -1389,28 +1547,11 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     addDecision(story.id, { id, kind: "saved", text, by: data.viewer.name, at: "Today", ts: Date.now(), entryId: d.entryId, question: d.question, replaces: d.id });
     showToast("Decision changed. The old one stays, crossed out.", { label: "Undo", run: () => removeDecision(story.id, id) });
   };
-  const decisionsPanel = <StoryDecisions decisions={decisions} open={openQuestions} onSee={seeEntry} inChat={inChat} onChange={changeDecision} />;
+  const decisionsPanel = (boxed: boolean) => (
+    <StoryDecisions decisions={decisions} open={openQuestions} onSee={seeEntry} inChat={inChat} onChange={changeDecision} boxed={boxed} />
+  );
   // Everything attached in the chat, for Files; a file opens the message it came with.
   const chatFiles: ChatFile[] = entries.flatMap((e) => (e.kind === "message" && e.files ? e.files.map((file, i) => ({ key: `${e.id}-${i}`, entryId: e.id, file })) : []));
-  const stageKey = COLUMNS.find((c) => c.statuses.includes(state.status))?.key ?? "done";
-
-  const rail = (withHeader: boolean) => (
-    <StoryRail
-      withHeader={withHeader}
-      activity={activity}
-      yours={yours}
-      restartInChat={state.need === "stuck"}
-      epoch={epoch}
-      preview={preview}
-      onSoon={(m) => showToast(m)}
-      stage={stageKey}
-    />
-  );
-  // The story's own files: the chat goes to its first message, where they are.
-  const storyEntryId = storyEntry?.id;
-  const seeStoryFiles = () => {
-    if (storyEntryId) seeEntry(storyEntryId);
-  };
   const changeTab = (t: PanelTab) => {
     setTab(t);
     const url = new URL(window.location.href);
@@ -1418,10 +1559,14 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
     else url.searchParams.set("tab", t);
     window.history.replaceState(window.history.state, "", url);
   };
-  /** A decision's "Read more in the plan": the Work tab, where the plan is, wherever the tabs are at this width. */
-  const openWork = () => {
-    changeTab("work");
-    if (window.matchMedia("(min-width: 768px) and (max-width: 1023.98px)").matches) setCornerOpen(true);
+  /** A decision's "Read more in the plan": the Pages box (opened, if it was folded) or the Output tab, wherever the
+   *  pages are at this width. */
+  const openOutput = () => {
+    changeTab("output");
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      openSection("pages");
+      requestAnimationFrame(() => document.getElementById("story-box-pages")?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+    } else if (window.matchMedia("(min-width: 768px) and (max-width: 1023.98px)").matches) setCornerOpen(true);
     else if (window.matchMedia("(max-width: 767.98px)").matches) {
       const fold = document.querySelector<HTMLDetailsElement>('[data-tour="fold"]');
       if (fold) {
@@ -1430,75 +1575,83 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
       }
     }
   };
-  // Work: what's running and what was made, then the files attached after the story was written (the story's own files
-  // are in the Story tab).
-  const workFiles = chatFiles.filter((f) => f.entryId !== storyEntry?.id);
-  const workEmpty = nowOf(activity).length === 0 && readyOf(activity).length === 0 && workFiles.length === 0;
-  // A tab shows once it has something in it: Story when more than the title was written (or files came with it), Work
-  // once something is made or under way. A link to a tab that isn't there opens Status.
-  const storyWritten = Boolean(brief.why || brief.detail || (brief.ask && brief.ask.length > 0) || (brief.files && brief.files.length > 0));
-  const shownTabs: PanelTab[] = ["status", ...(storyWritten ? (["story"] as const) : []), ...(workEmpty ? [] : (["work"] as const)), "history"];
+  // Output: what's running and what was made, then the files attached after the story was written (the story's own
+  // files are in Story details).
+  const outputFiles = chatFiles.filter((f) => f.entryId !== storyEntry?.id);
+  // No Story tab (Shubham, 27 Nov): what was written opens in Story details, from the title. Output is always there: its
+  // parts are defined up front and say what's in them or when it comes (Shubham, 27 Nov).
+  const shownTabs: PanelTab[] = ["status", "output", "history"];
   const openTab: PanelTab = shownTabs.includes(tab) ? tab : "status";
   // A tab you're not on says when it needs you, or while something is being made there.
   const tabDots: Partial<Record<PanelTab, "yours" | "busy">> = {
     status: yours ? "yours" : undefined,
-    work: anyWorking(activity) ? "busy" : undefined,
+    output: anyWorking(activity) ? "busy" : undefined,
   };
-  // The right-hand side in tabs (Shubham, 26 Nov): Status · Story · Work · History. `inCard`: the desktop card, with
-  // its own padding; the tablet card and the phone fold bring theirs.
-  const panelTabs = (inCard: boolean) => (
+  // What the right-hand side holds, in this order: today's status, what's been decided (Shubham, 26 Nov: both, the
+  // first thing you see), what was made, and the history. `boxed`: from 1024 px each is a white box of its own that
+  // folds (Shubham, 27 Nov); below that they're the tabs' contents.
+  const statusPicker = (boxed: boolean) => (
+    <StatusPicker
+      status={state.status}
+      need={state.need}
+      turn={turn}
+      detail={pickerDetail}
+      robotRun={robotRun}
+      dot={status.dot}
+      moves={statusMoveList}
+      // Not twice: while the decision is showing in the chat, the chat holds its button.
+      suggested={docked ? undefined : suggestedMove}
+      suggestedLabel={ask?.primary?.label}
+      locked={locked}
+      merger={mergerFirst === "you" ? "You" : mergerFirst}
+      onMove={changeStatus}
+      onGuide={() => setGuideOpen(true)}
+      boxed={boxed}
+    />
+  );
+  const outputs = (boxed: boolean) => (
+    <StoryRail
+      activity={activity}
+      status={state.status}
+      yours={yours}
+      restartInChat={state.need === "stuck"}
+      preview={preview}
+      onSoon={(m) => showToast(m)}
+      files={outputFiles}
+      onOpenFile={seeEntry}
+      boxed={boxed}
+    />
+  );
+  const historyList = <HistoryList entries={entries} onSee={seeEntry} />;
+  // Below 1024 px (the tablet's corner card, the phone's fold) they're tabs (Shubham, 26 Nov), so the fold stays short:
+  // Status with the decisions under it, Output, History.
+  const panelTabs = () => (
     <PanelTabs
       tab={openTab}
       shown={shownTabs}
       onTab={changeTab}
       dots={tabDots}
-      // The desktop card's tab row is as tall as the chat's header (56 px), the pills centred in it, so the two line up.
-      listClassName={inCard ? "flex h-14 items-center px-4 [&>*]:w-full" : ""}
-      bodyClassName={inCard ? "px-4 pt-4 pb-4" : "pt-4"}
+      bodyClassName="pt-4"
       content={{
         status: (
-          // Today's status, then what's been decided (Shubham, 26 Nov: both, the first thing you see).
           <div className="flex flex-col gap-6 px-1">
-            <StatusPicker
-              status={state.status}
-              need={state.need}
-              turn={turn}
-              detail={pickerDetail}
-              dot={status.dot}
-              moves={statusMoveList}
-              // Not twice: while the decision is showing in the chat, the chat holds its button.
-              suggested={docked ? undefined : suggestedMove}
-              suggestedLabel={ask?.primary?.label}
-              locked={locked}
-              merger={mergerFirst === "you" ? "You" : mergerFirst}
-              onMove={changeStatus}
-              onGuide={() => setGuideOpen(true)}
-            />
-            <div className="border-t border-[var(--line)] pt-4">{decisionsPanel}</div>
+            {statusPicker(false)}
+            <div className="border-t border-[var(--line)] pt-4">{decisionsPanel(false)}</div>
           </div>
         ),
-        story: (
-          <div className="px-1">
-            <StoryOverview brief={brief} onReadAll={() => setDetailsOpen(true)} onSeeFiles={seeStoryFiles} />
-          </div>
-        ),
-        work: workEmpty ? (
-          <p className="m-0 px-1 text-sm text-pretty text-[var(--tx2)]">Nothing made yet. The plan, the preview and the code show here as they’re made.</p>
-        ) : (
-          // No side padding of its own: the rows reach the card's edges as before, so the Preview line keeps one row.
-          <div className="flex flex-col gap-6">
-            {rail(false)}
-            <FilesSection files={workFiles} onOpen={seeEntry} />
-          </div>
-        ),
-        history: (
-          <div className="px-1">
-            <HistoryList entries={entries} onSee={seeEntry} />
-          </div>
-        ),
+        // No side padding of its own: the rows reach the edges, so a preview's line keeps one row.
+        output: outputs(false),
+        history: <div className="px-1">{historyList}</div>,
       }}
     />
   );
+  // From 1024 px there are no tabs: a link to one (?tab=output, ?tab=history) scrolls to its box instead, once.
+  const arrivedOn = useRef<PanelTab | null>(openTab);
+  useEffect(() => {
+    if (!wide || !arrivedOn.current) return;
+    if (arrivedOn.current !== "status") document.getElementById(`story-box-${arrivedOn.current}`)?.scrollIntoView({ block: "start" });
+    arrivedOn.current = null;
+  }, [wide]);
   // The way back and ⋯ (one of each: they sit over the chat below 1024 px and at the top of the right-hand side from it).
   const backLink = (
     <Tip label="All stories">
@@ -1569,7 +1722,8 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                   type="button"
                   aria-haspopup="dialog"
                   onClick={() => setDetailsOpen(true)}
-                  className="min-w-0 rounded-[6px] text-left decoration-black/25 underline-offset-[3px] hover:underline lg:truncate"
+                  // A soft highlight behind the title on hover, no underline (Shubham, 27 Nov).
+                  className="-mx-1.5 min-w-0 rounded-[8px] px-1.5 text-left transition-colors duration-[120ms] hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary lg:truncate"
                 >
                   {story.title}
                 </button>
@@ -1589,7 +1743,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                   open={cornerOpen}
                   onOpenChange={setCornerOpen}
                 >
-                  <div className="pt-1">{panelTabs(false)}</div>
+                  <div className="pt-1">{panelTabs()}</div>
                 </ActivityCorner>
               </span>
             </span>
@@ -1600,7 +1754,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
               <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 py-2 [&::-webkit-details-marker]:hidden">
                 <ActivitySummary items={activity} yours={yours} />
               </summary>
-              <div className="pt-1 pb-4">{panelTabs(false)}</div>
+              <div className="pt-1 pb-4">{panelTabs()}</div>
             </details>
           )}
           {/* Phones, with Activity closed: a running preview's Stop stays one tap away. */}
@@ -1650,7 +1804,7 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                   refusal={askRefusal}
                   onAnswer={answer}
                   onSkipQuestion={skipQuestion}
-                  onReadMore={openWork}
+                  onReadMore={openOutput}
                   highlight={highlight}
                   storyCard={storyCard}
                   onReadStory={() => setDetailsOpen(true)}
@@ -1677,9 +1831,13 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                   Jump to latest
                 </button>
               )}
+              {/* The message box, the decision in its place, or who it's with: one gives way to the next with a cross-fade
+                  (Shubham, 27 Nov: everything that opens should be smooth). The one leaving is lifted out (popLayout) and
+                  fades where it was; the decision brings its own rise (DecisionDock). Nothing moves on the first paint. */}
+              <AnimatePresence initial={false} mode="popLayout">
               {handedTo ? (
                 // Sent to a teammate: the message box gives way to who has it, until they act or you take it back.
-                <div>
+                <motion.div key="handed" {...(reduce ? SWAP_FADE : SWAP)}>
                   {/* Narrow screens: the words get the row, and Take it back goes under them, full width. */}
                   <div className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2.5 rounded-[20px] border border-[var(--card-line)] bg-[#FAFAFA] py-2.5 pr-2.5 pl-4 max-sm:p-3">
                     <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
@@ -1696,11 +1854,13 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                       Take it back
                     </button>
                   </div>
-                </div>
+                </motion.div>
               ) : docked ? (
-                <DecisionDock ask={ask} question={openQuestion} refusal={askRefusal} onAnswer={answer} onSkip={skipQuestion} onWrite={actions.write} onReadMore={openWork} />
+                <motion.div key={`dock:${decisionKey}`} exit={SWAP.exit}>
+                  <DecisionDock seen={decisionKey ?? undefined} ask={ask} question={openQuestion} refusal={askRefusal} onAnswer={answer} onSkip={skipQuestion} onWrite={actions.write} onReadMore={openOutput} />
+                </motion.div>
               ) : (
-              <div>
+              <motion.div key="box" {...(reduce ? SWAP_FADE : SWAP)}>
                 {/* Writing first, with a decision still waiting: the way back to it. */}
                 {decisionKey && (
                   <button
@@ -1724,28 +1884,45 @@ function StoryView({ story, data }: { story: StoryItem; data: StoryPageData }) {
                   rebuild={rebuild}
                   onRebuildChange={setRebuild}
                   suggestions={suggestions}
+                  // The suggested next message, faint in the empty box, Tab to use it (Shubham, 27 Nov: as Claude does).
+                  // Only once the robot is done (its reply written in), never while it reads or works.
+                  suggestFrom={
+                    working
+                      ? null
+                      : { status: state.status, need: state.need, waitingOn: state.waitingOn, entries, viewerInitials: data.viewer.initials, prNo, merger: mergerFirst }
+                  }
                   hint={noteHint}
                   viewerName={data.viewer.name}
                   onSend={send}
                 />
-              </div>
+              </motion.div>
               )}
+              </AnimatePresence>
             </div>
             </div>
           </section>
           </div>
         </div>
 
-        {/* Beside the chat from 1024 px: the story's activity, in a card like Ask PM's side panel and as wide (300 px,
-            320 px from 1280). Its title row is as tall as the chat's header, so the tops line up. No Team here (Shubham,
-            26 Nov): people talk in Messages. `relative` keeps the rows' screen-reader text inside the scroll area. */}
+        {/* Beside the chat from 1024 px: white boxes on the page's wash, one under the other, in place of one tall card
+            with tabs (Shubham, 27 Nov: "the status as a first white box, then Decisions, then pages in a second box, then
+            preview", and "Decisions is also a separate part, and for all the sections there will be a collapsible
+            icon"). Every section is a box of its own with a fold icon (PanelSection): Status, Decisions, then what was
+            made (Pages, Preview, Code, Files), then History. As wide as Ask PM's side panel (300 px, 320 px from 1280);
+            the column scrolls, its top in line with the chat card's. No Team here (Shubham, 26 Nov): people talk in
+            Messages. */}
         {wide && (
-          <aside
-            data-tour="panel"
-            aria-label="Status, story, work and history"
-            className="hidden w-[300px] flex-none flex-col overflow-hidden rounded-[24px] bg-white ring-1 ring-black/[0.06] lg:ml-4 lg:flex xl:w-[320px]"
-          >
-            {panelTabs(true)}
+          <aside data-tour="panel" aria-label="Status, decisions, output and history" className="hidden w-[300px] flex-none lg:ml-4 lg:flex xl:w-[320px]">
+            {/* The scroll area is a pixel larger all round, so it doesn't clip the boxes' hairline rings (the same ring
+                as the chat card's, so their edges line up). `relative` keeps the rows' screen-reader text inside it. */}
+            <div className="relative -m-px flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-px">
+              {statusPicker(true)}
+              {decisionsPanel(true)}
+              {outputs(true)}
+              <PanelSection id="history" title="History" boxed>
+                <div className="mt-2">{historyList}</div>
+              </PanelSection>
+            </div>
           </aside>
         )}
       </main>

@@ -124,11 +124,11 @@ export function ActivityCorner({ items, yours, open, onOpenChange, title, childr
                 This story
               </h2>
             ))}
-          <Tip label={open ? "Close" : `Status, story, work and history: ${signal.words}`}>
+          <Tip label={open ? "Close" : `Status, output and history: ${signal.words}`}>
             <button
               ref={button}
               type="button"
-              aria-label={`Status, story, work and history: ${signal.words}`}
+              aria-label={`Status, output and history: ${signal.words}`}
               aria-expanded={open}
               aria-controls={PANEL_ID}
               onClick={() => setOpen(!open)}
@@ -150,7 +150,7 @@ export function ActivityCorner({ items, yours, open, onOpenChange, title, childr
             <motion.div
               key="activity"
               id={PANEL_ID}
-              aria-label="Status, story, work and history"
+              aria-label="Status, output and history"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { delay: reduce ? 0 : 0.12, duration: reduce ? 0 : 0.15 } }}
               exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.1 } }}

@@ -45,7 +45,7 @@ const MOCK_TOKEN_REPOSITORIES = 12;
 /** The code the mock sign-in page shows, and the only one the mock accepts. */
 export const MOCK_CODE = "4K7Q-9XPD";
 
-type MockState = Pick<Connection, "status" | "account" | "via" | "repositories" | "tokenLast4" | "reason">;
+type MockState = Pick<Connection, "status" | "account" | "via" | "repositories" | "tokenLast4" | "reason" | "connectedAt">;
 
 const shared = globalThis as typeof globalThis & {
   __crafthqMockConnections?: Record<ConnectionService, MockState>;
@@ -57,7 +57,7 @@ const states = (shared.__crafthqMockConnections ??= {
 });
 
 function view(service: ConnectionService): Connection {
-  const { status, account, via, repositories, tokenLast4, reason } = states[service];
+  const { status, account, via, repositories, tokenLast4, reason, connectedAt } = states[service];
   return {
     service,
     method: METHODS[service],
@@ -69,6 +69,7 @@ function view(service: ConnectionService): Connection {
     ...(status !== "not_connected" && repositories !== undefined ? { repositories } : {}),
     ...(status !== "not_connected" && tokenLast4 ? { tokenLast4 } : {}),
     ...(status === "needs_attention" && reason ? { reason } : {}),
+    ...(status !== "not_connected" && connectedAt ? { connectedAt } : {}),
   };
 }
 
@@ -100,10 +101,12 @@ type ConnectOptions =
 
 export function connect(service: ConnectionService, options: ConnectOptions = {}): Connection {
   const account = MOCK_ACCOUNTS[service];
+  // Today, in UTC: the mock's stand-in for when the connection was made.
+  const connectedAt = new Date().toISOString().slice(0, 10);
   if (options.via === "app") {
     states[service] = options.noRepositories
-      ? { status: "needs_attention", account, via: "app", repositories: 0, reason: "No repositories yet" }
-      : { status: "connected", account, via: "app", repositories: MOCK_APP_REPOSITORIES };
+      ? { status: "needs_attention", account, via: "app", repositories: 0, reason: "No repositories yet", connectedAt }
+      : { status: "connected", account, via: "app", repositories: MOCK_APP_REPOSITORIES, connectedAt };
   } else if (options.via === "token") {
     states[service] = {
       status: "connected",
@@ -111,9 +114,10 @@ export function connect(service: ConnectionService, options: ConnectOptions = {}
       via: "token",
       repositories: MOCK_TOKEN_REPOSITORIES,
       tokenLast4: options.tokenLast4,
+      connectedAt,
     };
   } else {
-    states[service] = { status: "connected", account };
+    states[service] = { status: "connected", account, connectedAt };
   }
   return view(service);
 }

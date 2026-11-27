@@ -36,6 +36,8 @@ export interface Connection {
   tokenLast4?: string;
   /** Why the connection needs attention, e.g. "Access expired". Present only with "needs_attention". */
   reason?: string;
+  /** When it was connected, as YYYY-MM-DD ("since 19 Nov" in Settings › GitHub). Present once connected. */
+  connectedAt?: string;
 }
 
 /** Body of GET /api/connections. Connections come back in the order people should connect them. */

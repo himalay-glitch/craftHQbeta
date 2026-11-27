@@ -4,7 +4,7 @@ import type { SearchItem, Viewer } from "@/types/dashboard";
 import { ICON_BTN, MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
 import { Notifications } from "@/components/notifications";
 import { AvatarMenu } from "./AvatarMenu";
-import { NAV, currentPath } from "./nav";
+import { NAV, currentPath, isCurrent } from "./nav";
 import { SearchBox } from "./SearchBox";
 
 interface TopBarProps {
@@ -37,7 +37,7 @@ export function TopBar({ viewer, search, current }: TopBarProps) {
                 <DropdownMenu.Content align="start" sideOffset={6} collisionPadding={8} className={MENU_CONTENT}>
                   {NAV.map(({ href, label, icon: Icon }) => (
                     <DropdownMenu.Item key={href} asChild className={MENU_ITEM}>
-                      <a href={href} aria-current={path === href ? "page" : undefined} className="aria-[current=page]:font-medium">
+                      <a href={href} aria-current={isCurrent(path, href) ? "page" : undefined} className="aria-[current=page]:font-medium">
                         <Icon aria-hidden="true" size={16} strokeWidth={1.75} className="text-[var(--tx2)]" />
                         {label}
                       </a>

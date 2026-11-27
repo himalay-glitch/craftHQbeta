@@ -4,10 +4,16 @@ import type { Connection } from "@/types/connections";
 import { fetchConnections } from "./api";
 import { Button, IconButton } from "./Button";
 import { ConnectionRow } from "./ConnectionRow";
+import { TicketTools } from "./TicketTools";
 
 export type ConnectAccountsModalProps = {
   open: boolean;
   onClose: () => void;
+  /**
+   * "setup", the default: the step after sign-in, GitHub and Claude only (Shubham, 26 Nov). "connectors": Connectors in
+   * the sidebar, which adds the optional ticket tools a story can be imported from.
+   */
+  variant?: "setup" | "connectors";
 };
 
 type Load = { state: "loading" } | { state: "error" } | { state: "ready"; connections: Connection[] };
@@ -26,15 +32,19 @@ const DIALOG =
   "max-sm:mb-0 max-sm:max-w-none max-sm:rounded-b-none";
 
 /**
- * Asks people to connect their accounts: GitHub first, then Claude (DESIGN.md §6.6, §7.9).
- * Built on the native <dialog>, which gives focus containment, Esc and the top layer for free.
+ * Asks people to connect their accounts, as cards (Shubham, 26 Nov: like New story → Import's "Where is the ticket?"):
+ * GitHub first, then Claude, which the robots need (DESIGN.md §6.6, §7.9). After sign-in that's all it shows. As
+ * Connectors, from the sidebar, the optional ticket tools a story can be imported from follow. Built on the native
+ * <dialog>, which gives focus containment, Esc and the top layer for free.
  */
-export function ConnectAccountsModal({ open, onClose }: ConnectAccountsModalProps) {
+export function ConnectAccountsModal({ open, onClose, variant = "setup" }: ConnectAccountsModalProps) {
+  const all = variant === "connectors";
   const dialogRef = useRef<HTMLDialogElement>(null);
   const focusActionRef = useRef(false);
   const busyCountRef = useRef(0);
   const titleId = useId();
   const descriptionId = useId();
+  const requiredId = useId();
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [showSkeleton, setShowSkeleton] = useState(false);
@@ -78,6 +88,8 @@ export function ConnectAccountsModal({ open, onClose }: ConnectAccountsModalProp
   }, [load]);
 
   const updateConnection = useCallback((updated: Connection) => {
+    // The card that had the focus closes once it's connected: move the focus to the next thing to do.
+    focusActionRef.current = true;
     setLoad((current) =>
       current.state === "ready"
         ? {
@@ -136,10 +148,14 @@ export function ConnectAccountsModal({ open, onClose }: ConnectAccountsModalProp
         <header className="flex items-start gap-3 px-6 pt-6">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-semibold">
-              Connect your accounts
+              {all ? "Connectors" : "Connect your accounts"}
             </h2>
             <p id={descriptionId} className="mt-1 text-sm text-balance text-muted-foreground">
-              Connect GitHub first, then Claude. The robots can start once both are connected.
+              {!allConnected
+                ? "Connect GitHub first, then Claude. The robots can start once both are connected."
+                : all
+                  ? "GitHub and Claude are connected, so the robots can work. Connect a ticket tool to import stories from it."
+                  : "GitHub and Claude are connected, so the robots can work."}
             </p>
           </div>
           <IconButton label="Close" onClick={onClose} className="-mt-1 -mr-2">
@@ -147,33 +163,42 @@ export function ConnectAccountsModal({ open, onClose }: ConnectAccountsModalProp
           </IconButton>
         </header>
 
-        <div className="px-6 py-5">
-          {load.state === "ready" ? (
-            <ol className="flex list-none flex-col gap-3">
-              {connections.map((connection) => (
-                <ConnectionRow
-                  key={connection.service}
-                  connection={connection}
-                  isNext={connection.service === next}
-                  onConnected={updateConnection}
-                  onBusyChange={trackBusy}
-                />
-              ))}
-            </ol>
-          ) : load.state === "error" ? (
-            <div className="flex flex-col items-start gap-3 rounded-xl border border-border p-4">
-              <p role="alert" className="flex items-center gap-1.5 text-sm text-danger-ink">
-                <CircleExclamationPoint size={16} strokeWidth={1.75} aria-hidden className="flex-none" />
-                {"Couldn't load your connections."}
-              </p>
-              <Button onClick={retry}>Try again</Button>
-            </div>
-          ) : (
-            <ol aria-hidden="true" className={`flex list-none flex-col gap-3 ${showSkeleton ? "" : "invisible"}`}>
-              <li className="h-24 animate-pulse rounded-xl bg-field motion-reduce:animate-none" />
-              <li className="h-24 animate-pulse rounded-xl bg-field motion-reduce:animate-none" />
-            </ol>
-          )}
+        <div className="flex flex-col gap-5 px-6 py-5">
+          <section aria-labelledby={all ? requiredId : titleId}>
+            {/* As Connectors there are two groups, so this one says what it is; after sign-in the title does. */}
+            {all ? (
+              <h3 id={requiredId} className="mb-2 text-sm font-medium">
+                Needed to start
+              </h3>
+            ) : null}
+            {load.state === "ready" ? (
+              <ol className="grid list-none grid-cols-1 gap-2 sm:grid-cols-2">
+                {connections.map((connection) => (
+                  <ConnectionRow
+                    key={connection.service}
+                    connection={connection}
+                    isNext={connection.service === next}
+                    onConnected={updateConnection}
+                    onBusyChange={trackBusy}
+                  />
+                ))}
+              </ol>
+            ) : load.state === "error" ? (
+              <div className="flex flex-col items-start gap-3 rounded-xl border border-border p-4">
+                <p role="alert" className="flex items-center gap-1.5 text-sm text-danger-ink">
+                  <CircleExclamationPoint size={16} strokeWidth={1.75} aria-hidden className="flex-none" />
+                  {"Couldn't load your connections."}
+                </p>
+                <Button onClick={retry}>Try again</Button>
+              </div>
+            ) : (
+              <ol aria-hidden="true" className={`grid list-none grid-cols-1 gap-2 sm:grid-cols-2 ${showSkeleton ? "" : "invisible"}`}>
+                <li className="h-[54px] animate-pulse rounded-xl bg-field motion-reduce:animate-none" />
+                <li className="h-[54px] animate-pulse rounded-xl bg-field motion-reduce:animate-none" />
+              </ol>
+            )}
+          </section>
+          {all ? <TicketTools /> : null}
         </div>
 
         <footer className="flex items-center gap-3 px-6 pb-6">

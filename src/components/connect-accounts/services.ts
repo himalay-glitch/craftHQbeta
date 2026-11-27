@@ -4,6 +4,8 @@ import type { ButtonVariant } from "./Button";
 type ServiceCopy = {
   name: string;
   purpose: string;
+  /** The card's line under the name until it's connected: what it's for, in a few words. */
+  short: string;
   /** Shown in the logo spot until the service's official logo is in public/connect-accounts/. */
   initial: string;
   /** The official logo, unmodified (DESIGN.md §3.6). */
@@ -23,6 +25,7 @@ export const SERVICE_COPY: Record<ConnectionService, ServiceCopy> = {
   github: {
     name: "GitHub",
     purpose: "CraftHQ opens pull requests as you, in repositories where the CraftHQ app is installed.",
+    short: "Your repositories",
     initial: "G",
     logo: "/connect-accounts/GitHub_Invertocat_Black.svg",
     brandButton: { variant: "inverse", mark: "/connect-accounts/GitHub_Invertocat_White.svg" },
@@ -30,6 +33,7 @@ export const SERVICE_COPY: Record<ConnectionService, ServiceCopy> = {
   claude: {
     name: "Claude",
     purpose: "The robots do their work with your Claude account.",
+    short: "Powers the robots",
     initial: "C",
     // Local preview only: this file is git-ignored on Shubham's machine. Anthropic supplies the official
     // logo on request (trademark guidelines), so the row shows the initial wherever the file is missing.

@@ -1,0 +1,21 @@
+---
+// Settings (Shubham, 26 Nov), following the live CraftHQ settings: your settings, the same in every project, and each
+// project's own. Opened from the account menu under your avatar, top right (AvatarMenu.tsx), not from the sidebar.
+// Rendered on request, so the section in the URL (?tab=tokens, the link the Docs use) is the one in the HTML from the
+// first paint, with no jump after hydration. Each section's title is the page's heading.
+export const prerender = false;
+
+import AppLayout from "@/layouts/AppLayout.astro";
+import { DEFAULT_PROJECT, SettingsScreen, resolveTab, serverTitle } from "@/components/settings/SettingsScreen";
+import { dashboardData } from "../dashboard/_sample-data";
+
+const search = dashboardData.stories.map(({ id, title, status }) => ({ id, title, status }));
+const tab = resolveTab(Astro.url.searchParams.get("tab"));
+const project = Astro.url.searchParams.get("project") ?? DEFAULT_PROJECT;
+---
+
+<AppLayout title={serverTitle(tab, project)} viewer={dashboardData.viewer} search={search}>
+  <main id="main" class="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16 md:px-8 lg:pt-10">
+    <SettingsScreen client:load initialTab={tab} initialProject={project} />
+  </main>
+</AppLayout>

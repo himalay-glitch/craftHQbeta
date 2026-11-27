@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { AskCard, AskRefusal, ThreadEntry } from "@/types/stories";
 import chat from "./chat.module.css";
 import { DecisionCard, Question } from "./StoryThread";
@@ -18,7 +19,13 @@ interface DecisionDockProps {
   onSkip?: () => void;
   /** "Ask a question": the message box comes back, with the way back to this. */
   onWrite: () => void;
+  /** Which decision this is. The first time it shows it rises a beat after the robot's message lands; coming back to
+   *  it ("Back to the decision") it rises at once, with no wait. */
+  seen?: string;
 }
+
+/** Decisions that have already risen into place on this visit. */
+const risen = new Set<string>();
 
 /**
  * While a decision waits on you, it takes the message box's place (Shubham, 26 Nov: "I can still type and send; that
@@ -26,11 +33,15 @@ interface DecisionDockProps {
  * on purpose: "Ask a question" at the end of the card's buttons ("Ask for changes" and the card's own "Ask a question"
  * do the same). Nothing sits under the card (Shubham, 26 Nov: no line under the box).
  */
-export function DecisionDock({ ask, question, refusal, onAnswer, onSkip, onWrite, onReadMore }: DecisionDockProps) {
+export function DecisionDock({ ask, question, refusal, onAnswer, onSkip, onWrite, onReadMore, seen }: DecisionDockProps) {
+  const [again] = useState(() => (seen ? risen.has(seen) : false));
+  useEffect(() => {
+    if (seen) risen.add(seen);
+  }, [seen]);
   // A card whose own buttons already open the box ("Ask a question", "Write to the agent") needs no second way.
   const writes = /^(Ask a question|Write to the agent)$/.test(ask?.secondary?.label ?? "");
   return (
-    <div className={chat.rise}>
+    <div className={again ? chat.riseNow : chat.rise}>
       {question ? (
         <Question
           entry={question}

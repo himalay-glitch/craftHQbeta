@@ -1,18 +1,45 @@
-import { Fragment, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { DropdownMenu, Popover } from "radix-ui";
-import { BookmarkCheck, BookmarkPlus, Check, ChevronDown, ChevronRight, File as FileIcon, FileImage, FilePlay, FileText, Forward, PencilLine } from "lucide-react";
-import type { AskCard, AskRefusal, Author, FileRef, LiveState, RunPhase, ThreadEntry } from "@/types/stories";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  ArrowRight,
+  BookmarkCheck,
+  BookmarkPlus,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CircleHelp,
+  File as FileIcon,
+  FileImage,
+  FilePlay,
+  FileText,
+  Forward,
+  GitMerge,
+  GitPullRequest,
+  MessageCircleQuestion,
+  PencilLine,
+  RefreshCw,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
+import type { AskCard, AskRefusal, Author, FileRef, LiveState, RunPhase, Segment, ThreadEntry } from "@/types/stories";
 import { BTN_PRIMARY, BTN_SECONDARY, MENU_CONTENT, MENU_ITEM } from "@/components/dashboard/classes";
 import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
 import { BotAvatar } from "@/components/ask/BotAvatar";
 import tokens from "@/components/dashboard/tokens.module.css";
 import chat from "./chat.module.css";
 import { plainText } from "./decisions";
-import { elapsed, useNow } from "./clock";
+import { elapsed } from "./clock";
 import { PHASE_LABEL, PHASE_NOTE, runLine, runTime } from "./phases";
 import { isOnline } from "./presence";
 import { letter, type QuestionEntry } from "./questions";
+import { usePausedMotion } from "./motion-pref";
+import { Collapse } from "./Collapse";
 import { RichText } from "./RichText";
+import { RunTrail } from "./RunTrail";
+import { StageIcon } from "./StageIcon";
+import type { ColumnKey } from "./stage";
+import { replyPlan, STEP, STEP_MS } from "./stream";
 import { Refusal } from "./TeammateBanner";
 
 interface StoryThreadProps {
@@ -56,6 +83,25 @@ const MINE_BUBBLE = `w-fit max-w-[80%] rounded-[20px] bg-[#F2F2F4] px-4 py-2.5 $
 const GHOST =
   "h-8 rounded-full px-3 text-sm text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)]";
 const CARD = "w-full max-w-[460px] rounded-[18px] bg-white p-4 ring-1 ring-black/[0.08]";
+
+// Three kinds of line, each its own look (Shubham, 27 Nov: "there are many text types… they should differentiate"),
+// on DESIGN.md §3.2's roles:
+// - What was said (the robot's and people's words): Reading, 16 px, in ink. Only conversation is this size.
+// - What you do next: Body, 14 px, in ink, behind a small "Next" tag.
+// - What happened (a run's summary, the story's stage changes, "Saved as a decision"): Caption, 12 px, muted, a 12 px
+//   mark in front (a tick for a finished run, a dot for a change), always at the start of the words' column.
+const HAPPENED = "m-0 flex items-start gap-1.5 text-xs text-pretty text-[var(--tx2)]";
+/** The 12 px mark in front of a "what happened" line, as tall as its line. */
+const MARK = "flex h-4 w-3 flex-none items-center justify-center";
+
+/** A day's divider, centred. */
+function DayDivider({ day }: { day: string }) {
+  return (
+    <p className="m-0 pt-4 pb-1 text-center text-xs font-medium text-[var(--tx2)]" role="separator">
+      {day}
+    </p>
+  );
+}
 
 type AuthorKey = string;
 const keyOf = (a: Author): AuthorKey => (a.kind === "agent" ? "agent" : a.initials);
@@ -129,7 +175,7 @@ function SaveDecision({ text, mine, onSave }: { text: string; mine: boolean; onS
           align={mine ? "start" : "end"}
           sideOffset={6}
           collisionPadding={8}
-          className={`${tokens.tokens} z-50 w-[min(340px,calc(100vw-16px))] rounded-[16px] bg-white p-4 ring-1 ring-black/[0.08] outline-none`}
+          className={`${tokens.tokens} ${chat.pop} z-50 w-[min(340px,calc(100vw-16px))] rounded-[16px] bg-white p-4 ring-1 ring-black/[0.08] outline-none`}
         >
           <form
             onSubmit={(e) => {
@@ -205,16 +251,90 @@ function StoryCardButton({ card, onOpen }: { card: StoryCard; onOpen?: () => voi
   );
 }
 
+// ---- The decision cards: "Needs your OK", "Needs your answer", Stuck, in the chat or in the message box's place ----
+// Shubham, 27 Nov: they looked "very average and wireframy". Each now leads with a tile in its tone (DESIGN.md §2.7:
+// a tone means state; attention for what waits on you, negative for something stopped) holding where the decision
+// takes the story, drawn once as it arrives (StageIcon). Then the label and the title, what it moves on the right, the
+// buttons (the main one with its icon, the next one filled rather than outlined, as DESIGN.md §7.1's secondary is),
+// and "Send to someone" on a soft strip at the foot. The card itself stays plain white: no gradient (Shubham, 27 Nov),
+// no shadow.
+
+type Tone = "attention" | "stuck";
+const TONE: Record<Tone, { ink: string; tile: string }> = {
+  attention: { ink: "text-warning-ink", tile: "bg-warning-tint text-warning-ink" },
+  stuck: { ink: "text-danger-ink", tile: "bg-danger-tint text-danger-ink" },
+};
+
+/** A filled secondary button (DESIGN.md §7.1), quieter than the main one beside it. */
+const BTN_SOFT =
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-field px-3.5 text-sm font-medium whitespace-nowrap text-[var(--tx)] transition-colors duration-[120ms] hover:bg-field-hover active:translate-y-px";
+
+/** The stage a decision moves the story to, by the name its card uses. */
+const STAGE_OF: Record<string, ColumnKey> = { Planning: "planning", Approved: "building", Building: "building", "In review": "review", "Pull request": "pr", Done: "done" };
+
+/** The main button's icon, by what it does. */
+function actionIcon(label: string): ReactNode {
+  const icon = { "aria-hidden": true, size: 16, strokeWidth: 1.75 } as const;
+  if (/^Settle/.test(label)) return <GitMerge {...icon} />;
+  if (/pull request/i.test(label)) return <GitPullRequest {...icon} />;
+  if (/^Approve/.test(label)) return <Check {...icon} />;
+  if (/^Try again/.test(label)) return <RotateCcw {...icon} />;
+  if (/^Reconnect/.test(label)) return <RefreshCw {...icon} />;
+  if (/^Move to/.test(label)) return <ArrowRight {...icon} />;
+  return null;
+}
+
+/** A decision card's top: its tile, its label in the tone, its title, and on the right what it moves or its number. */
+function CardHead({ tone, tile, label, title, aside }: { tone: Tone; tile: ReactNode; label: string; title: string; aside?: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span aria-hidden="true" className={`flex size-10 flex-none items-center justify-center rounded-[12px] ${TONE[tone].tile}`}>
+        {tile}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-h-5 items-center gap-2">
+          <p className={`m-0 min-w-0 flex-1 text-xs font-medium ${TONE[tone].ink}`}>{label}</p>
+          {aside}
+        </div>
+        <p className="m-0 mt-0.5 text-base font-semibold text-pretty text-[var(--tx)]">{title}</p>
+      </div>
+    </div>
+  );
+}
+
+/** What the decision moves: "In review → Pull request". */
+function MoveChip({ move }: { move: { from: string; to: string } }) {
+  return (
+    <span className="hidden flex-none items-center gap-1 text-xs text-[var(--tx2)] sm:inline-flex">
+      <span className="sr-only">Moves it from </span>
+      {move.from}
+      <ArrowRight aria-hidden="true" size={12} strokeWidth={2} />
+      <span className="sr-only"> to </span>
+      <span className="font-medium text-[var(--tx)]">{move.to}</span>
+    </span>
+  );
+}
+
 /**
  * The decision card's other way out (Shubham, 26 Nov): not yours to decide, so send the story to a teammate. Picking
- * someone sends it at once, with Undo; the story then waits on them and is paused for you.
+ * someone sends it at once, with Undo; the story then waits on them and is paused for you. A soft strip across the
+ * card's foot, with a few of the faces it could go to.
  */
 export function Handoff({ people, onSend }: NonNullable<AskCard["handoff"]>) {
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-[var(--line)] pt-3">
-      <span className="text-sm text-[var(--tx2)]">Someone else should decide?</span>
+    <div className="-mx-4 mt-4 -mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-[#FAFAFA] px-4 py-2.5">
+      <span className="flex min-w-0 items-center gap-2.5 text-sm text-[var(--tx2)]">
+        <span aria-hidden="true" className="flex flex-none -space-x-1.5">
+          {people.slice(0, 3).map((p) => (
+            <span key={p.initials} className="flex rounded-full ring-2 ring-[#FAFAFA]">
+              <PersonAvatar initials={p.initials} />
+            </span>
+          ))}
+        </span>
+        Someone else should decide?
+      </span>
       <DropdownMenu.Root modal={false}>
-        <DropdownMenu.Trigger className={`${BTN_SECONDARY} data-[state=open]:bg-[var(--ctl-bg-h)]`}>
+        <DropdownMenu.Trigger className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-white px-3.5 text-sm font-medium whitespace-nowrap text-[var(--tx)] ring-1 ring-black/[0.08] transition-shadow duration-[120ms] hover:ring-black/[0.16] active:translate-y-px data-[state=open]:ring-black/[0.16]">
           <Forward aria-hidden="true" size={16} strokeWidth={1.75} />
           Send to someone
           <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} className="-mr-1 text-[var(--tx2)]" />
@@ -252,24 +372,38 @@ export function DecisionCard({
   /** In the message box's place: a quiet way to write first, at the end of the buttons (nothing under the card). */
   onAsk?: () => void;
 }) {
+  const tone: Tone = ask.tone === "stuck" ? "stuck" : "attention";
+  const target = ask.move ? STAGE_OF[ask.move.to] : undefined;
+  const tile =
+    tone === "stuck" ? (
+      <TriangleAlert size={20} strokeWidth={1.75} />
+    ) : /^Conflict/.test(ask.label) ? (
+      <GitMerge size={20} strokeWidth={1.75} />
+    ) : target ? (
+      <StageIcon stage={target} play={1} size={20} />
+    ) : (
+      <CircleHelp size={20} strokeWidth={1.75} />
+    );
   return (
-    <div className={className}>
-      <p className={`m-0 flex items-center gap-1.5 text-xs font-medium ${ask.tone === "stuck" ? "text-danger-ink" : "text-warning-ink"}`}>
-        <span aria-hidden="true" className={`size-1.5 rounded-full ${ask.tone === "stuck" ? "bg-danger-ink" : "bg-warning"}`} />
-        {ask.label}
-      </p>
-      <p className="m-0 mt-2 text-sm font-semibold text-[var(--tx)]">{ask.title}</p>
-      {ask.meta && <p className="m-0 mt-1 text-sm text-pretty text-[var(--tx2)]">{ask.meta}</p>}
-      {refusal && <Refusal text={refusal.text} fix={refusal.fix} />}
+    // overflow-hidden: the strip at the foot keeps the card's round corners.
+    <div className={`${className} overflow-hidden`}>
+      <CardHead tone={tone} tile={tile} label={ask.label} title={ask.title} aside={ask.move ? <MoveChip move={ask.move} /> : undefined} />
+      {ask.meta && <p className="m-0 mt-2 text-sm text-pretty text-[var(--tx2)] sm:pl-13">{ask.meta}</p>}
+      {refusal && (
+        <div className="sm:pl-13">
+          <Refusal text={refusal.text} fix={refusal.fix} />
+        </div>
+      )}
       {!refusal && (ask.primary || ask.secondary || onAsk) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2 sm:pl-13">
           {ask.primary && (
             <button type="button" onClick={ask.primary.onClick} className={BTN_PRIMARY}>
+              {actionIcon(ask.primary.label)}
               {ask.primary.label}
             </button>
           )}
           {ask.secondary && (
-            <button type="button" onClick={ask.secondary.onClick} className={BTN_SECONDARY}>
+            <button type="button" onClick={ask.secondary.onClick} className={BTN_SOFT}>
               {ask.secondary.label}
             </button>
           )}
@@ -312,7 +446,7 @@ function Checklist({ items, fresh }: { items: string[]; fresh?: boolean }) {
 function Fold({ line, time, rows }: { line: string; time?: string; rows: { label: string; note?: string; time?: string }[] }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="px-1">
+    <div>
       <button
         type="button"
         aria-expanded={open}
@@ -321,11 +455,11 @@ function Fold({ line, time, rows }: { line: string; time?: string; rows: { label
       >
         <Check aria-hidden="true" size={12} strokeWidth={2} className="flex-none text-[var(--green)]" />
         <span className="min-w-0 truncate">{line}</span>
-        {time && <span className="flex-none tabular-nums">— {time}</span>}
+        {time && <span className="flex-none tabular-nums">· {time}</span>}
         <ChevronRight aria-hidden="true" size={12} strokeWidth={2} className={`flex-none transition-transform duration-[120ms] ${open ? "rotate-90" : ""}`} />
       </button>
-      {open && (
-        <ol className={`m-0 mt-1 mb-1 flex list-none flex-col gap-1.5 border-l border-[var(--line)] p-0 pl-3 ${chat.enter}`}>
+      <Collapse open={open}>
+        <ol className="m-0 flex list-none flex-col gap-1.5 border-l border-[var(--line)] p-0 py-1 pl-3">
           {rows.map((r, i) => (
             <li key={`${r.label}-${i}`} className="text-xs">
               <span className="flex items-baseline gap-2">
@@ -336,12 +470,12 @@ function Fold({ line, time, rows }: { line: string; time?: string; rows: { label
             </li>
           ))}
         </ol>
-      )}
+      </Collapse>
     </div>
   );
 }
 
-/** The phases behind a reply, folded: "Planned · changed · screens checked · reviewed · verified — 14s". */
+/** The phases behind a reply, folded: "Planned · changed · screens checked · reviewed · verified · 14s". */
 function RunFold({ phases }: { phases: RunPhase[] }) {
   return (
     <Fold
@@ -361,14 +495,94 @@ function Run({ entry }: { entry: Extract<ThreadEntry, { kind: "run" }> }) {
   return <Fold line={entry.summary} rows={entry.steps.map((label) => ({ label }))} />;
 }
 
-/** "2 of 6 · 9s" beside the live phase: hidden from screen readers, so the polite region isn't read every second. */
-function LiveMeta({ step, of, since }: { step?: number; of?: number; since?: number }) {
-  const now = useNow(since !== undefined);
-  const parts = [step && of && of > 1 ? `${step} of ${of}` : null, since && now ? elapsed(now - since) : null].filter(Boolean);
-  if (!parts.length) return null;
+/** Replies that have written in once on this visit: one that mounts again (tinted by "See in chat") shows whole. */
+const written = new Set<string>();
+
+/** How long a word takes to fade in (chat.module.css `.word`), and a beat more. */
+const WORD_FADE_MS = 460;
+
+/**
+ * A reply that arrived while the page is open writes itself in, a word at a time at Ask PM's pace (stream.ts),
+ * instead of a "Builder is writing a reply" line first (Shubham, 27 Nov). Each word fades up out of a soft blur as
+ * it arrives, so the words flow in line after line instead of popping (Shubham, 27 Nov: "text coming very smoothly").
+ * `settled` turns true once the last word has finished fading: from then the reply is plain text again. With reduced
+ * motion it's all there at once.
+ */
+function Writes({ id, total, on, children }: { id: string; total: number; on: boolean; children: (shown: number, settled: boolean) => ReactNode }) {
+  const [shown, setShown] = useState(() => (on && !written.has(id) ? 0 : total));
+  const [settled, setSettled] = useState(() => !(on && !written.has(id)));
+  useEffect(() => {
+    written.add(id);
+  }, [id]);
+  useEffect(() => {
+    if (shown >= total) {
+      if (settled) return;
+      const t = window.setTimeout(() => setSettled(true), WORD_FADE_MS);
+      return () => window.clearTimeout(t);
+    }
+    const t = window.setTimeout(() => setShown((s) => Math.min(total, s + STEP)), STEP_MS);
+    return () => window.clearTimeout(t);
+  }, [shown, total, settled]);
+  return <>{children(shown, settled)}</>;
+}
+
+/** One word writing in. Keys stay put, so only the newest words fade; the ones already there hold still. */
+const revealWord = (w: string, key: string, first: boolean) => (
+  <Fragment key={key}>
+    {!first && " "}
+    <span className={chat.word}>{w}</span>
+  </Fragment>
+);
+
+/** The first `n` words of a text, each fading in as it arrives (the same word split as stream.ts). */
+function RevealText({ text, n }: { text: string; n: number }) {
+  return <>{text.split(" ").slice(0, Math.max(0, n)).map((w, i) => revealWord(w, String(i), i === 0))}</>;
+}
+
+/** The first `n` words of a message's text the same way; a chip (a person, a story) is one word. */
+function RevealSegments({ segments, n, stories }: { segments: Segment[]; n: number; stories: { id: number; title: string }[] }) {
+  const out: ReactNode[] = [];
+  let left = n;
+  segments.forEach((seg, si) => {
+    if (left <= 0) return;
+    if (typeof seg === "string") {
+      const ws = seg.split(" ");
+      ws.slice(0, left).forEach((w, wi) => out.push(revealWord(w, `${si}-${wi}`, wi === 0)));
+      left -= ws.length;
+    } else {
+      out.push(
+        <span key={si} className={chat.word}>
+          <RichText segments={[seg]} stories={stories} />
+        </span>,
+      );
+      left -= 1;
+    }
+  });
+  return <>{out}</>;
+}
+
+/** The live line comes in like a new message (rise 8 px and fade, 360 ms) and leaves faster (fade, 150 ms). */
+const LIVE_MOTION = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.36, ease: [0.2, 0, 0, 1] } },
+  exit: { opacity: 0, transition: { duration: 0.15, ease: [0.4, 0, 1, 1] } },
+} as const;
+/** Under reduced motion it only fades (DESIGN.md §3.7). */
+const LIVE_FADE = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.15 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+} as const;
+
+/** The robot's face on the live line, busy: a slow head tilt while it reads, a plush hop while it works. Still under
+ *  reduced motion or "Pause animations". */
+function LiveFace({ doing }: { doing: "read" | "work" }) {
+  const reduce = useReducedMotion();
+  const paused = usePausedMotion();
+  const move = reduce || paused ? "" : doing === "work" ? chat.botHop : chat.botTilt;
   return (
-    <span aria-hidden="true" className="flex-none text-xs font-normal text-[var(--tx2)] tabular-nums">
-      {parts.join(" · ")}
+    <span className={`inline-flex flex-none ${move}`}>
+      <BotAvatar id="builder" size={32} bare />
     </span>
   );
 }
@@ -403,20 +617,21 @@ export function Question({
   if (answered && entry.answer) {
     const own = entry.answer.text !== undefined;
     return (
+      // Answered: the question as quiet context (14 px, muted), then the answer as said words with its tick, then who
+      // answered and when, as a "what happened" line (Shubham, 27 Nov: fewer kinds of text).
       <div className={THEIR_TEXT}>
-        <p className="m-0 text-[var(--tx2)]">{entry.question}</p>
+        <p className="m-0 text-sm text-[var(--tx2)]">{entry.question}</p>
         <p className="m-0 mt-1 flex items-start gap-2">
           <span className="flex h-6 flex-none items-center">
             <Check aria-hidden="true" size={14} strokeWidth={2} className={`text-[var(--green)] ${entry.fresh ? chat.check : ""}`} />
           </span>
           <span className="min-w-0">
-            <span className="font-medium">
+            <span className="block">
               {own ? `Something else: “${entry.answer.text}”` : `${lettered ? `${letter(entry.answer.option)} · ` : ""}${entry.options[entry.answer.option]}`}
-            </span>{" "}
-            <span className="text-xs whitespace-nowrap text-[var(--tx2)] tabular-nums">
-              {entry.answer.by} · {entry.answer.at}
-            </span>{" "}
-            <button
+            </span>
+            <span className="mt-0.5 block text-xs text-[var(--tx2)] tabular-nums">
+              {entry.answer.by} · {entry.answer.at} ·{" "}
+              <button
               type="button"
               onClick={() => {
                 if (own) {
@@ -428,7 +643,8 @@ export function Question({
               className="rounded-[4px] text-xs text-[var(--tx2)] underline-offset-2 hover:text-[var(--tx)] hover:underline"
             >
               Change
-            </button>
+              </button>
+            </span>
           </span>
         </p>
       </div>
@@ -453,15 +669,22 @@ export function Question({
         setChanging(false);
       }}
     >
-      <p className="m-0 flex items-center gap-1.5 text-xs font-medium text-warning-ink">
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />
-        Needs your answer
-        {entry.number !== undefined && <span className="font-normal text-[var(--tx2)] tabular-nums">· decision #{entry.number}</span>}
-      </p>
-      <p className="m-0 mt-2 text-sm font-semibold text-pretty text-[var(--tx)]">{entry.question}</p>
+      <CardHead
+        tone="attention"
+        tile={<MessageCircleQuestion size={20} strokeWidth={1.75} />}
+        label="Needs your answer"
+        title={entry.question}
+        aside={
+          entry.number !== undefined ? (
+            <span className="flex-none rounded-md bg-field px-1.5 font-mono text-xs text-[var(--tx2)] tabular-nums">
+              <span className="sr-only">Decision </span>#{entry.number}
+            </span>
+          ) : undefined
+        }
+      />
       {/* What the agent found, before the choices (the live product's decision cards, Shubham 26 Nov). */}
-      {entry.context && <p className="m-0 mt-1 text-sm text-pretty text-[var(--tx2)]">{entry.context}</p>}
-      <fieldset className="m-0 mt-3 flex flex-col gap-1.5 border-0 p-0">
+      {entry.context && <p className="m-0 mt-2 text-sm text-pretty text-[var(--tx2)] sm:pl-13">{entry.context}</p>}
+      <fieldset className="m-0 mt-3 flex flex-col gap-1.5 border-0 p-0 sm:pl-13">
         <legend className="sr-only">{entry.question}</legend>
         {entry.options.map((o, i) => {
           const picked = choice === i;
@@ -525,7 +748,7 @@ export function Question({
         )}
       </fieldset>
       {(fallback || (entry.readMore && onReadMore)) && (
-        <p className="m-0 mt-3 text-xs text-pretty text-[var(--tx2)]">
+        <p className="m-0 mt-3 text-xs text-pretty text-[var(--tx2)] sm:pl-13">
           {fallback && (
             <>
               If nobody answers by {fallback.by}, {lettered ? letter(fallback.option) : `“${entry.options[fallback.option]}”`} goes ahead.
@@ -544,8 +767,9 @@ export function Question({
           )}
         </p>
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2 sm:pl-13">
         <button type="submit" disabled={!ready} className={BTN_PRIMARY}>
+          <Check aria-hidden="true" size={16} strokeWidth={1.75} />
           Send answer
         </button>
         {onSkip && (
@@ -570,13 +794,15 @@ export function Question({
 
 /** The agent's (or a teammate's) side: a face and "name · time" once per group, as in Ask PM, then the words and
  *  cards with 12 px between them. A new group stands 28 px off the one before. */
+// In the chat the agent's face stands on its own, with no tinted circle behind it (Shubham, 27 Nov); people keep
+// their circles, and so do the bots elsewhere (the sidebar).
 function TheirRow({ author, head, at, children }: { author: Author; head: boolean; at: string; children: ReactNode }) {
   return (
     <div className={`flex gap-3 ${head ? "mt-4" : ""}`}>
       <div className="w-8 flex-none">
         {head &&
           (author.kind === "agent" ? (
-            <BotAvatar id="builder" size={32} />
+            <BotAvatar id="builder" size={32} bare />
           ) : (
             <PersonAvatar initials={author.initials} size={32} online={isOnline(author.initials)} />
           ))}
@@ -621,6 +847,7 @@ export function StoryThread({
   savedIds,
 }: StoryThreadProps) {
   const { rows, lastKey } = layout(entries);
+  const reduce = useReducedMotion();
 
   // The story's own updates (who created it, stage changes) run together: one quiet line per day, "Nov 11 · Plan
   // written · Plan approved by Josh", so the conversation leads (Shubham, 25 Nov: simpler). Each update keeps its own
@@ -642,30 +869,51 @@ export function StoryThread({
         if (item.kind === "updates") {
           // A few short updates read as one line ("Nov 12 · Builder started building · Verified by Checker"). A longer
           // run (main brought in, a push refused, GitHub reconnected) gets a line each, so it doesn't run together.
+          // They're "what happened" lines (Shubham, 27 Nov): muted, 12 px, a dot in front, at the start of the words'
+          // column like a run's summary, no longer centred across the chat.
           const stack = item.entries.reduce((n, e) => n + (e.kind === "stage" ? e.text.length : 30), 0) > 120;
+          // data-entry: "See what changed" on a teammate's banner scrolls here; `highlight` tints it for a moment.
+          const update = (entry: System) => (
+            <span
+              key={entry.id === highlight ? `${entry.id}-lit` : entry.id}
+              data-entry={entry.id}
+              className={`rounded-md ${entry.fresh ? chat.enter : ""} ${entry.id === highlight ? chat.flash : ""}`}
+            >
+              {entry.kind === "created" ? `${entry.by.kind === "agent" ? "Agent" : entry.by.name} created this story` : entry.text}
+            </span>
+          );
+          const dot = (
+            <span aria-hidden="true" className={MARK}>
+              <span className="size-1 rounded-full bg-current" />
+            </span>
+          );
           return (
-            <p key={item.entries[0].id} className={`m-0 py-0.5 text-center text-xs text-balance text-[var(--tx2)] ${stack ? "flex flex-col gap-1" : ""}`}>
-              {item.divider && <span className="font-medium">{item.divider}</span>}
-              {item.entries.map((entry, i) => (
-                <Fragment key={entry.id}>
-                  {!stack && (i > 0 || item.divider) && <span aria-hidden="true"> · </span>}
-                  {/* data-entry: "See what changed" on a teammate's banner scrolls here; `highlight` tints it for a moment. */}
-                  <span
-                    data-entry={entry.id}
-                    key={entry.id === highlight ? `${entry.id}-lit` : entry.id}
-                    className={`rounded-md ${entry.fresh ? chat.enter : ""} ${entry.id === highlight ? chat.flash : ""}`}
-                  >
-                    {entry.kind === "created" ? (
-                      <>
-                        <span className="text-[var(--tx)]">{entry.by.kind === "agent" ? "Agent" : entry.by.name}</span> created this story
-                      </>
-                    ) : (
-                      entry.text
-                    )}
-                  </span>
-                </Fragment>
-              ))}
-            </p>
+            <Fragment key={item.entries[0].id}>
+              {item.divider && <DayDivider day={item.divider} />}
+              <div className="flex flex-col gap-1 pl-11">
+                {stack ? (
+                  item.entries.map((entry) => (
+                    <p key={entry.id} className={HAPPENED}>
+                      {dot}
+                      <span className="min-w-0">{update(entry)}</span>
+                    </p>
+                  ))
+                ) : (
+                  <p className={HAPPENED}>
+                    {dot}
+                    <span className="min-w-0">
+                      {item.entries.map((entry, i) => (
+                        <Fragment key={entry.id}>
+                          {/* A no-break space before the dot: a wrapped line never starts with "·". */}
+                          {i > 0 && <span aria-hidden="true">{"\u00A0· "}</span>}
+                          {update(entry)}
+                        </Fragment>
+                      ))}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </Fragment>
           );
         }
         const { entry, divider, head } = item.row;
@@ -699,72 +947,88 @@ export function StoryThread({
             const from = entry.author.kind === "agent" ? "the agent" : mine ? "You" : entry.author.name;
             save = <SaveDecision text={words} mine={mine} onSave={(text) => onSaveDecision(entry.id, text, from)} />;
           }
-          const bubbles = card ? (
-            <>
-              {card.lead && <div className={`${mine ? MINE_BUBBLE : THEIR_TEXT} ${land}`}>{card.lead}</div>}
-              <div className={`w-full max-w-[460px] ${land}`}>
-                <StoryCardButton card={card} onOpen={onReadStory} />
-              </div>
-            </>
-          ) : (
-            <>
-              {entry.text && entry.text.length > 0 && (
-                <div className={`${mine ? MINE_BUBBLE : THEIR_TEXT} ${land}`}>
-                  <RichText segments={entry.text} stories={stories} />
+          // `shown`: how many of its words are out (Writes). Every message shows whole but the robot's reply that just
+          // arrived, which writes in: its text, then the report's parts in order, then its files and run summary.
+          const plan = replyPlan(entry);
+          const bubbles = (shown: number, settled = true) => {
+            const all = shown >= plan.total;
+            const upTo = (text: string, start: number) => (settled ? text : <RevealText text={text} n={shown - start} />);
+            return card ? (
+              <>
+                {card.lead && <div className={`${mine ? MINE_BUBBLE : THEIR_TEXT} ${land}`}>{card.lead}</div>}
+                <div className={`w-full max-w-[460px] ${land}`}>
+                  <StoryCardButton card={card} onOpen={onReadStory} />
                 </div>
-              )}
-              {entry.report && (
-                <>
-                  <div className={`${THEIR_TEXT} ${land}`}>{entry.report.outcome}</div>
-                  {entry.report.means && <div className={`${THEIR_TEXT} ${land}`}>{entry.report.means}</div>}
-                  {entry.report.details && <Checklist items={entry.report.details} fresh={entry.fresh} />}
-                  {entry.report.next && (
-                    <div className={`${THEIR_TEXT} ${land}`}>
-                      <span className="font-medium">Next → </span>
-                      {entry.report.next}
-                    </div>
-                  )}
-                </>
-              )}
-              {entry.files && entry.files.length > 0 && (
-                <div className={land}>
-                  <Files files={entry.files} mine={mine} />
-                </div>
-              )}
-              {entry.run && entry.run.length > 0 && (
-                // `max-w-full`: no wider than the chat, so a long summary ends in "…" instead of pushing a phone
-                // screen sideways.
-                <div className={`max-w-full ${land}`}>
-                  <RunFold phases={entry.run} />
-                </div>
-              )}
-              {saved && (
-                <p className="m-0 flex items-center gap-1.5 text-xs text-[var(--tx2)]">
-                  <BookmarkCheck aria-hidden="true" size={12} strokeWidth={2} className="flex-none" />
-                  Saved as a decision
-                </p>
-              )}
-            </>
-          );
+              </>
+            ) : (
+              <>
+                {entry.text && entry.text.length > 0 && shown > 0 && (
+                  <div className={`${mine ? MINE_BUBBLE : THEIR_TEXT} ${land}`}>
+                    {settled ? <RichText segments={entry.text} stories={stories} /> : <RevealSegments segments={entry.text} n={shown} stories={stories} />}
+                  </div>
+                )}
+                {entry.report && shown > plan.starts.outcome && (
+                  <>
+                    <div className={`${THEIR_TEXT} ${land}`}>{upTo(entry.report.outcome, plan.starts.outcome)}</div>
+                    {entry.report.means && shown > plan.starts.means && (
+                      <div className={`${THEIR_TEXT} ${land}`}>{upTo(entry.report.means, plan.starts.means)}</div>
+                    )}
+                    {entry.report.details && shown > plan.starts.details && <Checklist items={entry.report.details} fresh={entry.fresh} />}
+                    {entry.report.next && shown > plan.starts.next && (
+                      // What you do next: smaller than the conversation, behind its tag (the tag is the plan's "Next" word).
+                      <p className={`m-0 flex max-w-full items-start gap-2 text-sm text-pretty text-[var(--tx)] ${land}`}>
+                        <span className="inline-flex h-5 flex-none items-center rounded-md bg-field px-1.5 text-xs font-medium text-[var(--tx2)]">
+                          Next<span className="sr-only">:</span>
+                        </span>
+                        <span className="min-w-0">{upTo(entry.report.next, plan.starts.next + 1)}</span>
+                      </p>
+                    )}
+                  </>
+                )}
+                {all && entry.files && entry.files.length > 0 && (
+                  <div className={land}>
+                    <Files files={entry.files} mine={mine} />
+                  </div>
+                )}
+                {all && entry.run && entry.run.length > 0 && (
+                  // `max-w-full`: no wider than the chat, so a long summary ends in "…" instead of pushing a phone
+                  // screen sideways.
+                  <div className={`max-w-full ${land}`}>
+                    <RunFold phases={entry.run} />
+                  </div>
+                )}
+                {saved && (
+                  <p className={HAPPENED}>
+                    <span aria-hidden="true" className={MARK}>
+                      <BookmarkCheck size={12} strokeWidth={2} />
+                    </span>
+                    Saved as a decision
+                  </p>
+                )}
+              </>
+            );
+          };
           // Yours: the bubble alone, as in Ask PM; the day sits in the divider and the time in the tooltip.
           body = mine ? (
             <div title={entry.at} className={`flex flex-col items-end gap-1.5 pl-12 ${head ? "mt-4" : ""}`}>
-              {bubbles}
+              {bubbles(plan.total)}
             </div>
           ) : (
             <TheirRow author={entry.author} head={head} at={entry.at}>
-              {bubbles}
+              {entry.author.kind === "agent" ? (
+                <Writes id={entry.id} total={plan.total} on={Boolean(entry.fresh) && !reduce}>
+                  {bubbles}
+                </Writes>
+              ) : (
+                bubbles(plan.total)
+              )}
             </TheirRow>
           );
         }
 
         return (
           <Fragment key={entry.id}>
-            {divider && (
-              <p className="m-0 pt-4 pb-1 text-center text-xs font-medium text-[var(--tx2)]" role="separator">
-                {divider}
-              </p>
-            )}
+            {divider && <DayDivider day={divider} />}
             {/* data-entry: "See in chat" (a decision) and "See what changed" scroll here, and `highlight` tints it. */}
             {body && (
               <div
@@ -786,36 +1050,37 @@ export function StoryThread({
         </TheirRow>
       )}
 
-      {/* The robot, live: reading your message, working, or waiting on someone, as Ask PM's "is on it" pill beside
-          its face. The face holds still and nothing here loops: the words and the elapsed time say it's busy
-          (DESIGN.md §8.5), and the working ring on the activity icon is the page's one loop (§3.7). */}
-      <div aria-live="polite" className="mt-4 min-h-10">
-        {live?.kind === "thinking" && (
-          <div className={`flex items-center gap-3 ${chat.enter}`}>
-            <BotAvatar id="builder" size={32} />
-            <span className={`inline-flex h-8 items-center rounded-full bg-[#F4F4F5] px-3.5 text-sm text-[var(--tx2)] ${chat.labelIn}`}>
-              Builder is reading your message
-            </span>
-          </div>
-        )}
-        {/* Working: only the current phase, by the robot's name, sliding in as it changes, with its step and the run's time. */}
-        {live?.kind === "working" && (
-          <div className={`flex items-center gap-3 ${chat.enter}`}>
-            <BotAvatar id="builder" size={32} />
-            <span className="inline-flex h-8 min-w-0 items-center gap-2 rounded-full bg-[#F4F4F5] px-3.5">
-              <span key={live.label} className={`truncate text-sm text-[var(--tx)] ${chat.labelIn}`}>
-                {live.label}
-              </span>
-              <LiveMeta step={live.step} of={live.of} since={live.since} />
-            </span>
-          </div>
-        )}
-        {(live?.kind === "waiting" || live?.kind === "quiet") && (
-          <p className={`m-0 flex items-center gap-2 pl-11 text-xs text-[var(--tx2)] ${chat.enter}`}>
-            {live.kind === "waiting" && <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--tx2)]" />}
-            {live.text}
-          </p>
-        )}
+      {/* The robot, live: reading your message, working, or waiting on someone. While it reads or works, its face
+          moves (a slow head tilt while reading, a plush hop while working) and three small lines of what it's doing run
+          beside it, and nothing else (Shubham, 27 Nov: no pill with the phase above them). The trail carries on from
+          one phase to the next, so it doesn't restart. Screen readers hear the phase in words. Waiting, it holds still.
+          While it writes its reply nothing shows here: the words write themselves in above. */}
+      {/* `relative`: a line that's leaving is lifted out (popLayout) and fades where it was, while the next takes its
+          place, so the two never stack. */}
+      <div aria-live="polite" className="relative mt-4 min-h-10">
+        <AnimatePresence initial={false} mode="popLayout">
+          {(live?.kind === "thinking" || live?.kind === "working") && (
+            // The face sits on the newest line: both centred 16 px above the block's foot. One key for reading and
+            // working, so the lines carry on from one to the other.
+            <motion.div key="busy" {...(reduce ? LIVE_FADE : LIVE_MOTION)} className="flex items-end gap-3">
+              <LiveFace doing={live.kind === "thinking" ? "read" : "work"} />
+              <span className="sr-only">{live.kind === "thinking" ? "Builder is reading your message" : live.label}</span>
+              <div className="min-w-0 flex-1 pb-2">
+                {live.kind === "thinking" ? (
+                  <RunTrail phase="thinking" label="Builder is reading your message" />
+                ) : (
+                  <RunTrail phase={live.phase} label={live.label} />
+                )}
+              </div>
+            </motion.div>
+          )}
+          {(live?.kind === "waiting" || live?.kind === "quiet") && (
+            <motion.p key={`rest:${live.text}`} {...(reduce ? LIVE_FADE : LIVE_MOTION)} className="m-0 flex items-center gap-2 pl-11 text-xs text-[var(--tx2)]">
+              {live.kind === "waiting" && <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--tx2)]" />}
+              {live.text}
+            </motion.p>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

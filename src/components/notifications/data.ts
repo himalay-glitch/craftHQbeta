@@ -21,21 +21,21 @@ export const NOTICES: Notice[] = [
   { id: "review-43", storyId: 43, from: { kind: "bot", id: "tester" }, text: ["", "Creation flow revision", " passed every check and is ready for your review"], when: "just now", action: "Review" },
   { id: "review-33", storyId: 33, from: { kind: "bot", id: "tester" }, text: ["", "Event Discuss tab: posts, replies and likes", " is ready for your review"], when: "just now", action: "Review" },
   { id: "review-52", storyId: 52, from: { kind: "bot", id: "tester" }, text: ["", "Explore: discovery (search + browse, list + map)", " is ready for your review"], when: "2m ago", action: "Review" },
-  { id: "blocked-25", storyId: 25, from: { kind: "bot", id: "pm" }, text: ["Couldn’t update the pull request for ", "Phone sign-up and verification code", ": CraftHQ can’t write to GitHub"], when: "1m ago", action: "Reconnect" },
+  { id: "conflict-26", storyId: 26, from: { kind: "bot", id: "pm" }, text: ["Deepak’s hq-25 merged and changes the same lines as ", "Home feed states: loading, empty, error, offline", ". It’s settled when you create the pull request"], when: "20m ago", action: "Review" },
   { id: "stuck-21", storyId: 21, from: { kind: "bot", id: "debugger" }, text: ["", "Test story", " is stuck: its preview couldn’t start"], when: "1h ago", action: "Open" },
   { id: "question-28", storyId: 28, from: { kind: "bot", id: "pm" }, text: ["The PM needs a decision on ", "Create a login screen", ": what it should add"], when: "1h ago", action: "Answer" },
   { id: "plan-30", storyId: 30, from: { kind: "bot", id: "pm" }, text: ["The plan for ", "Loop handover test: answers follow the story owner", " is ready for your OK"], when: "8d ago", action: "Read plan" },
 
   { id: "pr-53", storyId: 53, from: { kind: "bot", id: "pm" }, text: ["Pull request #259 for ", "View your profile", " is ready. Deepak merges it on GitHub"], when: "3m ago" },
   { id: "queued-58", storyId: 58, from: { kind: "person", name: "Deepak Tewatia", initials: "DT" }, text: ["Deepak approved ", "Dark mode for the calendar", ". It’s queued for the Developer"], when: "4m ago" },
-  { id: "main-26", storyId: 26, from: { kind: "bot", id: "pm" }, text: ["hq-5 merged, so the PM is bringing main into ", "Home feed states: loading, empty, error, offline", ". Both sides of every clash can stay"], when: "6m ago" },
+  { id: "merged-25", storyId: 25, from: { kind: "person", name: "Deepak Tewatia", initials: "DT" }, text: ["Deepak merged ", "Phone sign-up and verification code", ""], when: "20m ago" },
   { id: "merged-1", storyId: 1, from: { kind: "person", name: "Deepak Tewatia", initials: "DT" }, text: ["Deepak merged ", "Sign up with your email", ""], when: "Yesterday" },
 ];
 
-// What this viewer has read, kept in this browser until the API keeps it. The three new reviews, the refused pull
-// request update and the ready one start unread.
+// What this viewer has read, kept in this browser until the API keeps it. The three new reviews, the conflict and
+// the ready pull request start unread.
 const KEY = "crafthq:notifications:read";
-const FIRST_UNREAD = ["review-43", "review-33", "review-52", "blocked-25", "pr-53"];
+const FIRST_UNREAD = ["review-43", "review-33", "review-52", "conflict-26", "pr-53"];
 const FIRST_READ = NOTICES.filter((n) => !FIRST_UNREAD.includes(n.id)).map((n) => n.id);
 
 const listeners = new Set<() => void>();

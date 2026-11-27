@@ -7,6 +7,7 @@ import { AttachedFiles, type Attachment } from "./AttachedFiles";
 import { clearDraft, setDraft, useDraft, type StoryDraft } from "./draft";
 import { ImportFrom, LogoMark } from "./ImportFrom";
 import { detailOf, TOOLS, type Ticket, type TicketTool } from "./imports";
+import chat from "./chat.module.css";
 
 export interface NewStoryDialogProps {
   open: boolean;
@@ -464,7 +465,7 @@ export function NewStoryDialog({ open, onClose, people, viewerId, onCreate, onDi
         {dragDepth > 0 && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-[12px] border-2 border-dashed border-[var(--cta)] bg-white/90 text-sm font-medium text-[var(--cta)]"
+            className={`pointer-events-none absolute inset-2 flex items-center justify-center rounded-[12px] border-2 border-dashed border-[var(--cta)] bg-white/90 text-sm font-medium text-[var(--cta)] ${chat.appear}`}
           >
             Drop files to attach them
           </div>

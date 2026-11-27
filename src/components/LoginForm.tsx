@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { LoginErrorBody } from "@/types/auth";
 import { AlertCircleIcon } from "@/components/icons";
+import { noteSignIn } from "@/components/dashboard/setup";
 
 // Labels stay in the accessibility tree; the filled fields carry placeholders visually.
 const labelClass = "sr-only";
@@ -36,6 +37,8 @@ export function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
+        // The dashboard opens the GitHub and Claude step after a sign-in, while either isn't connected.
+        noteSignIn();
         // Straight to the dashboard: "/" still redirects to /login until astro.config.mjs points it here.
         window.location.assign("/dashboard");
         return;
@@ -44,7 +47,7 @@ export function LoginForm() {
       if (res.status === 429) {
         const retry = body?.retry_after_seconds;
         setError(
-          `Too many attempts — try again in ${
+          `Too many attempts. Try again in ${
             typeof retry === "number" ? `${retry} seconds` : "a few minutes"
           }.`,
         );
@@ -52,7 +55,7 @@ export function LoginForm() {
         setError(body?.error ?? "sign-in failed");
       }
     } catch {
-      setError("network error — try again");
+      setError("Network error. Try again.");
     } finally {
       setPending(false);
     }

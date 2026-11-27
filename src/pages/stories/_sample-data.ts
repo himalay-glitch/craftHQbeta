@@ -18,13 +18,14 @@ export const finished: StoryItem[] = [
 // Laid over the dashboard's stories by ID, so its file is never edited (the dashboard lays it over its own list too).
 // Robots at work right now, matching the dashboard's sample: two builds, and three replies on stories in review (its
 // "Agent run started" activity). Minutes, not times: this page is rendered ahead of time, and the browser turns them
-// into times. Then the Pull request column (Shubham, 26 Nov): hq-53's is ready for Deepak to merge; hq-5 merged first
-// and changed the same home-feed lines as hq-26, so the PM is bringing main into hq-26 by itself (6 clashes, both sides
-// can stay); hq-25 was brought up to date, but GitHub refused the update, so its pull request is behind and it's stuck
-// until someone reconnects GitHub (hq-35, 25 Nov: never "ready" when the PR wasn't updated). And stories that change
-// the same part say so from the start.
+// into times. Then the Pull request column (Shubham, 26 Nov): hq-53's is ready for Deepak to merge. hq-26 and hq-25 are
+// the conflict example (Shubham, 27 Nov): hq-25 is Deepak's, already merged into main; hq-26 is yours, in review, and
+// changes the same lines. Creating its pull request checks it against main first, finds the 6 conflicts, and asks
+// once; then they're settled (both sides kept), the checks run again and the pull request is created. The refused
+// update ("Reconnect GitHub") is still shown on hq-35's demo. And stories that change the same part say so from the
+// start.
 export const working: Record<number, Partial<StoryItem>> = {
-  57: { live: { phase: "implement", minutesAgo: 4 }, overlaps: [25] },
+  57: { live: { phase: "implement", minutesAgo: 4 } },
   54: { live: { phase: "ui-check", minutesAgo: 1 } },
   34: { live: { phase: "reply", minutesAgo: 0 } },
   // hq-35, the live story from 17–25 Nov (Shubham, 26 Nov): back in review after a rebuild, waiting for you, with its pull
@@ -44,19 +45,24 @@ export const working: Record<number, Partial<StoryItem>> = {
   27: { live: { phase: "reply", minutesAgo: 0 } },
   53: { status: "pull_request", need: undefined, waitingOn: undefined, pr: { state: "open", number: 259, merge: "ready" } },
   26: {
-    status: "pull_request",
-    pr: { state: "open", number: 178, merge: "conflict", conflictWith: 5 },
-    main: { behind: [5], checked: "just now", clashes: 6 },
+    status: "in_review",
+    need: "review",
+    waitingOn: "You",
+    owner: "J",
+    action: "Try the preview, then create the pull request.",
+    main: { behind: [25], checked: "1h ago", clashes: 6, onPush: true },
     updated: "6m ago",
     updatedMinutes: 6,
   },
   25: {
-    status: "pull_request",
-    pr: { state: "open", number: 175, merge: "blocked", unsent: 2 },
-    main: { behind: [], checked: "1m ago", settled: 3 },
-    overlaps: [57],
-    updated: "1m ago",
-    updatedMinutes: 1,
+    status: "done",
+    need: undefined,
+    waitingOn: undefined,
+    owner: "DT",
+    outcome: "merged",
+    pr: { state: "merged", number: 175 },
+    updated: "20m ago",
+    updatedMinutes: 20,
   },
   33: { overlaps: [44] },
   44: { overlaps: [33] },

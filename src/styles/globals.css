@@ -191,6 +191,15 @@ html[data-theme="light"] {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
+
+  /* No scrollbars drawn anywhere (Shubham, 27 Nov: "remove the scroller from the UI, from everywhere"). Everything
+     still scrolls with the trackpad, the wheel, touch and the keyboard; only the bar is hidden. */
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer components {

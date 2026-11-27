@@ -1,0 +1,16 @@
+---
+// /docs: the first article, Getting started, the same page as /docs/getting-started (docs/CRAFTHQ_DOCS_SPEC.md §1).
+// Docs opens from the bottom of the sidebar (src/components/shell/nav.ts).
+import AppLayout from "@/layouts/AppLayout.astro";
+import GuidePage from "@/components/docs/GuidePage.astro";
+import { loadArticles } from "@/components/docs/articles";
+import { dashboardData } from "../dashboard/_sample-data";
+
+const [first] = await loadArticles();
+if (!first) throw new Error("src/content/docs/ has no articles.");
+const search = dashboardData.stories.map(({ id, title, status }) => ({ id, title, status }));
+---
+
+<AppLayout title={`${first.h1} · Docs · CraftHQ`} viewer={dashboardData.viewer} search={search}>
+  <GuidePage slug={first.slug} />
+</AppLayout>

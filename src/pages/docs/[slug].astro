@@ -1,0 +1,20 @@
+---
+// /docs/<article>: one page for each file in src/content/docs/ (getting-started, statuses, guide, claude-code).
+import type { GetStaticPaths, InferGetStaticPropsType } from "astro";
+import AppLayout from "@/layouts/AppLayout.astro";
+import GuidePage from "@/components/docs/GuidePage.astro";
+import { loadArticles } from "@/components/docs/articles";
+import { dashboardData } from "../dashboard/_sample-data";
+
+export const getStaticPaths = (async () =>
+  (await loadArticles()).map(({ slug, h1 }) => ({ params: { slug }, props: { slug, h1 } }))) satisfies GetStaticPaths;
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
+const { slug, h1 } = Astro.props as Props;
+const search = dashboardData.stories.map(({ id, title, status }) => ({ id, title, status }));
+---
+
+<AppLayout title={`${h1} · Docs · CraftHQ`} viewer={dashboardData.viewer} search={search}>
+  <GuidePage slug={slug} />
+</AppLayout>

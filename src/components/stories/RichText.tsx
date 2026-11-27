@@ -6,7 +6,7 @@ import { PersonAvatar } from "@/components/dashboard/PersonAvatar";
 import { storyRef } from "@/components/dashboard/format";
 import { AgentAvatar } from "./AgentAvatar";
 
-const CHIP_BASE = "mx-0.5 inline-flex max-w-[280px] items-center gap-1.5 rounded-[6px] py-px pr-1.5 pl-0.5 align-middle text-sm";
+const CHIP_BASE = "mx-0.5 inline-flex max-w-[min(280px,100%)] items-center gap-1.5 rounded-[6px] py-px pr-1.5 pl-0.5 align-middle text-sm";
 
 /** Message text with chips for people, the agent and other stories. Line breaks are kept. */
 export function RichText({

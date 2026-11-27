@@ -1,6 +1,8 @@
 import { useId, useState, type SubmitEvent } from "react";
 import { ChevronRight } from "lucide-react";
 import type { Decision } from "@/types/stories";
+import { Collapse } from "./Collapse";
+import { PanelSection } from "./PanelSection";
 
 // Decisions, under the status on the right (Shubham, 26 Nov): what was settled on this story, by whom and when, kept
 // for good, so a misunderstanding or a debate can always be settled by looking it up. Newest first, one line each;
@@ -22,24 +24,25 @@ interface StoryDecisionsProps {
   /** Whether that entry is in the chat on this visit (decisions saved on an earlier visit may point at a note that isn't). */
   inChat: (entryId: string) => boolean;
   onChange: (d: Decision, text: string) => void;
+  /** From 1024 px: a white box of its own that folds (Shubham, 27 Nov: "Decisions is also a separate part"). */
+  boxed?: boolean;
 }
 
-export function StoryDecisions({ decisions, open, onSee, inChat, onChange }: StoryDecisionsProps) {
-  const headingId = useId();
+export function StoryDecisions({ decisions, open, onSee, inChat, onChange, boxed }: StoryDecisionsProps) {
   const [all, setAll] = useState(false);
   const current = decisions.filter((d) => !d.replacedBy).length;
   const shown = all ? decisions : decisions.filter((d) => !d.replacedBy).slice(0, SHOWN);
   const hidden = decisions.length - shown.length;
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col">
-      <div className="flex h-6 items-center justify-between gap-2">
-        <h3 id={headingId} className="m-0 flex items-center gap-1.5 text-xs font-medium text-[var(--tx2)]">
-          Decisions
-          {current > 0 && <span className="tabular-nums">· {current}</span>}
-        </h3>
-        {/* A question still waiting: one tap to it, wherever it is. */}
-        {open.length > 0 && (
+    <PanelSection
+      id="decisions"
+      title="Decisions"
+      count={current > 0 ? current : undefined}
+      boxed={boxed}
+      extra={
+        // A question still waiting: one tap to it, wherever it is.
+        open.length > 0 && (
           <button
             type="button"
             onClick={() => onSee(open[0].id)}
@@ -48,8 +51,9 @@ export function StoryDecisions({ decisions, open, onSee, inChat, onChange }: Sto
             <span aria-hidden="true" className="size-1.5 rounded-full bg-[#d97706]" />
             {open.length} open
           </button>
-        )}
-      </div>
+        )
+      }
+    >
       {decisions.length === 0 ? (
         <p className="m-0 mt-1 text-xs text-pretty text-[var(--tx2)]">
           Nothing decided yet. Answers to questions, approvals and messages you save as decisions are kept here for good.
@@ -66,7 +70,7 @@ export function StoryDecisions({ decisions, open, onSee, inChat, onChange }: Sto
           {all ? "Show fewer" : `Show all ${decisions.length}`}
         </button>
       )}
-    </section>
+    </PanelSection>
   );
 }
 
@@ -119,7 +123,7 @@ function DecisionRow({ d, onSee, inChat, onChange }: { d: Decision; onSee: (id: 
           className={`mt-[3px] flex-none text-[var(--tx2)] opacity-0 transition-[transform,opacity] duration-[120ms] group-hover:opacity-100 group-focus-visible:opacity-100 ${open ? "rotate-90 opacity-100" : ""}`}
         />
       </button>
-      {open && (
+      <Collapse open={open}>
         <div className="px-2 pt-0.5 pb-2">
           {where && <p className="m-0 text-xs text-pretty text-[var(--tx2)]">{where}</p>}
           {d.others && d.others.length > 0 && (
@@ -178,7 +182,7 @@ function DecisionRow({ d, onSee, inChat, onChange }: { d: Decision; onSee: (id: 
             ) : null
           )}
         </div>
-      )}
+      </Collapse>
     </li>
   );
 }

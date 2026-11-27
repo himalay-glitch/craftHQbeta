@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { File as FileIcon, FileImage, FilePlay } from "lucide-react";
 import type { FileRef } from "@/types/stories";
+import { PanelSection } from "./PanelSection";
 import { RAISED } from "./StoryActivity";
 
-// Files in the Work tab (Shubham, 26 Nov: the old story page's Files, kept small): what was attached in the chat after
-// the story was written, one line each; a file opens the message it came with.
+// Files, the last part of the Output (Shubham, 26 Nov: the old story page's Files, kept small): what was attached in
+// the chat after the story was written, one line each; a file opens the message it came with.
 
 const ROW =
   "group relative flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors duration-[120ms] hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--cta)] pointer-coarse:min-h-11";
@@ -18,16 +19,13 @@ export interface ChatFile {
   file: FileRef;
 }
 
-export function FilesSection({ files, onOpen }: { files: ChatFile[]; onOpen: (entryId: string) => void }) {
+/** `boxed`: from 1024 px, a white box of its own that folds, like the other parts. */
+export function FilesSection({ files, onOpen, boxed }: { files: ChatFile[]; onOpen: (entryId: string) => void; boxed?: boolean }) {
   const [all, setAll] = useState(false);
   if (files.length === 0) return null;
   const shown = all ? files : files.slice(0, SHOWN);
   return (
-    <div role="group" aria-label="Files">
-      <h3 className="m-0 flex h-6 items-center gap-1.5 text-xs font-medium text-[var(--tx2)]">
-        Files
-        {files.length > 1 && <span className="tabular-nums">· {files.length}</span>}
-      </h3>
+    <PanelSection id="files" title="Files" count={files.length > 1 ? files.length : undefined} boxed={boxed}>
       <div className="-mx-2 mt-0.5 flex flex-col">
         {shown.map(({ key, entryId, file }) => {
           const Icon = file.kind === "image" ? FileImage : file.kind === "video" ? FilePlay : FileIcon;
@@ -49,11 +47,11 @@ export function FilesSection({ files, onOpen }: { files: ChatFile[]; onOpen: (en
         <button
           type="button"
           onClick={() => setAll((a) => !a)}
-          className="mt-1 inline-flex min-h-6 items-center rounded-[4px] text-xs font-medium text-[var(--tx2)] underline decoration-black/20 underline-offset-2 hover:text-[var(--tx)] pointer-coarse:min-h-9"
+          className="mt-1 inline-flex min-h-6 items-center self-start rounded-[4px] text-xs font-medium text-[var(--tx2)] underline decoration-black/20 underline-offset-2 hover:text-[var(--tx)] pointer-coarse:min-h-9"
         >
           {all ? "Show fewer" : `Show all ${files.length}`}
         </button>
       )}
-    </div>
+    </PanelSection>
   );
 }

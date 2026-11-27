@@ -1,0 +1,154 @@
+---
+// One Docs article in the Reader design (Shubham, 26 Nov): the live site's words (docs/CRAFTHQ_DOCS_SPEC.md, with the
+// em dashes taken out), laid out for reading in this app's design system (DESIGN.md). On the left, one quiet contents
+// list that stays in view: the four articles, the open one showing its sections, the section you're reading marked as
+// you scroll. Beside it, a 720 px reading column like the story page's: the Guide label and read time, the heading and
+// intro, the sections parted by space rather than lines, then Previous and Next as one quiet row. Below 900 px the
+// contents fold into a "Contents" button above the article. The words come from src/content/docs/ (articles.ts);
+// guide.css styles what the Markdown renders and draws the diagrams.
+import { ArrowLeft, ArrowRight, ChevronDown } from "lucide-react";
+import "./guide.css";
+import { loadArticles } from "./articles";
+import DocsContents from "./DocsContents.astro";
+
+interface Props {
+  slug: string;
+}
+
+const { slug } = Astro.props;
+const articles = await loadArticles();
+const at = articles.findIndex((a) => a.slug === slug);
+const article = articles[at];
+if (!article) throw new Error(`There's no Docs article "${slug}" in src/content/docs/.`);
+// The first article has only Next, the last only Previous (spec §1).
+const previous = articles[at - 1];
+const next = articles[at + 1];
+---
+
+<main id="main" class="mx-auto w-full max-w-[1088px] px-4 pt-6 pb-24 text-foreground md:px-8 lg:pt-10">
+  <div class="min-[900px]:grid min-[900px]:grid-cols-[240px_minmax(0,720px)] min-[900px]:justify-center min-[900px]:gap-12 xl:gap-16">
+    <aside class="hidden min-[900px]:block">
+      {/* In view 24 px under the top bar, and scrolling on its own when it's taller than the window. */}
+      <div class="sticky top-[calc(var(--bar-h)+24px)] max-h-[calc(100dvh-var(--bar-h)-48px)] overflow-y-auto pb-6">
+        <DocsContents articles={articles} current={article} />
+      </div>
+    </aside>
+
+    <div class="min-w-0">
+      <details class="group mb-6 rounded-xl border border-border min-[900px]:hidden">
+        <summary
+          class="flex h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 text-sm font-medium [&::-webkit-details-marker]:hidden"
+        >
+          Contents
+          <ChevronDown
+            aria-hidden="true"
+            size={16}
+            strokeWidth={1.75}
+            className="text-muted-foreground transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
+          />
+        </summary>
+        <div class="border-t border-border p-1">
+          <DocsContents articles={articles} current={article} caption={false} />
+        </div>
+      </details>
+
+      <header>
+        <p class="text-xs font-medium text-muted-foreground">Guide · {article.minutes} min read</p>
+        <h1 class="mt-1.5 text-xl font-semibold tracking-title text-balance">{article.h1}</h1>
+        <div class="guide-md mt-3 text-base text-muted-foreground" set:html={article.lede} />
+      </header>
+
+      {
+        article.sections.map((s) => (
+          <section aria-labelledby={s.id} class="mt-10">
+            <h2
+              id={s.id}
+              data-docs-section
+              class="scroll-mt-[calc(var(--bar-h)+24px)] text-base font-semibold text-balance"
+              set:html={s.headingHtml}
+            />
+            <div class="guide-md mt-2 text-base" set:html={s.html} />
+          </section>
+        ))
+      }
+
+      {
+        (previous || next) && (
+          <nav aria-label="Previous and next articles" class="mt-16 grid gap-6 border-t border-border pt-6 sm:grid-cols-2 sm:gap-8">
+            {previous ? (
+              <a
+                href={`/docs/${previous.slug}`}
+                rel="prev"
+                class="-mx-3 -my-2 block rounded-lg px-3 py-2 transition-colors duration-100 hover:bg-hover"
+              >
+                <span class="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  <ArrowLeft aria-hidden="true" size={12} strokeWidth={2} />
+                  Previous
+                </span>
+                <span class="mt-1 block text-sm font-semibold">{previous.title}</span>
+                <span class="mt-0.5 block text-sm text-muted-foreground">{previous.summary}</span>
+              </a>
+            ) : (
+              <span class="hidden sm:block" />
+            )}
+            {next && (
+              <a
+                href={`/docs/${next.slug}`}
+                rel="next"
+                class="-mx-3 -my-2 block rounded-lg px-3 py-2 transition-colors duration-100 hover:bg-hover sm:text-right"
+              >
+                <span class="flex items-center gap-1 text-xs font-medium text-muted-foreground sm:justify-end">
+                  Next
+                  <ArrowRight aria-hidden="true" size={12} strokeWidth={2} />
+                </span>
+                <span class="mt-1 block text-sm font-semibold">{next.title}</span>
+                <span class="mt-0.5 block text-sm text-muted-foreground">{next.summary}</span>
+              </a>
+            )}
+          </nav>
+        )
+      }
+    </div>
+  </div>
+</main>
+
+<script>
+  // Marks the section you're reading in the contents: the last one whose heading has passed the line just under the
+  // top bar. At the very end of the page, where the last sections can't reach that line, it's the one you jumped to if
+  // it's on screen, otherwise the last.
+  const headings = [...document.querySelectorAll<HTMLElement>("[data-docs-section]")];
+  const links = [...document.querySelectorAll<HTMLAnchorElement>("[data-docs-toc]")];
+  const first = headings[0];
+  if (first && links.length) {
+    let frame = 0;
+    let shown = "";
+    const mark = () => {
+      frame = 0;
+      const line = parseFloat(getComputedStyle(first).scrollMarginTop) + 8;
+      let id = first.id;
+      for (const h of headings) {
+        if (h.getBoundingClientRect().top > line) break;
+        id = h.id;
+      }
+      const atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atEnd) {
+        const jumped = headings.find((h) => `#${h.id}` === decodeURIComponent(location.hash));
+        const top = jumped?.getBoundingClientRect().top ?? -1;
+        id = jumped && top >= 0 && top < window.innerHeight ? jumped.id : (headings.at(-1)?.id ?? id);
+      }
+      if (id === shown) return;
+      shown = id;
+      for (const link of links) {
+        if (link.dataset.docsToc === id) link.setAttribute("aria-current", "true");
+        else link.removeAttribute("aria-current");
+      }
+    };
+    const queue = () => {
+      if (!frame) frame = requestAnimationFrame(mark);
+    };
+    addEventListener("scroll", queue, { passive: true });
+    addEventListener("resize", queue);
+    addEventListener("hashchange", queue);
+    mark();
+  }
+</script>

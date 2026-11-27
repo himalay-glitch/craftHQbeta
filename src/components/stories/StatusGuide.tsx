@@ -5,7 +5,7 @@ import { DIALOG } from "./StoryDetails";
 
 // "How statuses work" (Shubham, 26 Nov: the old story page's link under its status box). The five stages in a sentence
 // each, who moves the story on, and the few rules that make the rest make sense. Opened from the Status tab and from the
-// status box's menu; nothing to act on, so Esc or a click outside closes it.
+// Status box; nothing to act on, so Esc or a click outside closes it.
 
 const STAGES: { name: string; text: (merger: string) => string }[] = [
   { name: "Planning", text: () => "The agent reads the story and writes a plan: a specification page and an engineering page. Nothing is built. Approving the plan starts the build." },

@@ -37,6 +37,9 @@ export interface MainState {
   clashes?: number;
   /** The last update settled this many clashes, keeping both sides. */
   settled?: number;
+  /** Still in review, with no pull request yet: what's behind is compared when you create the pull request, and a
+   *  conflict is shown then, with one button to settle it and carry on (Shubham, 27 Nov). */
+  onPush?: boolean;
 }
 
 /** While a pull request waits to be merged, what's happening to it. ready: up to date and passing, with the person who
@@ -184,6 +187,9 @@ export type LiveState =
   | { kind: "thinking" }
   /** `phase`: the run's current phase, one at a time; `step` of `of` and the elapsed time since `since` go beside it. */
   | { kind: "working"; label: string; phase?: PhaseKey; step?: number; of?: number; since?: number }
+  /** Its reply is writing itself into the chat, word by word. The words say it, so the live line shows nothing, and
+   *  whatever waits on you (a decision, a question) comes once they're out. */
+  | { kind: "writing" }
   | { kind: "waiting"; text: string }
   | { kind: "quiet"; text: string };
 
@@ -301,6 +307,12 @@ export interface ActivityItem {
   device?: Device;
   /** Previews only: the preview machine. */
   run?: "off" | "starting" | "on";
+  /** Previews only: this story's own preview (the default: just what it makes, a login screen or a modal, opened
+   *  where the change is), or the whole app, every screen from the first one (Shubham, 27 Nov: "see all your product
+   *  from A to Z"). */
+  scope?: "story" | "app";
+  /** The whole app only: this story's build is in it. Before the build it's the app as it is now. */
+  withStory?: boolean;
   /** Epoch ms, set in handlers only: when it started working, or when a preview started starting or running. */
   startedAt?: number;
   /** Stage changes only: where the story moved, as the board's column names ("Planning" → "Building"). */
@@ -315,7 +327,8 @@ export interface ActivityItem {
 
 /** What the activity column can do to a preview; the story page owns the state and the timers. */
 export interface PreviewActions {
-  start: (id: string) => void;
+  /** `device`: asked for in a message ("the whole app on mobile"), so it starts there. */
+  start: (id: string, device?: Device) => void;
   stop: (id: string) => void;
   device: (id: string, d: Device) => void;
 }

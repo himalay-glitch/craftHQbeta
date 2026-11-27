@@ -1,6 +1,6 @@
-import { useId, useState, type Ref } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useId, useState } from "react";
 import {
+  AppWindow,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
@@ -20,18 +20,21 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import type { NeedKind } from "@/types/dashboard";
+import type { NeedKind, StoryStatus } from "@/types/dashboard";
 import type { ActivityItem, ActivityKind, PreviewActions } from "@/types/stories";
-import { anyWorking, isProof, nowOf, OPENS, orderOutputs, readyOf, reasonOf, type Reason } from "./activity";
+import { activeOf, isProof, madeOf, OPENS, orderOutputs, reasonOf, type Reason } from "./activity";
 import chat from "./chat.module.css";
 import { elapsed, useNow } from "./clock";
+import { Collapse } from "./Collapse";
+import { PanelSection } from "./PanelSection";
 import { PreviewButtons, PreviewInline } from "./PreviewControl";
-import { COLUMNS, type ColumnKey } from "./stage";
+import { COLUMNS } from "./stage";
 
-// The activity column, kept minimal. On top, one small card with only what's running now, a slim row each: the
-// Builder's ring while it works, the time so far, "Finished" for a moment, then the row goes down. Nothing running:
-// one quiet line, no box. At the bottom, the outputs to check: one line each, no boxes, the build and its checks
-// folded into one. Colour only for state (DESIGN.md §2.7); the robot is the one 3D thing.
+// What the story made, a part each: Pages, Preview, Code (Shubham, 27 Nov: every part a white box of its own that
+// folds). A part lists what was made, one line each, the build and its checks folded into one; and what's under way
+// shows in its own part, in place: the Builder's ring while it works, the time so far, a build's bar, then it turns into
+// a finished line where it stands. Before 27 Nov what was running sat in one list on top and went down when it finished.
+// Colour only for state (DESIGN.md §2.7); the robot is the one 3D thing.
 
 export const ICON: Record<ActivityKind, LucideIcon> = {
   read: BookOpen,
@@ -53,12 +56,8 @@ export interface ActivityProps {
   yours?: NeedKind;
   /** The chat's decision already offers Restart, so a failed preview gets no second button here. */
   restartInChat: boolean;
-  /** Bumped by Undo, so restored rows appear without motion. */
-  epoch: number;
   preview: PreviewActions;
   onSoon: (message: string) => void;
-  /** The column the story is in: what that stage needs comes first in the outputs (Shubham, 26 Nov). */
-  stage?: ColumnKey;
 }
 
 // ---- Words ----
@@ -120,7 +119,7 @@ export function Tile({ item, size = 32, badge = true }: { item: ActivityItem; si
       </span>
     );
   }
-  const Icon = item.kind === "pr" && /merged/i.test(item.detail) ? GitMerge : ICON[item.kind];
+  const Icon = item.kind === "pr" && /merged/i.test(item.detail) ? GitMerge : item.kind === "preview" && item.scope === "app" ? AppWindow : ICON[item.kind];
   return (
     <span aria-hidden="true" className={`relative flex flex-none items-center justify-center ${t.box} ${RAISED}`}>
       <Icon size={size === 24 ? 14 : 16} strokeWidth={1.75} />
@@ -139,77 +138,46 @@ export function Tile({ item, size = 32, badge = true }: { item: ActivityItem; si
   );
 }
 
-// ---- On top: what's running now ----
+// ---- Under way: being made, waiting on someone, or stopped ----
 
-/** One thing under way (or just finished), as a slim row: what it is, what it's doing, and for how long. */
-function NowRow({
-  item,
-  yours,
-  restartInChat,
-  preview,
-  onSoon,
-  ref,
-}: { item: ActivityItem; ref?: Ref<HTMLLIElement> } & Omit<ActivityProps, "items" | "epoch">) {
-  const reduce = useReducedMotion();
-  const settling = Boolean(item.settling);
-  const reason = reasonOf(item, settling ? undefined : yours);
-  const ticking = !settling && item.startedAt !== undefined && (reason === "working" || reason === "starting" || reason === "running");
+/** One thing under way, in its part: what it is, what it's doing and for how long; why, in full, when it stopped. */
+function LiveRow({ item, yours, restartInChat, preview, onSoon }: { item: ActivityItem } & Omit<ActivityProps, "items">) {
+  const reason = reasonOf(item, yours);
+  const ticking = item.startedAt !== undefined && (reason === "working" || reason === "starting" || reason === "running");
   const now = useNow(ticking);
   const time = ticking && now && item.startedAt !== undefined ? elapsed(now - item.startedAt) : null;
-  const stage = item.kind === "stage";
-  const status = stage && item.move ? `Now ${item.move.to}` : statusOf(item);
+  const status = statusOf(item);
+  const word = reasonWord(item, reason, yours);
   const tone = item.state === "failed" ? "text-[var(--red)]" : item.state === "working" ? "text-[var(--tx)]" : "text-[var(--tx2)]";
   // A preview that's starting can be cancelled; one that couldn't start can be started again (unless the chat's
-  // decision already offers Restart). Everything else on top is news: no buttons.
+  // decision already offers Restart). Everything else under way is news: no buttons.
   const previewActions = item.kind === "preview" && (item.run === "starting" || (item.state === "failed" && !restartInChat));
 
   return (
-    <motion.li
-      ref={ref}
-      layout={reduce ? false : "position"}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: [0.2, 0, 0, 1] as const } }}
-      exit={reduce ? { opacity: 0, transition: { duration: 0.1 } } : { opacity: 0, y: 16, transition: { duration: 0.25, ease: [0.4, 0, 1, 1] as const } }}
-      className="relative flex gap-2.5 rounded-lg px-2 py-1.5"
-    >
-      {/* Tinted for a moment when it arrives and when its state changes (DESIGN.md §8.4); a merge, in the positive
-          tint, once, where it lands (§8.6). */}
-      <span
-        aria-hidden="true"
-        key={`${item.state}:${item.run ?? ""}`}
-        className={`pointer-events-none absolute inset-0 rounded-lg ${item.fresh ? (item.kind === "pr" && /merged/i.test(item.detail) ? chat.flashGood : chat.flash) : ""}`}
-      />
-      {stage ? (
-        <span aria-hidden="true" className={`relative flex size-7 flex-none items-center justify-center rounded-[9px] ${RAISED}`}>
-          <ArrowRight size={16} strokeWidth={1.75} className="text-[var(--tx2)]" />
-        </span>
-      ) : (
-        <Tile key={item.state} item={item} size={28} />
-      )}
+    <div className="relative flex gap-2.5 rounded-lg px-2 py-1.5">
+      {/* Tinted for a moment when it arrives and when its state changes (DESIGN.md §8.4). */}
+      <span aria-hidden="true" key={`${item.state}:${item.run ?? ""}`} className={`pointer-events-none absolute inset-0 rounded-lg ${item.fresh ? chat.flash : ""}`} />
+      <Tile key={item.state} item={item} size={24} />
       <div className="relative min-w-0 flex-1">
-        <p className="m-0 flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--tx)]">{item.kind === "preview" ? "Preview" : item.title}</span>
-          <span key={settling ? "finished" : reason} className={`flex flex-none items-center gap-1 text-xs tabular-nums ${chat.labelIn} ${reason === "failed" ? "text-[var(--red)]" : "text-[var(--tx2)]"}`}>
-            {settling && item.run === "on" ? (
+        <p className="m-0 flex min-h-6 items-center gap-2">
+          {/* Under its part's heading, a preview is named for which it is, as its finished line is. */}
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--tx)]">
+            {item.kind === "preview" ? (item.scope === "app" ? "Whole app" : "This story") : item.title}
+          </span>
+          <span key={reason} className={`flex flex-none items-center gap-1 text-xs tabular-nums ${chat.labelIn} ${reason === "failed" ? "text-[var(--red)]" : "text-[var(--tx2)]"}`}>
+            {item.settling && item.run === "on" ? (
               // A preview that has just started running: it's on, not finished.
               <>
                 <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--green)]" />
                 Running
               </>
-            ) : settling && !stage ? (
-              <>
-                <CircleCheck aria-hidden="true" size={12} strokeWidth={2} className="text-[var(--green)]" />
-                Finished
-              </>
             ) : time ? (
               time
             ) : reason === "working" ? (
               `Started ${item.at}`
-            ) : stage ? (
-              item.at
-            ) : status?.startsWith(reasonWord(item, reason, yours)) ? null : (
+            ) : status?.startsWith(word) ? null : (
               // Said once: not here when the status line already starts with it.
-              reasonWord(item, reason, yours)
+              word
             )}
           </span>
         </p>
@@ -235,8 +203,8 @@ function NowRow({
             className="mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--ctl-bg-on)]"
           >
             <div
-              className={`h-full w-full origin-left rounded-full transition-transform duration-300 ease-out motion-reduce:transition-none ${item.state === "failed" ? "bg-[var(--red)]" : item.state === "done" ? "bg-[var(--green)]" : "bg-[var(--cta)]"}`}
-              style={{ transform: `scaleX(${item.state === "done" ? 1 : item.progress.done / item.progress.total})` }}
+              className={`h-full w-full origin-left rounded-full transition-transform duration-300 ease-out motion-reduce:transition-none ${item.state === "failed" ? "bg-[var(--red)]" : "bg-[var(--cta)]"}`}
+              style={{ transform: `scaleX(${item.progress.done / item.progress.total})` }}
             />
           </div>
         )}
@@ -246,55 +214,18 @@ function NowRow({
           </div>
         )}
       </div>
-    </motion.li>
+    </div>
   );
 }
 
-/**
- * What's running now, in one small card: a slim row for each thing under way, and for a moment each thing that
- * has just finished, before it goes down to the outputs. Nothing running: nothing shown.
- */
-export function NowArea({ items, yours, restartInChat, epoch, preview, onSoon }: ActivityProps) {
-  // Under way first, then what's passing through on its way down.
-  const now = nowOf(items);
-  const rows = [...now.filter((i) => !i.settling), ...now.filter((i) => i.settling)];
-
-  return (
-    // popLayout: what's leaving lifts out of the flow, so the next thing takes its place at once.
-    <AnimatePresence key={epoch} initial={false} mode="popLayout">
-      {rows.length > 0 ? (
-        <motion.div
-          key="card"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1, transition: { duration: 0.15 } }}
-          exit={{ opacity: 0, transition: { duration: 0.15, delay: 0.1 } }}
-          // No box (Shubham, 25 Nov): what's under way sits on the panel like everything else; the robot's ring, the
-          // words and the bar say it's working.
-          className="-mx-1"
-        >
-          <ul className="m-0 flex list-none flex-col p-0">
-            <AnimatePresence initial={false} mode="popLayout">
-              {rows.map((it) => (
-                <NowRow key={it.id} item={it} yours={yours} restartInChat={restartInChat} preview={preview} onSoon={onSoon} />
-              ))}
-            </AnimatePresence>
-          </ul>
-        </motion.div>
-      ) : null}
-      {/* Nothing running: no line at all. The Status section above already says what's happening (Shubham, 26 Nov:
-          "a very minimal way"). */}
-    </AnimatePresence>
-  );
-}
-
-// ---- At the bottom: the outputs ----
+// ---- Made: one line each ----
 
 /** One line: a small tile, the name, and what it is now, muted. No box; a soft background on hover. */
 const LINE = "group relative flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left pointer-coarse:min-h-11";
 // Hover is a 4% black wash (DESIGN.md §3.1 `--hover`), so it shows on the grey canvas as well as on white.
 const LINE_BUTTON = `${LINE} transition-colors duration-[120ms] hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--cta)]`;
 
-/** `holdName`: never narrower than a short name like "Preview", so buttons beside it move down instead of squeezing it. */
+/** `holdName`: never narrower than a short name like "Whole app", so buttons beside it move down instead of squeezing it. */
 function LineText({ title, detail, proof, running, holdName }: { title: string; detail: string; proof?: boolean; running?: boolean; holdName?: boolean }) {
   return (
     // The name and what it is now share a line when they fit; in a narrow space the state goes under the name, so
@@ -302,7 +233,7 @@ function LineText({ title, detail, proof, running, holdName }: { title: string; 
     // hence the tooltip (DESIGN.md §3.2).
     <span
       title={detail ? `${title} · ${detail}` : title}
-      className={`relative flex flex-1 flex-wrap items-baseline gap-x-1.5 ${holdName ? "min-w-[4.5rem]" : "min-w-0"}`}
+      className={`relative flex flex-1 flex-wrap items-baseline gap-x-1.5 ${holdName ? "min-w-24" : "min-w-0"}`}
     >
       <span className="flex max-w-full min-w-0 items-baseline gap-1.5">
         <span className="min-w-0 truncate text-sm font-medium text-[var(--tx)]">{title}</span>
@@ -331,12 +262,23 @@ function Trailing({ icon: Icon, open }: { icon: LucideIcon; open?: boolean }) {
   );
 }
 
-function OutputRow({ item, proof, preview, onSoon }: { item: ActivityItem; proof: boolean; preview: PreviewActions; onSoon: (message: string) => void }) {
+interface OutputRowProps {
+  item: ActivityItem;
+  proof: boolean;
+  preview: PreviewActions;
+  onSoon: (message: string) => void;
+  /** The whole app, while it's off: whether this story is in it. */
+  line?: string;
+}
+
+function OutputRow({ item, proof, preview, onSoon, line }: OutputRowProps) {
   const opens = OPENS[item.kind];
   const flash = item.fresh && <span aria-hidden="true" key={item.doneAt} className={`pointer-events-none absolute inset-0 rounded-lg ${chat.flash}`} />;
 
-  // The preview: started, opened and stopped right on its line (it costs server time, so Stop is never faded).
+  // A preview, this story's or the whole app: started, opened and stopped right on its line (it costs server time, so
+  // Stop is never faded).
   if (item.kind === "preview") {
+    const off = !item.run || item.run === "off";
     return (
       // Where the name and the buttons don't fit side by side, the buttons go on a line of their own under it, on the
       // right. Below 18rem (phones under about 330 px) that holds in every state, so starting or stopping a preview
@@ -344,8 +286,15 @@ function OutputRow({ item, proof, preview, onSoon }: { item: ActivityItem; proof
       <div className={`${LINE} flex-wrap gap-y-1`}>
         {flash}
         <Tile item={item} size={24} badge={false} />
-        {/* Off, the play button already says it's ready to try; the words would only be cut short beside it. */}
-        <LineText title="Preview" detail={!item.run || item.run === "off" ? "" : item.detail} proof={proof} running={item.run === "on"} holdName />
+        {/* Named under the part's Preview heading: "This story" and "Whole app" (Shubham, 27 Nov). Off, this story's
+            play button already says it's ready to try; the whole app says whether this story is in it yet. */}
+        <LineText
+          title={item.scope === "app" ? "Whole app" : "This story"}
+          detail={off ? (item.scope === "app" ? (line ?? "") : "") : item.detail}
+          proof={proof}
+          running={item.run === "on"}
+          holdName
+        />
         <span className="ml-auto flex @max-[18rem]:basis-full @max-[18rem]:justify-end">
           <PreviewInline item={item} preview={preview} onSoon={onSoon} />
         </span>
@@ -384,8 +333,8 @@ function ChecksRow({ items, proof }: { items: ActivityItem[]; proof: boolean }) 
         <LineText title="Build and checks" detail="All passed" proof={proof} />
         <Trailing icon={ChevronRight} open={open} />
       </button>
-      {open && (
-        <ul id={panelId} className={`m-0 mb-1 ml-[19px] flex list-none flex-col gap-1 border-l border-[var(--line)] py-1 pl-[19px] ${chat.enter}`}>
+      <Collapse open={open} id={panelId}>
+        <ul className="m-0 mb-1 ml-[19px] flex list-none flex-col gap-1 border-l border-[var(--line)] py-1 pl-[19px]">
           {items.map((it) => (
             <li key={it.id} className="flex items-baseline gap-2 text-xs">
               <CircleCheck aria-hidden="true" size={12} strokeWidth={2} className="flex-none translate-y-0.5 text-[var(--green)]" />
@@ -398,73 +347,163 @@ function ChecksRow({ items, proof }: { items: ActivityItem[]; proof: boolean }) 
             </li>
           ))}
         </ul>
-      )}
+      </Collapse>
     </div>
   );
 }
 
+/** Where the story is, for what a part says while it's empty: before the build, queued, building, or after it. */
+type Phase = "plan" | "queued" | "build" | "after";
+
+const phaseOf = (status: StoryStatus): Phase =>
+  status === "new" || status === "planning" ? "plan" : status === "approved" ? "queued" : status === "in_progress" ? "build" : "after";
+
+type Said = { title: string; detail?: string };
+
+interface Section {
+  /** Names its box and its fold: "pages". */
+  key: string;
+  label: string;
+  kinds: ActivityKind[];
+  /** What the empty slot stands for, when the part also has a line that's always there (Preview: the slot is this
+   *  story's preview, and the whole app's line is under it at every stage). Otherwise anything of `kinds`. */
+  slot?: (it: ActivityItem) => boolean;
+  /** The empty slot's icon. */
+  icon: LucideIcon;
+  /** While the part has nothing: what isn't there and, while it can still come, when it comes. */
+  empty: (phase: Phase) => Said;
+}
+
 /**
- * The outputs, at the bottom: what's finished, to check. One line each, in a fixed order (pages, the preview and
- * screens, the pull request, then the build and its checks folded into one line). While something is being worked
- * on, the lines fade back so the card on top is the one thing in focus; hover or keyboard focus brings them back.
+ * What was made, in parts (Shubham, 27 Nov: section-wise, "the page section for specification pages and engineering
+ * pages, second section is for preview"). The parts are always there, in this order, so nobody has to guess what will
+ * come (Shubham, 27 Nov: "a section that's already defined"): a part shows what's under way and what was made, one line
+ * each (only the pages this story has, say just the engineering page), or says plainly that it's empty and, while it
+ * can still come, when it comes. Once the story is past the point where a part is made, it says this story has none.
  */
-/** The outputs in parts (Shubham, 25 Nov), each under its own small heading, in the order you'd open them. */
-const SECTIONS: { key: "plan" | "preview" | "code"; label: string; kinds: ActivityKind[] }[] = [
-  { key: "plan", label: "Plan", kinds: ["spec", "engineering"] },
-  { key: "preview", label: "Preview", kinds: ["preview", "screenshots", "markup"] },
-  { key: "code", label: "Code", kinds: ["pr", "main", "build", "checks"] },
+const SECTIONS: Section[] = [
+  {
+    key: "pages",
+    label: "Pages",
+    kinds: ["spec", "engineering"],
+    icon: FileText,
+    empty: (phase) => (phase === "plan" ? { title: "No pages yet", detail: "Written while planning" } : { title: "No pages for this story" }),
+  },
+  {
+    // Two previews (Shubham, 27 Nov): this story's own, just what it makes (a login screen, a modal), and the whole app,
+    // every screen from A to Z. The whole app is there at every stage, so the empty slot stands for this story's.
+    key: "preview",
+    label: "Preview",
+    kinds: ["preview", "screenshots", "markup"],
+    slot: (it) => it.kind === "preview" && it.scope !== "app",
+    icon: MonitorPlay,
+    empty: (phase) => ({ title: "This story", detail: phase === "after" ? "Nothing was built" : "Comes with the build" }),
+  },
+  {
+    key: "code",
+    label: "Code",
+    kinds: ["pr", "main", "build", "checks"],
+    icon: GitPullRequest,
+    empty: (phase) =>
+      phase === "plan"
+        ? { title: "No code yet", detail: "Built once the plan is approved" }
+        : phase === "queued"
+          ? { title: "No code yet", detail: "Builder picks it up next" }
+          : phase === "build"
+            ? { title: "No code yet", detail: "Builder is on it" }
+            : { title: "No code for this story" },
+  },
 ];
 
-/** What each stage needs first: the plan while planning and building, the preview in review, the code (the pull
- *  request, the latest main) from the pull request on. */
-const ORDER: Record<ColumnKey, ("plan" | "preview" | "code")[]> = {
-  planning: ["plan", "preview", "code"],
-  building: ["plan", "code", "preview"],
-  review: ["preview", "plan", "code"],
-  pr: ["code", "preview", "plan"],
-  done: ["code", "preview", "plan"],
-};
+/** An empty part: a dashed slot where its line will go, and what it says instead. */
+function EmptySlot({ icon: Icon, title, detail }: { icon: LucideIcon; title: string; detail?: string }) {
+  return (
+    <div className={LINE}>
+      <span aria-hidden="true" className="relative flex size-6 flex-none items-center justify-center rounded-[7px] border border-dashed border-black/[0.16] text-[var(--tx2)]">
+        <Icon size={14} strokeWidth={1.75} />
+      </span>
+      {/* Like a made line: the words, then the detail beside them or under them when they don't fit. */}
+      <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5">
+        <span className="text-sm text-[var(--tx2)]">{title}</span>
+        {detail && <span className="text-xs text-[var(--tx2)]">{detail}</span>}
+      </span>
+    </div>
+  );
+}
 
-export function Outputs({ items, yours, preview, onSoon, stage = "planning" }: ActivityProps) {
-  const ready = orderOutputs(readyOf(items));
-  const dim = anyWorking(items);
-  const checks = ready.filter((it) => it.kind === "build" || it.kind === "checks");
+/** A folded part's state in a few words and a dot, in its title row, so folding it hides nothing that matters. */
+function signalOf(rows: ActivityItem[], proof: boolean, yours?: NeedKind) {
+  if (rows.some((it) => it.state === "failed")) return { dot: "bg-[var(--red)]", words: "Stopped" };
+  if (proof || (yours && rows.some((it) => it.state === "waiting"))) return { dot: "bg-[#d97706]", words: "Waiting on you" };
+  if (rows.some((it) => it.state === "working" || it.run === "starting")) return { dot: "bg-[var(--tx)]", words: "In progress" };
+  if (rows.some((it) => it.run === "on")) return { dot: "bg-[var(--green)]", words: "Preview running" };
+  return undefined;
+}
+
+/** The parts, one after the other: boxes of their own from 1024 px (`boxed`), plain parts inside the Output tab below. */
+export function Outputs({ items, yours, restartInChat, preview, onSoon, status, boxed }: ActivityProps & { status: StoryStatus; boxed?: boolean }) {
+  const made = madeOf(items);
+  const checks = made.filter((it) => it.kind === "build" || it.kind === "checks");
   const folded = checks.length > 1;
-  const lines = folded ? ready.filter((it) => !checks.includes(it)) : ready;
-
-  // Nothing made yet: nothing shown. Each part appears when it exists.
-  if (ready.length === 0) return null;
-  const sections = ORDER[stage].map((key) => SECTIONS.find((x) => x.key === key)).filter((x) => x !== undefined);
+  // What's under way and what was made, together, in the parts' fixed order, so a line stays where it is when it finishes.
+  const all = orderOutputs([...activeOf(items), ...(folded ? made.filter((it) => !checks.includes(it)) : made)]);
+  const phase = phaseOf(status);
+  // The whole app, while it's off: with this story in it once it's built, the app as it is before that. Short, so it
+  // stays whole beside Web, Mobile and Play in the tablet's corner card.
+  const appLine = (it: ActivityItem) => (it.withStory ? "With this story" : phase === "after" ? "Without this story" : "Before this story");
 
   return (
-    // A size container: the Preview line lays out by the width it's given (the card, or the phone's Activity).
-    <section aria-label="Outputs" className={`${chat.tray} @container flex flex-col gap-4`}>
-      {sections.map(({ label, kinds }) => {
-        const rows = lines.filter((it) => kinds.includes(it.kind));
+    <>
+      {SECTIONS.map(({ key, label, kinds, slot, icon, empty }) => {
+        const rows = all.filter((it) => kinds.includes(it.kind));
         const fold = folded && kinds.includes("checks");
         const count = rows.length + (fold ? 1 : 0);
-        if (count === 0) return null;
+        const vacant = slot ? !rows.some(slot) : count === 0;
+        const proof = rows.some((it) => it.state === "done" && isProof(it, yours)) || (fold && checks.some((it) => isProof(it, yours)));
+        const signal = signalOf(rows, proof, yours);
+        // While something is being made in this part, what's already there fades back, so the eye goes to it (it comes
+        // back on hover or focus). A part with nothing under way stays sharp.
+        const dim = rows.some((it) => it.state === "working");
         return (
-          <div key={label} role="group" aria-label={label}>
-            <h3 className="m-0 flex h-6 items-center gap-1.5 text-xs font-medium text-[var(--tx2)]">
-              {label}
-              {count > 1 && <span className="tabular-nums">· {count}</span>}
-            </h3>
+          <PanelSection
+            key={key}
+            id={key}
+            title={label}
+            count={count > 1 ? count : undefined}
+            boxed={boxed}
+            // Folded, the title row says what matters: something stopped, waiting on you, under way or running; or that
+            // there's nothing in it yet.
+            summary={
+              signal ? (
+                <span className="inline-flex items-center gap-1.5">
+                  {signal.words}
+                  <span aria-hidden="true" className={`size-1.5 flex-none rounded-full ${signal.dot}`} />
+                </span>
+              ) : count === 0 ? (
+                phase === "after" ? "None" : "None yet"
+              ) : undefined
+            }
+          >
             <div className="-mx-2 mt-0.5 flex flex-col">
-              {rows.map((it) => (
-                <div key={it.id} className={dim && !(it.kind === "preview" && it.run === "on") ? chat.dim : undefined}>
-                  <OutputRow item={it} proof={isProof(it, yours)} preview={preview} onSoon={onSoon} />
-                </div>
-              ))}
+              {vacant && <EmptySlot icon={icon} {...empty(phase)} />}
+              {rows.map((it) =>
+                it.state === "done" ? (
+                  <div key={it.id} className={dim && !(it.kind === "preview" && (it.run === "on" || it.run === "starting")) ? chat.dim : undefined}>
+                    <OutputRow item={it} proof={isProof(it, yours)} preview={preview} onSoon={onSoon} line={it.scope === "app" ? appLine(it) : undefined} />
+                  </div>
+                ) : (
+                  <LiveRow key={it.id} item={it} yours={yours} restartInChat={restartInChat} preview={preview} onSoon={onSoon} />
+                ),
+              )}
               {fold && (
                 <div className={dim ? chat.dim : undefined}>
                   <ChecksRow items={checks} proof={checks.some((it) => isProof(it, yours))} />
                 </div>
               )}
             </div>
-          </div>
+          </PanelSection>
         );
       })}
-    </section>
+    </>
   );
 }

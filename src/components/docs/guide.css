@@ -1,0 +1,390 @@
+/*
+ * The Docs articles' text and diagrams (src/content/docs/), in the Reader design (Shubham, 26 Nov) and this app's
+ * design system (DESIGN.md §3): Inter, the type roles, the tokens, the 4 px grid and hairlines, no shadows, light only
+ * like the whole app. The page around the text (the contents, the header, Previous and Next) is Tailwind classes in
+ * GuidePage.astro and DocsContents.astro. This file reaches only what Markdown renders, which can't carry classes, and
+ * the diagrams' own classes. It isn't in a cascade layer, so the reset in globals.css doesn't flatten it, and nothing
+ * here styles an element that also has utility classes. The base rules sit in :where(), so a diagram's class wins.
+ */
+
+/* ---- Reading text: 16/24 (DESIGN.md §3.2 Reading), set on the container in GuidePage.astro ---- */
+
+.guide-md {
+  overflow-wrap: break-word;
+}
+.guide-md > :first-child {
+  margin-top: 0;
+}
+.guide-md > :last-child {
+  margin-bottom: 0;
+}
+/* Long text runs at most about 70 characters a line (§3.2). */
+:where(.guide-md) p {
+  max-width: 65ch;
+  margin: 0 0 12px;
+}
+:where(.guide-md) strong {
+  color: var(--text);
+  font-weight: 600;
+}
+:where(.guide-md) em {
+  font-style: italic;
+}
+:where(.guide-md) h3 {
+  margin: 20px 0 4px;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+/* Links inside sentences are underlined (§3.2), and blue text is always the strong blue (§3.1). */
+:where(.guide-md) a {
+  color: var(--cta-hover);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+:where(.guide-md) a:hover {
+  text-decoration-thickness: 2px;
+}
+:where(.guide-md) :is(ul, ol) {
+  max-width: 65ch;
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+:where(.guide-md) ul {
+  list-style: disc;
+}
+:where(.guide-md) ol {
+  list-style: decimal;
+}
+:where(.guide-md) li {
+  margin: 4px 0;
+}
+:where(.guide-md) li > :is(ul, ol) {
+  margin: 4px 0 0;
+}
+:where(.guide-md) li::marker {
+  color: var(--muted);
+}
+:where(.guide-md) blockquote {
+  margin: 0 0 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border-strong);
+  color: var(--muted);
+}
+:where(.guide-md) hr {
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* Code in the system mono stack (§3.2). Inline: a chip in the field fill, at the Body size. Blocks: the same fill, no
+   colours (spec §5.4), scrolling sideways rather than wrapping. */
+:where(.guide-md) code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--field-bg);
+  font-family: var(--mono);
+  font-size: 14px;
+}
+:where(.guide-md) pre {
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--field-bg);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 20px;
+}
+:where(.guide-md) pre code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+}
+
+/* Tables (§5.5): a muted 12 px header in sentence case over the stronger rule, a hairline between rows, 12 px between
+   cells, no stripes and no column lines. The text is the Body size (14/20), and the first and last columns line up
+   with the paragraphs. A table wider than the column scrolls inside its own box (articles.ts wraps each one). */
+.guide-table {
+  margin: 0 0 16px;
+  overflow-x: auto;
+}
+.guide-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 20px;
+}
+.guide-table :is(th, td) {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.guide-table :is(th, td):first-child {
+  padding-left: 0;
+}
+.guide-table :is(th, td):last-child {
+  padding-right: 0;
+}
+.guide-table th {
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  vertical-align: bottom;
+}
+.guide-table td {
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- The three diagrams (spec §4), built from HTML in the articles ----
+   Each sits on a fill with no line around it (one way to separate at a time, §3.5). Names are card titles (14/20
+   semibold), the rest Caption (12/16). A diagram lays itself out from its own width (a container query), so it fits the
+   reading column whatever the sidebars are doing. From 560 px wide the two status diagrams are tracks: a dot for each
+   stage on one line that never wraps, joined by arrows, the names under the dots. Narrower, they stack: one white box a
+   line (inner corners: the outer radius less the padding, at least 4 px), the moves between them pointing down. */
+
+.guide-figure {
+  container-type: inline-size;
+  margin: 20px 0 24px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--field-bg);
+}
+.guide-figure-caption {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.guide-flow-step-name,
+.guide-groups-name,
+.guide-pair-title {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.guide-flow-step-who,
+.guide-groups-statuses {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Stacked: the narrow layout, and the default. */
+.guide-flow,
+.guide-groups-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.guide-flow-step,
+.guide-groups-box {
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--card);
+}
+.guide-flow-arrow {
+  align-self: flex-start;
+  margin-left: 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+  rotate: 90deg;
+}
+.guide-groups-move {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 12px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+.guide-groups-arrow {
+  display: inline-block;
+  font-size: 14px;
+  rotate: 90deg;
+}
+/* The caption names the colours, so they stay amber and red: amber for your moves (the Attention tone: a person is
+   needed), red for the assistant's. Words take the tone's ink; the arrows take its mark, the brighter amber (§3.1). */
+.guide-groups .by-you {
+  color: var(--warning-ink);
+}
+.guide-groups .by-assistant {
+  color: var(--danger-ink);
+}
+.guide-groups .by-you .guide-groups-arrow {
+  color: var(--warning);
+}
+.guide-groups-return {
+  margin: 16px 0 0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--warning-tint);
+  font-size: 14px;
+  line-height: 20px;
+}
+.guide-flow-aside {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* The tracks. Every stage spans two columns, every arrow the two between its stages' middles, so an arrow runs from
+   one dot to the next however many stages there are. The flow: a band for the line, then the names. The groups: who
+   moves a story on, written above the line, then the band, then the names. */
+@container (width >= 560px) {
+  .guide-flow,
+  .guide-groups-row {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .guide-flow {
+    grid-template-rows: 18px auto;
+  }
+  .guide-groups-row {
+    grid-template-rows: auto 18px auto;
+    align-items: end;
+  }
+  .guide-flow-step,
+  .guide-groups-box {
+    position: relative;
+    grid-column: span 2;
+    align-self: start;
+    padding: 6px 4px 0;
+    border-radius: 0;
+    background: none;
+    text-align: center;
+  }
+  .guide-flow-step {
+    grid-row: 2;
+  }
+  .guide-groups-box {
+    grid-row: 3;
+  }
+  /* The stage's dot, in the middle of the band above it. */
+  .guide-flow-step::before,
+  .guide-groups-box::before {
+    content: "";
+    position: absolute;
+    top: -14px;
+    left: calc(50% - 5px);
+    box-sizing: border-box;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--text);
+    border-radius: 50%;
+    background: var(--card);
+  }
+  .guide-flow-arrow,
+  .guide-groups-move {
+    position: relative;
+    grid-column: span 2;
+  }
+  .guide-flow-arrow:nth-child(2),
+  .guide-groups-move:nth-child(2) {
+    grid-column: 2 / span 2;
+  }
+  .guide-flow-arrow {
+    grid-row: 1;
+    align-self: stretch;
+    margin: 0;
+    font-size: 0;
+    rotate: none;
+  }
+  .guide-groups-move {
+    grid-row: 1;
+    display: block;
+    padding: 0 8px 4px;
+    text-align: center;
+  }
+  .guide-groups-arrow {
+    display: none;
+  }
+  /* The line from one dot to the next and its arrowhead, 5 px clear of each dot: grey in the flow, the mover's colour
+     in the groups. */
+  .guide-flow-arrow::before,
+  .guide-groups-move::before {
+    content: "";
+    position: absolute;
+    left: 10px;
+    right: 15px;
+    height: 2px;
+    background: currentColor;
+  }
+  .guide-flow-arrow::after,
+  .guide-groups-move::after {
+    content: "";
+    position: absolute;
+    right: 10px;
+    border-block: 4px solid transparent;
+    border-left: 6px solid currentColor;
+  }
+  .guide-flow-arrow::before {
+    top: 8px;
+  }
+  .guide-flow-arrow::after {
+    top: 5px;
+  }
+  .guide-groups-move::before {
+    top: calc(100% + 8px);
+  }
+  .guide-groups-move::after {
+    top: calc(100% + 5px);
+  }
+  .guide-groups .by-you::before {
+    background: var(--warning);
+  }
+  .guide-groups .by-you::after {
+    border-left-color: var(--warning);
+  }
+}
+
+/* The two pages of a story: two white cards, side by side from 480 px wide. */
+.guide-pair-lead {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+.guide-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+@container (width >= 480px) {
+  .guide-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.guide-pair-card {
+  padding: 12px 16px;
+  border-radius: 4px;
+  background: var(--card);
+}
+.guide-pair-title {
+  margin-bottom: 8px;
+}
+.guide-pair-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.guide-pair-list li {
+  margin: 0;
+}
+.guide-pair-list li + li {
+  margin-top: 4px;
+}

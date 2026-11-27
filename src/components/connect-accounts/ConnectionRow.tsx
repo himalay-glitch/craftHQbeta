@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type SubmitEvent } from "react";
-import { ArrowUpRight, Circle, CircleCheck, CircleExclamationPoint, LoaderCircle } from "lucide-react";
+import { CircleExclamationPoint, LoaderCircle } from "lucide-react";
 import { CONNECTIONS_CHANNEL, type Connection, type ConnectionBroadcast } from "@/types/connections";
+import { ToolLogo } from "@/components/stories/ImportFrom";
 import {
   ConnectionError,
   connectService,
@@ -9,7 +10,8 @@ import {
   startSignIn,
   type ConnectInput,
 } from "./api";
-import { Button, buttonClasses } from "./Button";
+import { Button } from "./Button";
+import { BODY, CardState, cardClasses, FACE_STATIC, FaceText, faceButton, type CardStatus } from "./Card";
 import { NEW_GITHUB_TOKEN_URL, SERVICE_COPY } from "./services";
 
 /**
@@ -21,7 +23,7 @@ type Phase = "idle" | "connecting" | "code" | "checking" | "token" | "saving";
 
 type ConnectionRowProps = {
   connection: Connection;
-  /** The next connection to make gets the primary button (DESIGN.md §6.6). */
+  /** The next connection to make: its card gets the focus when the modal opens and after each connection. */
   isNext: boolean;
   onConnected: (connection: Connection) => void;
   /** Tells the modal when a request starts and ends, so a scrim click doesn't close it midway. */
@@ -29,8 +31,6 @@ type ConnectionRowProps = {
 };
 
 const ICON = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
-/** Icons inside status pills: 12 px with a heavier stroke (DESIGN.md §3.6). */
-const PILL_ICON = { size: 12, strokeWidth: 2, "aria-hidden": true } as const;
 
 /** How often to check, while a sign-in window is open, whether the provider has finished. */
 const SIGN_IN_POLL_MS = 2000;
@@ -44,13 +44,6 @@ const FIELD =
 
 const TEXT_BUTTON =
   "inline-flex cursor-pointer items-center border-0 bg-transparent font-sans text-sm font-medium text-primary-strong hover:underline";
-
-/** Status pill tones (DESIGN.md §7.12): a tint background with the tone's ink. */
-const PILL_TONE = {
-  neutral: "bg-field text-muted-foreground",
-  positive: "bg-success-tint text-success-ink",
-  attention: "bg-warning-tint text-warning-ink",
-} as const;
 
 function Spinner({ size = 16 }: { size?: number }) {
   return (
@@ -90,11 +83,13 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
   const [code, setCode] = useState("");
   const [token, setToken] = useState("");
   const [signInUrl, setSignInUrl] = useState<string | null>(null);
-  const [logoMissing, setLogoMissing] = useState(false);
+  /** Opened by hand. A card is also open while it's partway through connecting, or showing an error. */
+  const [open, setOpen] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
   const windowRef = useRef<Window | null>(null);
   const fieldId = useId();
   const errorId = useId();
+  const bodyId = useId();
 
   // A service that connects with a code needs its sign-in page's address before the link can open it.
   useEffect(() => {
@@ -231,6 +226,7 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
     setError(null);
     setCode("");
     setToken("");
+    setOpen(false);
   }
 
   function submitCode(event: SubmitEvent<HTMLFormElement>) {
@@ -254,103 +250,75 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
   }
 
   function openTokenForm() {
+    // From the GitHub step too: the token replaces the window, so close it.
+    windowRef.current?.close();
+    windowRef.current = null;
     setError(null);
     setPhase("token");
   }
 
-  // The state, as a pill beside the name (DESIGN.md §7.12): an icon, a label and a tone, so it never
-  // reads as part of the description underneath.
-  let pill: { tone: keyof typeof PILL_TONE; icon: ReactNode; label: string };
-  if (phase === "connecting" || phase === "checking" || phase === "saving") {
-    pill = { tone: "neutral", icon: <Spinner size={12} />, label: phase === "connecting" ? "Connecting" : "Checking" };
-  } else if (connected) {
-    pill = { tone: "positive", icon: <CircleCheck {...PILL_ICON} />, label: "Connected" };
-  } else if (connection.status === "needs_attention") {
-    pill = { tone: "attention", icon: <CircleExclamationPoint {...PILL_ICON} />, label: "Needs attention" };
-  } else {
-    pill = { tone: "neutral", icon: <Circle {...PILL_ICON} />, label: "Not connected" };
-  }
+  const inFlow = phase !== "idle";
+  const busy = phase === "connecting" || phase === "checking" || phase === "saving";
+  /**
+   * One click connects (Shubham, 26 Nov: "I have to connect two times"): the card itself opens GitHub's window, or
+   * Claude's page in a new tab. Not when GitHub has no repositories yet: there's nothing to approve, so the card opens
+   * to say what to do instead.
+   */
+  const direct = !connected && !inFlow && !noRepositories && (usesWindow || usesCode);
+  /** Open across both columns for the step after the click (approve in the window, paste the code), or an error. */
+  const expanded = !connected && (inFlow || error !== null || (noRepositories && open));
 
-  // The line under the name: what the connection is for, or, once something has happened, the detail
-  // that matters now.
-  let detail: string;
-  if (phase === "connecting") {
-    detail = `Approve CraftHQ in the ${copy.name} window that opened.`;
-  } else if (connected) {
-    const who =
-      connection.via === "token"
-        ? `Developer token •••• ${connection.tokenLast4 ?? ""}`
-        : (connection.account ?? copy.name);
-    detail = connection.repositories ? `${who} · ${repositoryCount(connection.repositories)}` : who;
-  } else if (noRepositories) {
-    detail = "No repositories yet. Ask an owner of your GitHub organization to install the CraftHQ app, or use a developer token.";
-  } else if (connection.status === "needs_attention") {
-    detail = connection.reason ?? `${copy.name} needs attention.`;
-  } else {
-    detail = copy.purpose;
-  }
+  // The state on the right of the card (DESIGN.md §6.6 states, said the way the import's cards say them).
+  let status: CardStatus;
+  if (busy) status = "busy";
+  else if (connected) status = "connected";
+  else if (direct) status = "connect";
+  else if (connection.status === "needs_attention") status = "attention";
+  else status = "none";
+  const label = connection.status === "needs_attention" ? "Reconnect" : error ? "Try again" : "Connect";
 
-  const variant = isNext ? "primary" : "secondary";
-  const verb = connection.status === "needs_attention" ? "Reconnect" : "Connect";
-  let action: ReactNode = null;
-  if (phase === "connecting") {
-    action = (
-      <Button variant="ghost" onClick={cancel}>
-        Cancel
-      </Button>
-    );
-  } else if (!connected && phase === "idle" && usesWindow && !noRepositories) {
-    // The next step's button wears the provider's own colours (GitHub's black, with its white mark).
-    const branded = isNext ? copy.brandButton : undefined;
-    const mark = branded ? branded.mark : copy.logo;
-    action = (
-      <Button variant={branded ? branded.variant : variant} data-autofocus={isNext || undefined} onClick={openSignInWindow}>
-        {mark ? <img src={mark} alt="" width={16} height={16} className="size-4 flex-none" /> : null}
-        {`${verb} ${copy.name}`}
-        <ArrowUpRight {...ICON} />
-        <span className="sr-only">{` (opens a ${copy.name} window)`}</span>
-      </Button>
-    );
-  } else if (!connected && phase === "idle" && usesCode) {
-    // The next step's button wears the provider's own colours (Claude's orange).
-    const codeVariant = isNext && copy.brandButton ? copy.brandButton.variant : variant;
-    action = signInUrl ? (
-      <a
-        href={signInUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        data-autofocus={isNext || undefined}
-        className={buttonClasses(codeVariant)}
-        onClick={() => {
-          setError(null);
-          setPhase("code");
-        }}
-      >
-        {`Connect ${copy.name}`}
-        <ArrowUpRight {...ICON} />
-        <span className="sr-only">(opens in a new tab)</span>
-      </a>
-    ) : (
-      <Button variant={codeVariant} disabled>
-        {`Connect ${copy.name}`}
-      </Button>
-    );
-  }
+  const who =
+    connection.via === "token" ? `Developer token •••• ${connection.tokenLast4 ?? ""}` : (connection.account ?? copy.name);
 
-  let below: ReactNode = null;
+  // The card's line under the name: what it's for in a few words, or, once something has happened, the detail that
+  // matters now (the account, or why it needs attention).
+  let sub: string;
+  if (connected) sub = connection.repositories ? `${who} · ${repositoryCount(connection.repositories)}` : who;
+  else if (noRepositories) sub = "No repositories yet";
+  else if (connection.status === "needs_attention") sub = connection.reason ?? `${copy.name} needs attention`;
+  else sub = copy.short;
+
+  const tokenLink = canUseToken ? (
+    <button type="button" onClick={openTokenForm} className={TEXT_BUTTON}>
+      {noRepositories ? "Use a developer token" : "Use a developer token instead"}
+    </button>
+  ) : null;
+
+  let body: ReactNode = null;
   if (phase === "connecting") {
-    below = signInUrl ? (
-      <p className="mt-2 text-sm text-muted-foreground">
-        {"No window? "}
-        <a href={signInUrl} target="_blank" rel="noopener" className="text-primary-strong underline">
-          {`Open ${copy.name}`}
-          <span className="sr-only"> (opens in a new tab)</span>
-        </a>
-      </p>
-    ) : null;
-  } else if (usesCode && !connected && (phase === "code" || phase === "checking")) {
-    below = (
-      <form onSubmit={submitCode} noValidate className="mt-4 flex flex-col gap-1.5">
+    body = (
+      <>
+        <p className="text-sm text-pretty text-muted-foreground">{`Approve CraftHQ in the ${copy.name} window that opened.`}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Button variant="ghost" onClick={cancel} autoFocus>
+            Cancel
+          </Button>
+          {signInUrl ? (
+            <p className="text-sm text-muted-foreground">
+              {"No window? "}
+              <a href={signInUrl} target="_blank" rel="noopener" className="text-primary-strong underline">
+                {`Open ${copy.name}`}
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            </p>
+          ) : null}
+          {tokenLink}
+        </div>
+      </>
+    );
+  } else if (usesCode && (phase === "code" || phase === "checking")) {
+    body = (
+      <form onSubmit={submitCode} noValidate className="flex flex-col gap-1.5">
         <label htmlFor={fieldId} className="text-sm font-medium">
           {`Code from ${copy.name}`}
         </label>
@@ -392,8 +360,8 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
       </form>
     );
   } else if (canUseToken && (phase === "token" || phase === "saving")) {
-    below = (
-      <form onSubmit={submitToken} noValidate className="mt-4 flex flex-col gap-1.5">
+    body = (
+      <form onSubmit={submitToken} noValidate className="flex flex-col gap-1.5">
         <label htmlFor={fieldId} className="text-sm font-medium">
           Developer token
         </label>
@@ -434,60 +402,93 @@ export function ConnectionRow({ connection, isNext, onConnected, onBusyChange }:
         <p className="text-xs text-muted-foreground">CraftHQ shows only its last four characters after you save it.</p>
       </form>
     );
-  } else {
-    below = (
+  } else if (noRepositories) {
+    body = (
       <>
+        <p className="text-sm text-pretty text-muted-foreground">
+          No repositories yet. Ask an owner of your GitHub organization to install the CraftHQ app, or use a developer
+          token.
+        </p>
         {error ? <ErrorLine message={error} className="mt-2" /> : null}
-        {canUseToken && phase === "idle" ? (
-          <button type="button" onClick={openTokenForm} className={`mt-2 ${TEXT_BUTTON}`}>
-            {noRepositories ? "Use a developer token" : "Use a developer token instead"}
-          </button>
-        ) : null}
+        <div className="mt-2">{tokenLink}</div>
+      </>
+    );
+  } else if (error) {
+    // It didn't connect: what happened, and the card's "Try again" is the way back (never a dead end).
+    body = (
+      <>
+        <ErrorLine message={error} />
+        {tokenLink ? <div className="mt-2">{tokenLink}</div> : null}
       </>
     );
   }
 
-  return (
-    <li className="rounded-xl border border-border p-4">
-      {/* Top line: logo, name and state on the left; the action on the right. */}
-      <div className="flex flex-wrap items-center gap-3">
-        {copy.logo && !logoMissing ? (
-          <img
-            src={copy.logo}
-            alt=""
-            width={24}
-            height={24}
-            className="size-6 flex-none"
-            onError={() => setLogoMissing(true)}
-          />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="flex size-6 flex-none items-center justify-center rounded-md bg-field text-xs font-semibold"
-          >
-            {copy.initial}
-          </span>
-        )}
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-          <h3 className="text-sm font-semibold">{copy.name}</h3>
-          {/* Mark the exception, not the rule: every connection is required unless it says so. */}
-          {connection.required ? null : <span className="text-xs text-muted-foreground">Optional</span>}
-          <span
-            aria-live="polite"
-            className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium ${PILL_TONE[pill.tone]}`}
-          >
-            {pill.icon}
-            {pill.label}
-          </span>
-        </div>
-        {action}
-      </div>
+  const face = (
+    <>
+      <ToolLogo tool={{ logo: copy.logo ?? "", name: copy.name }} />
+      {/* Mark the exception, not the rule: every connection is required unless it says so. */}
+      <FaceText name={copy.name} sub={sub} tag={connection.required ? undefined : "Optional"} />
+      <CardState
+        status={status}
+        label={label}
+        external
+        busyLabel={phase === "connecting" ? "Connecting…" : "Checking…"}
+      />
+    </>
+  );
 
-      {/* Everything else lines up with the name, and runs the full width of the row. */}
-      <div className="pl-9">
-        <p className="mt-1 text-sm text-pretty text-muted-foreground">{detail}</p>
-        {below}
-      </div>
+  // The card's top line: the way to connect when one click does it, a toggle for what to do when it can't, else a
+  // plain line (connected, or partway through: the steps below have the buttons).
+  let top: ReactNode;
+  if (direct && usesWindow) {
+    top = (
+      <button type="button" data-autofocus={isNext || undefined} onClick={openSignInWindow} className={faceButton(expanded)}>
+        {face}
+        <span className="sr-only">{` (opens a ${copy.name} window)`}</span>
+      </button>
+    );
+  } else if (direct && signInUrl) {
+    top = (
+      <a
+        href={signInUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-autofocus={isNext || undefined}
+        onClick={() => {
+          setError(null);
+          setPhase("code");
+        }}
+        className={faceButton(expanded)}
+      >
+        {face}
+        <span className="sr-only"> (opens in a new tab)</span>
+      </a>
+    );
+  } else if (noRepositories && !inFlow) {
+    top = (
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={expanded ? bodyId : undefined}
+        onClick={() => setOpen(!open)}
+        className={faceButton(expanded)}
+      >
+        {face}
+      </button>
+    );
+  } else {
+    // Also Claude for the moment before its sign-in page's address arrives: it can't open anything yet.
+    top = <div className={FACE_STATIC}>{face}</div>;
+  }
+
+  return (
+    <li className={cardClasses(expanded)}>
+      {top}
+      {expanded && body ? (
+        <div id={bodyId} className={BODY}>
+          {body}
+        </div>
+      ) : null}
     </li>
   );
 }

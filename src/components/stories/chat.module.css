@@ -37,6 +37,54 @@
   }
 }
 
+/* A reply's words as they write in: each fades up out of a soft blur as it arrives, so the text flows in line after
+   line instead of popping in pairs (Shubham, 27 Nov: "text coming very smoothly"). */
+.word {
+  animation: word-in 420ms var(--ease-out) both;
+}
+@keyframes word-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+
+/* A tab's content as you switch to it: a quick fade and a 4 px rise (DESIGN.md §3.7, 200 ms). */
+.tabIn {
+  animation: tab-in 200ms var(--ease-out) both;
+}
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* A popover from a chat message ("Save as decision"): as the ⋯ menu, in a fade, a 4 px slide and scale 0.98 → 1 over
+   200 ms; out, a fade over 150 ms. */
+.pop {
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.pop[data-state="open"] {
+  animation: menu-in 200ms var(--ease-out);
+}
+.pop[data-state="open"][data-side="top"] {
+  animation-name: menu-in-up;
+}
+.pop[data-state="closed"] {
+  animation: menu-out 150ms var(--ease-in) forwards;
+}
+
+/* What appears inside the message box (a drop target, an attached file): a fade over 150 ms. */
+.appear {
+  animation: appear 150ms var(--ease-out) both;
+}
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}
+
 /* A status label that changes ("Reading the plan" → "Running the checks") slides up into place. */
 .labelIn {
   animation: label-in 260ms var(--ease-out) both;
@@ -97,6 +145,10 @@
     opacity: 0;
     transform: translateY(16px) scale(0.98);
   }
+}
+/* Coming back to a decision you'd stepped away from: the same rise, at once. */
+.riseNow {
+  animation: rise 300ms var(--ease-out) both;
 }
 
 /* The Builder's working ring on the activity card: its gap travels round once every 1.2 s. The column's only loop. */
@@ -184,18 +236,85 @@
   transition: opacity 150ms var(--ease-out);
 }
 
+/* The robot at work in the chat: a small plush hop on the working ring's 1.2 s tempo (DESIGN.md §3.7: only robots
+   bounce, with --ease-plush). Reading your message, it tilts its head slowly from side to side instead. */
+.botHop {
+  transform-origin: 50% 100%;
+  animation: bot-hop 1.2s var(--ease-plush) infinite;
+}
+@keyframes bot-hop {
+  0%,
+  55%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  20% {
+    transform: translateY(-3px) scale(0.97, 1.03);
+  }
+  38% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+}
+.botTilt {
+  transform-origin: 50% 85%;
+  animation: bot-tilt 2.4s var(--ease-in-out) infinite;
+}
+@keyframes bot-tilt {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+/* The newest line of the run's trail writes itself in from the left: a soft edge sweeps across it. */
+.write {
+  -webkit-mask-image: linear-gradient(90deg, #000 40%, transparent 60%);
+  mask-image: linear-gradient(90deg, #000 40%, transparent 60%);
+  -webkit-mask-size: 250% 100%;
+  mask-size: 250% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 100% 0;
+  mask-position: 100% 0;
+  animation: write 800ms var(--ease-out) forwards;
+}
+@keyframes write {
+  to {
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .botHop,
+  .botTilt {
+    animation: none;
+  }
+  .write {
+    animation: none;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .word,
+  .tabIn,
+  .appear,
   .enter,
   .landMine,
   .landTheirs,
   .labelIn,
+  .riseNow,
   .check,
   .rise {
     animation: none;
   }
   /* The menu just fades. */
   .menu[data-state="open"],
-  .menu[data-state="open"][data-side="top"] {
+  .menu[data-state="open"][data-side="top"],
+  .pop[data-state="open"],
+  .pop[data-state="open"][data-side="top"] {
     animation: menu-out 150ms linear reverse;
   }
   .recede {

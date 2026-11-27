@@ -5,7 +5,7 @@ import { ConnectAccountsModal } from "@/components/connect-accounts";
 import { TEAM, TEAM_ORDER } from "@/components/ask/team";
 import { TOOLTIP } from "@/components/dashboard/classes";
 import type { BotId } from "@/types/ask";
-import { NAV, currentPath, type NavItem } from "./nav";
+import { NAV, currentPath, isCurrent, type NavItem } from "./nav";
 
 // DESIGN.md §4.3: a 56 px rail of icons with their names on hover; `[` or the PanelLeft button opens it to the
 // labelled sidebar, and the choice is remembered. The width lives on <html data-sidebar>, set before paint by
@@ -140,9 +140,11 @@ export function Sidebar({ current }: { current: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // No "Ask PM" link here (Shubham, 26 Nov): the PM's face heads the agents below and opens the same page, so the link
+  // only repeated it. The top bar's menu under 1024 px keeps it, since that menu has no agents.
   const list = (foot: boolean) =>
-    NAV.filter((item) => !!item.foot === foot).map((item) => (
-      <Item key={item.href} item={item} current={path === item.href} />
+    NAV.filter((item) => !!item.foot === foot && item.href !== "/ask").map((item) => (
+      <Item key={item.href} item={item} current={isCurrent(path, item.href)} />
     ));
 
   // z-20 is the sidebar's layer (DESIGN.md §3.5), so the names float over the page beside it.
@@ -163,7 +165,7 @@ export function Sidebar({ current }: { current: string }) {
         </p>
         <ul aria-label="Agents" className="flex list-none flex-col gap-0.5">
           {TEAM_ORDER.map((id) => (
-            <BotItem key={id} id={id} current={id !== "pm" && path === `/ask/${id}`} />
+            <BotItem key={id} id={id} current={path === (id === "pm" ? "/ask" : `/ask/${id}`)} />
           ))}
         </ul>
       </div>
@@ -207,7 +209,7 @@ export function Sidebar({ current }: { current: string }) {
           </RailName>
         </li>
       </ul>
-      <ConnectAccountsModal open={connectors} onClose={() => setConnectors(false)} />
+      <ConnectAccountsModal open={connectors} onClose={() => setConnectors(false)} variant="connectors" />
     </nav>
   );
 }

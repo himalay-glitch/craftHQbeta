@@ -4,8 +4,8 @@ import { BTN_PRIMARY, BTN_SECONDARY } from "@/components/dashboard/classes";
 import { BotAvatar } from "@/components/ask/BotAvatar";
 
 // A first visit to a story page, as a new person sees it (Shubham, 26 Nov: "show the first story in Planning, hq-28, as
-// a first-time user coming on that story"). A welcome, then a few steps that light up one part of the page at a time —
-// the chat, the place where the story asks for you, the status, the decisions, the tabs — each with two sentences and
+// a first-time user coming on that story"). A welcome, then a few steps that light up one part of the page at a time
+// (the chat, the place where the story asks for you, the status, the decisions, the tabs), each with two sentences and
 // Back / Next. Skip or Esc ends it at any point. The page itself never changes: the story, its number and its state stay
 // as they are. Front end only: it shows on hq-28 (the demo story) once per browser session, and on any story with
 // ?tour in the address.
@@ -57,7 +57,7 @@ function stepsFor(storyRef: string, wide: boolean, need?: NeedKind): Step[] {
       {
         key: "fold",
         title: "Everything else is here",
-        body: "The story’s status, its decisions, the work and the history. Open it whenever you need them.",
+        body: "The story’s status, its decisions, what was made and the history. Open it whenever you need them.",
         target: () => q("[data-tour=fold]"),
         place: "below",
       },
@@ -70,7 +70,7 @@ function stepsFor(storyRef: string, wide: boolean, need?: NeedKind): Step[] {
     {
       key: "status",
       title: "Where it is, and whose turn",
-      body: "Planning, Building, In review, Pull request, Done. Open the box to move the story on yourself; every choice says what it will do.",
+      body: "Planning, Building, In review, Pull request, Done, in that order. To move the story yourself, click a status with an outline: it moves at once, and you can undo it.",
       target: () => q("[data-tour=panel] section[aria-label=Status]"),
       place: "left",
     },
@@ -83,9 +83,11 @@ function stepsFor(storyRef: string, wide: boolean, need?: NeedKind): Step[] {
     },
     {
       key: "tabs",
-      title: "Work and History",
-      body: "Work fills up as things are made: the plan, the preview, the code. History is the whole log, newest first.",
-      target: () => q("[data-tour=panel] [role=tablist]"),
+      title: "What was made, and the history",
+      body: "Pages, Preview and Code each open to show what’s there or when it comes. Preview has this story on its own, or the whole app. History is the last box, newest first.",
+      // From 1024 px the right-hand side is boxes (Shubham, 27 Nov): the Pages, Preview and Code boxes together; a tab
+      // row where there are tabs.
+      target: () => q("[data-tour=panel] [data-tour=output]") ?? q("[data-tour=panel] [role=tablist]"),
       place: "left",
     },
   ];
