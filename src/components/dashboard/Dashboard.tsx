@@ -17,7 +17,7 @@ import { NewStoryPanel } from "./NewStoryPanel";
 import { QueueMessage } from "./QueueMessage";
 import { SetupBanner } from "./SetupBanner";
 import { useConnectionSetup } from "./setup";
-import { ShippedRibbon } from "./ShippedRibbon";
+import { ShippedThisWeek } from "./ShippedThisWeek";
 import { StoryPanel, type StoryAction } from "./StoryPanel";
 import { StatPanel } from "./StatPanel";
 import { Toast, type ToastMessage } from "./Toast";
@@ -68,7 +68,7 @@ type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | { kin
 /**
  * The dashboard island (DESIGN.md §5.6: what needs me, what's moving, what shipped), in three columns that fill
  * the width: Ready to review and Stuck on the left, Needs you in the middle (a deck of decisions, one at a time, or
- * the all clear), Running and Queued on the right; this week's merges on a line below.
+ * the all clear), Running and Queued on the right; what shipped this week below, on the same grid.
  */
 export function Dashboard({ data }: { data: DashboardData }) {
   const override = useStateOverride();
@@ -445,8 +445,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
               </div>
             </div>
 
-            <div className="mt-12 border-t border-[var(--line)] pt-6">
-              <ShippedRibbon shipped={data.shipped} done={data.done + answered} />
+            <div className="mt-10 border-t border-[var(--line)] pt-6">
+              <ShippedThisWeek shipped={data.shipped} done={data.done + answered} total={data.totalStories} onOpen={open} />
             </div>
           </>
         )}
