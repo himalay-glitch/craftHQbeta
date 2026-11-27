@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Tooltip } from "radix-ui";
-import { CircleX, Clock, GitPullRequest, LoaderCircle, Plus, X } from "lucide-react";
+import { CircleX, Clock, GitPullRequest, LoaderCircle, Plus } from "lucide-react";
 import { ConnectAccountsModal } from "@/components/connect-accounts";
 import type { DashboardData, DashboardStateOverride, NeedKind, Story, StoryStatus } from "@/types/dashboard";
 import { BTN_SECONDARY } from "./classes";
@@ -9,8 +9,10 @@ import { clearStoryParam, readStoryParam, sortQueue, storyRef, URL_EVENT, writeS
 import { ActivityPanel, type DetailsTab } from "./ActivityPanel";
 import { AllClear } from "./AllClear";
 import { DashboardSkeleton } from "./DashboardSkeleton";
-import type { DecisionOption, DecisionReply } from "./decisions";
+import { KINDS, type DecisionOption, type DecisionReply } from "./decisions";
+import { FilterPill } from "./FilterPill";
 import { NeedsDeck } from "./NeedsDeck";
+import { NeedsPanel } from "./NeedsPanel";
 import { NewStoryPanel } from "./NewStoryPanel";
 import { QueueMessage } from "./QueueMessage";
 import { SetupBanner } from "./SetupBanner";
@@ -61,7 +63,7 @@ function useIsWide() {
 const visibleStoryButton = (id: number) =>
   Array.from(document.querySelectorAll<HTMLElement>(`[data-story="${id}"]`)).find((el) => el.offsetParent !== null);
 
-type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | null;
+type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | { kind: "needs"; top: number } | null;
 
 /**
  * The dashboard island (DESIGN.md §5.6: what needs me, what's moving, what shipped), in three columns that fill
@@ -119,7 +121,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const allClear = mine.length === 0;
 
   const openStory = urlStory !== null && urlStory !== closing ? byId.get(urlStory) : undefined;
-  const panel: "story" | "details" | "new" | null = openStory ? "story" : (localPanel?.kind ?? null);
+  const panel: "story" | "details" | "new" | "needs" | null = openStory ? "story" : (localPanel?.kind ?? null);
 
   // ---- Toasts ----
   const showToast = useCallback((message: string, action?: ToastMessage["action"]) => {
@@ -276,9 +278,10 @@ export function Dashboard({ data }: { data: DashboardData }) {
     else if (answer.option.choice.kind === "act") act(story, answer.option.choice.action);
   };
 
-  // A story picked in Ready to review or Stuck: show the whole deck and bring that card to the top.
+  // A story picked in Ready to review, Stuck or See all: bring that card to the top, showing the whole deck if the
+  // filter hides it.
   const pick = (id: number) => {
-    setNeed("all");
+    if (!visible.some((s) => s.id === id)) setNeed("all");
     setJump((j) => ({ id, key: (j?.key ?? 0) + 1 }));
     if (!isWide) document.getElementById("needs-title")?.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
   };
@@ -325,22 +328,26 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 middle, what's running and queued. The side cards stretch to the deck's height. */}
             <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
               <section aria-labelledby="needs-title" className="min-w-0 lg:order-2">
-                <header className="flex h-6 items-center gap-2">
-                  <h2 id="needs-title" className="text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
+                <header className="flex h-[30px] items-center justify-between gap-3">
+                  <h2 id="needs-title" className="flex items-baseline gap-2 text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
                     Needs you
+                    <span className="font-normal text-[var(--tx2)] tabular-nums">{visible.length}</span>
                   </h2>
-                  {need === "all" ? (
-                    <span className="text-[15px] leading-[22px] text-[var(--tx2)] tabular-nums">{visible.length}</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setNeed("all")}
-                      aria-label={`Showing ${need === "review" ? "Ready to review" : "Stuck"} only. Show all ${mine.length}`}
-                      className="inline-flex h-6 items-center gap-1 rounded-full bg-[#EEF4FF] pr-1.5 pl-2.5 text-[12px] leading-4 font-medium text-[#1F57C3] transition-colors duration-[120ms] hover:bg-[#E3ECFD]"
-                    >
-                      {need === "review" ? "Ready to review" : "Stuck"} · {visible.length}
-                      <X aria-hidden="true" size={13} strokeWidth={2} />
-                    </button>
+                  {mine.length > 0 && (
+                    <FilterPill
+                      name="Show"
+                      value={need}
+                      defaultValue="all"
+                      showDefaultValue
+                      align="end"
+                      options={[
+                        { value: "all" as const, label: "All", count: mine.length },
+                        ...KINDS.map((k) => ({ value: k.kind, label: k.label, count: mine.filter((s) => s.need === k.kind).length })).filter(
+                          (o) => o.count > 0 || o.value === need,
+                        ),
+                      ]}
+                      onChange={setNeed}
+                    />
                   )}
                 </header>
 
@@ -359,7 +366,13 @@ export function Dashboard({ data }: { data: DashboardData }) {
                         {allClear ? (
                           <AllClear answered={answered} />
                         ) : visible.length ? (
-                          <NeedsDeck stories={visible} onDecide={decide} onOpen={open} jump={jump} />
+                          <NeedsDeck
+                            stories={visible}
+                            onDecide={decide}
+                            onOpen={open}
+                            jump={jump}
+                            onSeeAll={(top) => openLocal({ kind: "needs", top })}
+                          />
                         ) : (
                           <QueueMessage kind="filtered" onClear={() => setNeed("all")} />
                         )}
@@ -464,6 +477,19 @@ export function Dashboard({ data }: { data: DashboardData }) {
             isWide={isWide}
             onClose={() => closePanel()}
             onOpenStory={open}
+          />
+        )}
+        {panel === "needs" && localPanel?.kind === "needs" && (
+          <NeedsPanel
+            key="needs"
+            stories={visible}
+            top={localPanel.top}
+            isWide={isWide}
+            onClose={() => closePanel()}
+            onPick={(id) => {
+              closePanel();
+              pick(id);
+            }}
           />
         )}
         {panel === "new" && (

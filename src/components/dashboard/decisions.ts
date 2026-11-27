@@ -189,7 +189,7 @@ export function decisionFor(story: Story): Decision {
   }
 }
 
-/** The kinds of need, in the queue's order, as the All menu names them. */
+/** The kinds of need, in the queue's order, as the Show filter and the See all panel name them. */
 export const KINDS: { kind: NeedKind; label: string }[] = [
   { kind: "stuck", label: "Stuck" },
   { kind: "review", label: "Ready to review" },

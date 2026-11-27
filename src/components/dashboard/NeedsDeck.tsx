@@ -1,12 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "framer-motion";
-import { DropdownMenu } from "radix-ui";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Story } from "@/types/dashboard";
-import { MENU_CONTENT, MENU_ITEM, MENU_SEPARATOR } from "./classes";
 import { DecisionCard } from "./DecisionCard";
-import { decisionFor, KINDS, type DecisionOption, type DecisionReply } from "./decisions";
-import { storyRef } from "./format";
+import { decisionFor, type DecisionOption, type DecisionReply } from "./decisions";
 
 type KeyLike = Pick<globalThis.KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "preventDefault"> & {
   target: EventTarget | null;
@@ -109,8 +106,10 @@ interface NeedsDeckProps {
   stories: Story[];
   onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
   onOpen: (id: number) => void;
-  /** A story picked beside the deck; each new key brings it to the top. */
+  /** A story picked beside the deck or in See all; each new key brings it to the top. */
   jump?: { id: number; key: number } | null;
+  /** See all: opens the side panel with every decision; gets the card on top. */
+  onSeeAll: (top: number) => void;
 }
 
 const ICON_BTN =
@@ -120,9 +119,9 @@ const ICON_BTN =
  * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the card says what
  * happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
  * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same, and 1–3 answer.
- * Under the deck, See all, to jump to any decision.
+ * Under the deck, See all opens every decision in the side panel, to pick which comes next.
  */
-export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
+export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDeckProps) {
   const reduced = useReducedMotion();
   const [seq, setSeq] = useState<number[]>([]);
   const [move, setMove] = useState<Move>("answered");
@@ -140,7 +139,7 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
   const next = order.slice(1).map((id) => byId.get(id)!);
   const topId = top?.id ?? null;
 
-  // A story picked beside the deck (Ready to review, Stuck) comes to the top, entering from the left.
+  // A story picked beside the deck (Ready to review, Stuck) or in See all comes to the top, entering from the left.
   const [lastJump, setLastJump] = useState(jump?.key ?? 0);
   if (jump && jump.key !== lastJump) {
     setLastJump(jump.key);
@@ -168,11 +167,6 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
     if (order.length < 2 || sent) return;
     setMove("back");
     setSeq([order[order.length - 1], ...order.slice(0, -1)]);
-  };
-  const jumpTo = (id: number) => {
-    if (id === topId || sent) return;
-    setMove("back");
-    setSeq([id, ...order.filter((x) => x !== id)]);
   };
 
   const answer = (story: Story, says: string, done: () => void) => {
@@ -237,9 +231,6 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
 
   if (!top || !decision) return null;
 
-  // All, grouped by kind of need, in the queue's order.
-  const groups = KINDS.map((k) => ({ ...k, items: order.map((id) => byId.get(id)!).filter((s) => s.need === k.kind) })).filter((g) => g.items.length > 0);
-
   return (
     <section
       ref={root}
@@ -288,37 +279,22 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
         </AnimatePresence>
       </div>
 
-      {/* Under the deck: back, every decision, later. Nothing else; the numbers on the answers are their keys. */}
+      {/* Under the deck: back, See all (the side panel with every decision), later. The numbers on the answers are
+          their keys, so there's no hint line. */}
       {order.length > 1 && (
         <div className="flex items-center justify-center gap-1">
           <button type="button" onClick={back} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
             <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.75} />
           </button>
 
-          <DropdownMenu.Root modal={false}>
-            <DropdownMenu.Trigger className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.04] data-[state=open]:bg-black/[0.06]">
-              See all
-              <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content align="center" sideOffset={6} className={`${MENU_CONTENT} max-h-[420px] w-[340px] overflow-y-auto`}>
-                {groups.map((g, gi) => (
-                  <DropdownMenu.Group key={g.kind}>
-                    {gi > 0 && <DropdownMenu.Separator className={MENU_SEPARATOR} />}
-                    <DropdownMenu.Label className="px-4 pt-2 pb-1 text-[12px] leading-4 text-[var(--tx2)]">
-                      {g.label} · {g.items.length}
-                    </DropdownMenu.Label>
-                    {g.items.map((s) => (
-                      <DropdownMenu.Item key={s.id} onSelect={() => jumpTo(s.id)} className={`${MENU_ITEM} ${s.id === topId ? "font-medium" : ""}`}>
-                        <span className="w-11 flex-none text-[12px] text-[var(--tx2)] tabular-nums">{storyRef(s.id)}</span>
-                        <span className="truncate">{s.title}</span>
-                      </DropdownMenu.Item>
-                    ))}
-                  </DropdownMenu.Group>
-                ))}
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+          <button
+            type="button"
+            onClick={() => onSeeAll(top.id)}
+            aria-haspopup="dialog"
+            className="inline-flex h-9 items-center rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.04]"
+          >
+            See all
+          </button>
 
           <button type="button" onClick={later} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
             <ChevronRight aria-hidden="true" size={18} strokeWidth={1.75} />
