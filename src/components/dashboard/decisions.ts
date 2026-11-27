@@ -191,7 +191,7 @@ export function decisionFor(story: Story): Decision {
 
 /** The kinds of need, in the queue's order, as the See all panel names them. */
 export const KINDS: { kind: NeedKind; label: string }[] = [
-  { kind: "stuck", label: "Blocked" },
+  { kind: "stuck", label: "Need a fix" },
   { kind: "review", label: "Awaiting review" },
   { kind: "decision", label: "Decisions" },
   { kind: "planning", label: "Plans to approve" },

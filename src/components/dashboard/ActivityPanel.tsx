@@ -113,7 +113,7 @@ export function ActivityPanel(p: ActivityPanelProps) {
               ))}
             </ul>
             <p className="mt-4 text-[13px] leading-[18px] text-[var(--tx2)]">
-              Blocked stories are in Needs you, because they need a person.
+              Stories that need a fix are in Needs you, because they need a person.
             </p>
           </>
         ) : (

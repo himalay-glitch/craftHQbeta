@@ -181,7 +181,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.15 }}
-          className="absolute -inset-6 z-10 flex flex-col items-center justify-center rounded-[24px] bg-white px-6 text-center"
+          className="absolute -inset-5 z-10 flex flex-col sm:-inset-6 items-center justify-center rounded-[24px] bg-white px-6 text-center"
         >
           <span className="inline-flex size-11 items-center justify-center rounded-full bg-[#16A34A] text-white">
             <Check aria-hidden="true" size={22} strokeWidth={2.5} />

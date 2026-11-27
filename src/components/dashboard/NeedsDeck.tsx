@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Story } from "@/types/dashboard";
@@ -79,7 +80,7 @@ function TopCard({
       whileDrag={{ scale: 1.02, cursor: "grabbing" }}
       onDragEnd={onDragEnd}
       style={{ x, zIndex: 3 }}
-      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
+      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
     >
       {/* Swipe hints, fading in with the drag. */}
       <motion.span
@@ -102,7 +103,7 @@ function TopCard({
 }
 
 interface NeedsDeckProps {
-  /** The stories that need you, in the queue's order (Blocked first). */
+  /** The stories that need you, in the queue's order (Need a fix first). */
   stories: Story[];
   onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
   onOpen: (id: number) => void;
@@ -110,19 +111,21 @@ interface NeedsDeckProps {
   jump?: { id: number; key: number } | null;
   /** See all: opens the side panel with every decision, each a way into its story's chat. */
   onSeeAll: () => void;
+  /** Where See all and ‹ › go: the right of Needs you's header. */
+  controls: HTMLElement | null;
 }
 
 const ICON_BTN =
-  "inline-flex size-9 items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.04] hover:text-[var(--tx)]";
+  "inline-flex size-8 items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)] disabled:opacity-40 disabled:hover:bg-transparent";
 
 /**
  * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the card says what
  * happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
  * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same. 1–4 choose an
  * answer and Enter sends it.
- * Under the deck, See all opens every decision in the side panel, each a way into its story's chat.
+ * In the tray's header, See all opens every decision in the side panel, each a way into its story's chat.
  */
-export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDeckProps) {
+export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls }: NeedsDeckProps) {
   const reduced = useReducedMotion();
   const [seq, setSeq] = useState<number[]>([]);
   const [move, setMove] = useState<Move>("answered");
@@ -144,7 +147,7 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
   const choice: Choice = picked && picked.id === topId ? picked.choice : 0;
   const select = (c: Choice) => topId !== null && setPicked({ id: topId, choice: c });
 
-  // A story picked beside the deck (Awaiting review, Blocked) comes to the top, entering from the left.
+  // A story picked beside the deck (Awaiting review, Need a fix) comes to the top, entering from the left.
   const [lastJump, setLastJump] = useState(jump?.key ?? 0);
   if (jump && jump.key !== lastJump) {
     setLastJump(jump.key);
@@ -293,27 +296,27 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
         </AnimatePresence>
       </div>
 
-      {/* Under the deck: back, See all (the side panel with every decision), later. */}
-      {order.length > 1 && (
-        <div className="flex items-center justify-center gap-1">
-          <button type="button" onClick={back} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
-            <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.75} />
-          </button>
-
-          <button
-            type="button"
-            onClick={onSeeAll}
-            aria-haspopup="dialog"
-            className="inline-flex h-9 items-center rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.04]"
-          >
-            See all
-          </button>
-
-          <button type="button" onClick={later} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
-            <ChevronRight aria-hidden="true" size={18} strokeWidth={1.75} />
-          </button>
-        </div>
-      )}
+      {/* In the tray's header: See all (the side panel with every decision), then back and later. */}
+      {controls &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              onClick={onSeeAll}
+              aria-haspopup="dialog"
+              className="inline-flex h-8 items-center rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.05]"
+            >
+              See all
+            </button>
+            <button type="button" onClick={back} disabled={order.length < 2} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
+              <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.75} />
+            </button>
+            <button type="button" onClick={later} disabled={order.length < 2} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
+              <ChevronRight aria-hidden="true" size={18} strokeWidth={1.75} />
+            </button>
+          </>,
+          controls,
+        )}
     </section>
   );
 }

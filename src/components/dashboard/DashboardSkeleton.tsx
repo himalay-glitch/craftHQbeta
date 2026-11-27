@@ -20,12 +20,15 @@ function Tile({ names, grow }: { names: number; grow: string }) {
 export function DashboardSkeleton() {
   return (
     <div aria-hidden="true" className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
-      <div className="lg:order-2">
-        <span className={`${SKELETON} block h-6 w-28`} />
+      <div className="rounded-[20px] border border-black/[0.05] bg-black/[0.025] p-3 sm:p-4 lg:order-2 lg:p-5">
+        <span className="flex h-8 items-center justify-between pl-1">
+          <span className={`${SKELETON} block h-5 w-28`} />
+          <span className={`${SKELETON} block h-5 w-24`} />
+        </span>
         <div className="relative mt-4 pb-8">
           <div className="absolute inset-x-0 top-0 bottom-8 translate-y-8 scale-[0.91] rounded-[24px] border border-black/[0.06] bg-white" />
           <div className="absolute inset-x-0 top-0 bottom-8 translate-y-4 scale-[0.955] rounded-[24px] border border-black/[0.06] bg-white" />
-          <div className="relative rounded-[24px] border border-black/[0.06] bg-white p-6">
+          <div className="relative rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
             <span className={`${SKELETON} block h-5 w-20 rounded-full`} />
             <span className={`${SKELETON} mt-4 block h-6 w-11/12`} />
             <span className={`${SKELETON} mt-2 block h-6 w-2/3`} />

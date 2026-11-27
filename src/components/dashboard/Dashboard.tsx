@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Tooltip } from "radix-ui";
-import { CircleX, Clock, GitPullRequest, LoaderCircle, Plus } from "lucide-react";
+import { CircleX, Clock, GitPullRequest, LoaderCircle, Plus, X } from "lucide-react";
 import { ConnectAccountsModal } from "@/components/connect-accounts";
 import type { DashboardData, DashboardStateOverride, NeedKind, Story, StoryStatus } from "@/types/dashboard";
 import { BTN_SECONDARY } from "./classes";
@@ -65,7 +65,7 @@ type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | { kin
 
 /**
  * The dashboard island (DESIGN.md §5.6: what needs me, what's moving, what shipped), in three columns that fill
- * the width: Awaiting review and Blocked on the left, Needs you in the middle (a deck of decisions, one at a time, or
+ * the width: Awaiting review and Need a fix on the left, Needs you in the middle (a deck of decisions, one at a time, or
  * the all clear), Active runs and Queued runs on the right.
  */
 export function Dashboard({ data }: { data: DashboardData }) {
@@ -78,10 +78,12 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const [stories, setStories] = useState(data.stories);
   // Decisions made since the page opened: the all-clear's count.
   const [answered, setAnswered] = useState(0);
-  // Awaiting review and Blocked filter the deck; Show all brings the rest back.
+  // Awaiting review and Need a fix filter the deck; the chip in the header brings the rest back.
   const [need, setNeed] = useState<"all" | NeedKind>("all");
-  // A story picked in Awaiting review or Blocked, for the deck to bring to the top.
+  // A story picked in Awaiting review or Need a fix, for the deck to bring to the top.
   const [jump, setJump] = useState<{ id: number; key: number } | null>(null);
+  // Where the deck puts its controls: the right of Needs you's header.
+  const [deckControls, setDeckControls] = useState<HTMLDivElement | null>(null);
   const [localPanel, setLocalPanel] = useState<LocalPanel>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [nextId, setNextId] = useState(data.nextStoryId);
@@ -276,7 +278,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
     else if (answer.option.choice.kind === "act") act(story, answer.option.choice.action);
   };
 
-  // A story picked in Awaiting review or Blocked: bring that card to the top, showing the whole deck if the filter
+  // A story picked in Awaiting review or Need a fix: bring that card to the top, showing the whole deck if the filter
   // hides it.
   const pick = (id: number) => {
     if (!visible.some((s) => s.id === id)) setNeed("all");
@@ -325,25 +327,34 @@ export function Dashboard({ data }: { data: DashboardData }) {
             {/* Three columns that fill the width: what to review and what's stuck, Needs you with its deck in the
                 middle, what's running and queued. The side cards stretch to the deck's height. */}
             <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
-              <section aria-labelledby="needs-title" className="min-w-0 lg:order-2">
-                <header className="flex h-6 items-center justify-between gap-3">
-                  <h2 id="needs-title" className="flex items-baseline gap-2 text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
+              {/* Needs you is a tray, top to bottom of the tiles beside it: its header (the title, the deck's controls on
+                  the right) and the deck sit inside it, so nothing floats on the page around the card. */}
+              <section
+                aria-labelledby="needs-title"
+                className="flex min-w-0 flex-col rounded-[20px] border border-black/[0.05] bg-black/[0.025] p-3 sm:p-4 lg:order-2 lg:p-5"
+              >
+                <header className="flex h-8 items-center justify-between gap-3 pl-1">
+                  <h2 id="needs-title" className="flex min-w-0 items-center gap-2 text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
                     Needs you
                     <span className="font-normal text-[var(--tx2)] tabular-nums">{visible.length}</span>
+                    {/* Only while a tile (Awaiting review, Need a fix) filters the deck: what it's showing, and the way back. */}
+                    {need !== "all" && (
+                      <button
+                        type="button"
+                        onClick={() => setNeed("all")}
+                        aria-label={`Showing ${need === "review" ? "Awaiting review" : "Need a fix"} only. Show all ${mine.length}`}
+                        className="inline-flex h-6 items-center gap-1 rounded-full bg-white pr-1.5 pl-2.5 text-[12px] leading-4 font-medium text-[var(--tx)] shadow-[0_0_0_1px_var(--card-line)] transition-colors duration-[120ms] hover:bg-[#FAFAFA]"
+                      >
+                        {need === "review" ? "Awaiting review" : "Need a fix"}
+                        <X aria-hidden="true" size={13} strokeWidth={2} className="text-[var(--tx2)]" />
+                      </button>
+                    )}
                   </h2>
-                  {/* Only while a tile (Awaiting review, Blocked) filters the deck: the way back to all of it. */}
-                  {need !== "all" && (
-                    <button
-                      type="button"
-                      onClick={() => setNeed("all")}
-                      className="text-[13px] leading-[18px] font-medium text-[var(--cta)] underline-offset-2 hover:underline"
-                    >
-                      Show all {mine.length}
-                    </button>
-                  )}
+                  {/* The deck puts See all and ‹ › here. */}
+                  <div ref={setDeckControls} className="flex flex-none items-center gap-0.5" />
                 </header>
 
-                <div className="mt-4">
+                <div className="mt-4 flex-1">
                   {override === "error" ? (
                     <QueueMessage kind="error" onRetry={() => window.location.assign(window.location.pathname)} />
                   ) : (
@@ -364,6 +375,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                             onOpen={open}
                             jump={jump}
                             onSeeAll={() => openLocal({ kind: "needs" })}
+                            controls={deckControls}
                           />
                         ) : (
                           <QueueMessage kind="filtered" onClear={() => setNeed("all")} />
@@ -390,7 +402,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   className="lg:flex-[3]"
                 />
                 <StatPanel
-                  label="Blocked"
+                  label="Need a fix"
                   value={stuckCount}
                   sub="can’t proceed without you"
                   icon={CircleX}
@@ -401,7 +413,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   onOpen={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
                   openLabel={need === "stuck" ? "Show everything in the deck" : "Show only these in the deck"}
                   pressed={need === "stuck"}
-                  empty="Nothing is blocked."
+                  empty="Nothing needs a fix."
                   className="lg:flex-[2]"
                 />
               </div>
