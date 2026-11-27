@@ -349,7 +349,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
           <>
             {/* Three columns that fill the width: what to review and what's stuck, Needs you with its deck in the
                 middle, what's running and queued. The side cards stretch to the deck's height. */}
-            <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6 [@media(max-height:820px)]:mt-4">
+            <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_528px_minmax(0,1fr)] [@media(max-height:820px)]:mt-4">
               {/* Needs you is a tray, top to bottom of the tiles beside it: its header (the title, the deck's controls on
                   the right) and the deck sit inside it, so nothing floats on the page around the card. */}
               <section

@@ -15,24 +15,26 @@ type Move = "answered" | "later" | "back";
 
 const EASE_OUT = [0.2, 0, 0, 1] as const;
 const EASE_IN = [0.4, 0, 1, 1] as const;
-// The cards under the top one: each lower and a little smaller, so the pile reads as a deck (no rotation, §6.12).
-const BEHIND = [
-  { y: 16, scale: 0.955, opacity: 1 },
-  { y: 32, scale: 0.91, opacity: 0.7 },
-];
+// The cards either side of the top one: the next on the right and the one before on the left, each a little smaller
+// and tilted out to its side, so the deck reads as browsing left and right, as its ‹ › do. Only resting cards tilt;
+// the one you hold never does (§6.12).
+const PILE = {
+  next: { x: 22, rotate: 3.5, scale: 0.94 },
+  prev: { x: -22, rotate: -3.5, scale: 0.94 },
+} as const;
 const SWIPE = 110; // px dragged, or …
 const FLICK = 500; // … px/s flicked, to count as a swipe
 const SAY_MS = 700; // how long the card says what happened before it leaves
 
+// Later: the top card goes into the left pile and the right one comes forward. Back: the reverse. Answered: it lifts
+// away and the right one comes forward.
 const variants = {
-  enter: (m: Move) => (m === "back" ? { opacity: 0, x: -56, y: 0, scale: 1 } : { opacity: 0, x: 0, y: BEHIND[0].y, scale: BEHIND[0].scale }),
-  center: { opacity: 1, x: 0, y: 0, scale: 1, transition: { duration: 0.24, ease: EASE_OUT } },
+  enter: (m: Move) => ({ opacity: 0, y: 0, ...(m === "back" ? PILE.prev : PILE.next) }),
+  center: { opacity: 1, x: 0, y: 0, rotate: 0, scale: 1, transition: { duration: 0.26, ease: EASE_OUT } },
   exit: (m: Move) =>
-    m === "later"
-      ? { opacity: 0, x: -80, transition: { duration: 0.15, ease: EASE_IN } }
-      : m === "back"
-        ? { opacity: 0, y: BEHIND[0].y, scale: BEHIND[0].scale, transition: { duration: 0.15, ease: EASE_IN } }
-        : { opacity: 0, y: -28, scale: 0.98, transition: { duration: 0.18, ease: EASE_IN } },
+    m === "answered"
+      ? { opacity: 0, y: -28, scale: 0.98, transition: { duration: 0.18, ease: EASE_IN } }
+      : { opacity: 0, ...(m === "later" ? PILE.prev : PILE.next), transition: { duration: 0.2, ease: EASE_IN } },
 };
 const fades = {
   enter: { opacity: 0 },
@@ -119,8 +121,8 @@ const ICON_BTN =
   "inline-flex size-8 items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)] disabled:opacity-40 disabled:hover:bg-transparent";
 
 /**
- * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the card says what
- * happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
+ * Needs you: one decision at a time, with the next card tilted out on its right and the one before on its left.
+ * Answer and the card says what happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
  * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same. 1–4 choose an
  * answer and Enter sends it.
  * In the tray's header, See all opens every decision in the side panel, each a way into its story's chat.
@@ -142,7 +144,8 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls 
   const byId = new Map(stories.map((s) => [s.id, s]));
   const top = order.length ? byId.get(order[0])! : null;
   const decision = top ? decisionFor(top) : null;
-  const next = order.slice(1).map((id) => byId.get(id)!);
+  // The piles: the next card on the right once there are two, the one before on the left once there are three.
+  const piles = order.length >= 3 ? (["prev", "next"] as const) : order.length === 2 ? (["next"] as const) : [];
   const topId = top?.id ?? null;
   const choice: Choice = picked && picked.id === topId ? picked.choice : 0;
   const select = (c: Choice) => topId !== null && setPicked({ id: topId, choice: c });
@@ -257,21 +260,22 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls 
       }}
       className="min-w-0"
     >
-      {/* The deck: the top card on the next two, with room below for the cards behind. */}
-      <div className="relative pb-8">
-        {BEHIND.slice(0, Math.min(next.length, BEHIND.length))
-          .map((b, i) => (
-            <motion.div
-              key={`behind-${i}`}
-              aria-hidden="true"
-              initial={false}
-              animate={reduced ? { opacity: b.opacity } : b}
-              transition={{ duration: 0.24, ease: EASE_OUT }}
-              style={{ zIndex: 2 - i }}
-              className="absolute inset-x-0 top-0 bottom-8 origin-bottom rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.12)]"
-            />
-          ))
-          .reverse()}
+      {/* The deck: the top card, with the next one tilted out on its right and the one before on its left. */}
+      <div className="relative px-4 sm:px-6">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-4 inset-y-0 sm:inset-x-6">
+          <AnimatePresence initial={false}>
+            {piles.map((side) => (
+              <motion.div
+                key={side}
+                initial={{ opacity: 0, ...PILE[side] }}
+                animate={{ opacity: 1, ...PILE[side] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: EASE_OUT }}
+                className="absolute inset-0 rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.14)]"
+              />
+            ))}
+          </AnimatePresence>
+        </div>
 
         <AnimatePresence initial={false} mode="popLayout" custom={move}>
           <TopCard
