@@ -19,8 +19,8 @@ const EASE_IN = [0.4, 0, 1, 1] as const;
 // and tilted out to its side, so the deck reads as browsing left and right, as its ‹ › do. Only resting cards tilt;
 // the one you hold never does (§6.12).
 const PILE = {
-  next: { x: 22, rotate: 3.5, scale: 0.94 },
-  prev: { x: -22, rotate: -3.5, scale: 0.94 },
+  next: { x: 24, y: 10, rotate: 3.5, scale: 0.95 },
+  prev: { x: -24, y: 10, rotate: -3.5, scale: 0.95 },
 } as const;
 const SWIPE = 110; // px dragged, or …
 const FLICK = 500; // … px/s flicked, to count as a swipe
@@ -29,7 +29,7 @@ const SAY_MS = 700; // how long the card says what happened before it leaves
 // Later: the top card goes into the left pile and the right one comes forward. Back: the reverse. Answered: it lifts
 // away and the right one comes forward.
 const variants = {
-  enter: (m: Move) => ({ opacity: 0, y: 0, ...(m === "back" ? PILE.prev : PILE.next) }),
+  enter: (m: Move) => ({ opacity: 0, ...(m === "back" ? PILE.prev : PILE.next) }),
   center: { opacity: 1, x: 0, y: 0, rotate: 0, scale: 1, transition: { duration: 0.26, ease: EASE_OUT } },
   exit: (m: Move) =>
     m === "answered"
@@ -261,8 +261,9 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls 
       className="min-w-0"
     >
       {/* The deck: the top card, with the next one tilted out on its right and the one before on its left. */}
-      <div className="relative px-4 sm:px-6">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-4 inset-y-0 sm:inset-x-6">
+      {/* Room either side and below for the tilted cards' corners. */}
+      <div className="relative px-5 pb-4 sm:px-6">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 bottom-4 sm:inset-x-6">
           <AnimatePresence initial={false}>
             {piles.map((side) => (
               <motion.div

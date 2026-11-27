@@ -25,10 +25,10 @@ export function DashboardSkeleton() {
           <span className={`${SKELETON} block h-5 w-28`} />
           <span className={`${SKELETON} block h-5 w-24`} />
         </span>
-        <div className="relative mt-4 px-4 sm:px-6">
-          <div className="absolute inset-x-4 inset-y-0 sm:inset-x-6">
-            <div className="absolute inset-0 -translate-x-[22px] -rotate-[3.5deg] scale-[0.94] rounded-[24px] border border-black/[0.06] bg-white" />
-            <div className="absolute inset-0 translate-x-[22px] rotate-[3.5deg] scale-[0.94] rounded-[24px] border border-black/[0.06] bg-white" />
+        <div className="relative mt-4 px-5 pb-4 sm:px-6">
+          <div className="absolute inset-x-5 top-0 bottom-4 sm:inset-x-6">
+            <div className="absolute inset-0 -translate-x-[24px] translate-y-[10px] -rotate-[3.5deg] scale-[0.95] rounded-[24px] border border-black/[0.06] bg-white" />
+            <div className="absolute inset-0 translate-x-[24px] translate-y-[10px] rotate-[3.5deg] scale-[0.95] rounded-[24px] border border-black/[0.06] bg-white" />
           </div>
           <div className="relative rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
             <span className="flex items-center justify-between">
