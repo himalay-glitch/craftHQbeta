@@ -1,0 +1,11 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import { AskPM } from "@/components/ask/AskPM";
+import { askData, askSearch, askViewer } from "@/components/ask/askData";
+
+// Ask PM (demo): the PM answers from the same stories the dashboard shows and routes new work to the team.
+---
+
+<AppLayout title="Ask PM · CraftHQ" viewer={askViewer} search={askSearch}>
+  <AskPM client:load data={askData} />
+</AppLayout>

@@ -1,0 +1,23 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import { AskPM } from "@/components/ask/AskPM";
+import { askData, askSearch, askViewer } from "@/components/ask/askData";
+import { FORMER_IDS, TEAM, isFormerId } from "@/components/ask/team";
+import type { BotId } from "@/types/ask";
+
+// A chat with one agent (demo): /ask/developer, /ask/designer, /ask/tester, /ask/debugger. The PM's own chat is /ask.
+// Rendered on request so `?state=new` (the first-time view: nothing on yet) is known before the page paints.
+export const prerender = false;
+
+const BOTS: BotId[] = ["developer", "designer", "tester", "debugger"];
+// Old links (/ask/builder …) land on the renamed agent's page.
+const asked = Astro.params.bot ?? "";
+if (isFormerId(asked)) return Astro.redirect(`/ask/${FORMER_IDS[asked]}${Astro.url.search}`, 301);
+const bot = asked as BotId;
+if (!BOTS.includes(bot)) return Astro.redirect("/ask");
+const fresh = Astro.url.searchParams.get("state") === "new";
+---
+
+<AppLayout title={`${TEAM[bot].name} · CraftHQ`} viewer={askViewer} search={askSearch}>
+  <AskPM client:load data={askData} bot={bot} fresh={fresh} />
+</AppLayout>
