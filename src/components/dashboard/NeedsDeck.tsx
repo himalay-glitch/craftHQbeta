@@ -102,7 +102,7 @@ function TopCard({
 }
 
 interface NeedsDeckProps {
-  /** The stories that need you, in the queue's order (Stuck first). */
+  /** The stories that need you, in the queue's order (Blocked first). */
   stories: Story[];
   onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
   onOpen: (id: number) => void;
@@ -139,7 +139,7 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
   const next = order.slice(1).map((id) => byId.get(id)!);
   const topId = top?.id ?? null;
 
-  // A story picked beside the deck (Ready to review, Stuck) comes to the top, entering from the left.
+  // A story picked beside the deck (Awaiting review, Blocked) comes to the top, entering from the left.
   const [lastJump, setLastJump] = useState(jump?.key ?? 0);
   if (jump && jump.key !== lastJump) {
     setLastJump(jump.key);

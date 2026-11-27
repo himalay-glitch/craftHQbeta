@@ -65,8 +65,8 @@ type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | { kin
 
 /**
  * The dashboard island (DESIGN.md §5.6: what needs me, what's moving, what shipped), in three columns that fill
- * the width: Ready to review and Stuck on the left, Needs you in the middle (a deck of decisions, one at a time, or
- * the all clear), Running and Queued on the right.
+ * the width: Awaiting review and Blocked on the left, Needs you in the middle (a deck of decisions, one at a time, or
+ * the all clear), Active runs and Queued runs on the right.
  */
 export function Dashboard({ data }: { data: DashboardData }) {
   const override = useStateOverride();
@@ -78,9 +78,9 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const [stories, setStories] = useState(data.stories);
   // Decisions made since the page opened: the all-clear's count.
   const [answered, setAnswered] = useState(0);
-  // Ready to review and Stuck filter the deck; Needs you shows it all again.
+  // Awaiting review and Blocked filter the deck; Show all brings the rest back.
   const [need, setNeed] = useState<"all" | NeedKind>("all");
-  // A story picked in Ready to review or Stuck, for the deck to bring to the top.
+  // A story picked in Awaiting review or Blocked, for the deck to bring to the top.
   const [jump, setJump] = useState<{ id: number; key: number } | null>(null);
   const [localPanel, setLocalPanel] = useState<LocalPanel>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -276,7 +276,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
     else if (answer.option.choice.kind === "act") act(story, answer.option.choice.action);
   };
 
-  // A story picked in Ready to review or Stuck: bring that card to the top, showing the whole deck if the filter
+  // A story picked in Awaiting review or Blocked: bring that card to the top, showing the whole deck if the filter
   // hides it.
   const pick = (id: number) => {
     if (!visible.some((s) => s.id === id)) setNeed("all");
@@ -331,7 +331,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                     Needs you
                     <span className="font-normal text-[var(--tx2)] tabular-nums">{visible.length}</span>
                   </h2>
-                  {/* Only while a tile (Ready to review, Stuck) filters the deck: the way back to all of it. */}
+                  {/* Only while a tile (Awaiting review, Blocked) filters the deck: the way back to all of it. */}
                   {need !== "all" && (
                     <button
                       type="button"
@@ -376,7 +376,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:order-1 lg:flex lg:flex-col lg:gap-6">
                 <StatPanel
-                  label="Ready to review"
+                  label="Awaiting review"
                   value={reviewCount}
                   sub="waiting on you"
                   icon={GitPullRequest}
@@ -386,13 +386,13 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   onOpen={() => setNeed((n) => (n === "review" ? "all" : "review"))}
                   openLabel={need === "review" ? "Show everything in the deck" : "Show only these in the deck"}
                   pressed={need === "review"}
-                  empty="Nothing to review."
+                  empty="Nothing awaiting review."
                   className="lg:flex-[3]"
                 />
                 <StatPanel
-                  label="Stuck"
+                  label="Blocked"
                   value={stuckCount}
-                  sub="not being picked up"
+                  sub="can’t proceed without you"
                   icon={CircleX}
                   tone="negative"
                   ring
@@ -401,16 +401,16 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   onOpen={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
                   openLabel={need === "stuck" ? "Show everything in the deck" : "Show only these in the deck"}
                   pressed={need === "stuck"}
-                  empty="Nothing is stuck."
+                  empty="Nothing is blocked."
                   className="lg:flex-[2]"
                 />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:order-3 lg:flex lg:flex-col lg:gap-6">
                 <StatPanel
-                  label="Running"
+                  label="Active runs"
                   value={data.running.length}
-                  sub={`${running.inProgress} building, ${running.inReview} checking`}
+                  sub={`${running.inProgress} building · ${running.inReview} in checks`}
                   icon={LoaderCircle}
                   tone="active"
                   spin
@@ -418,13 +418,13 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   onItem={open}
                   onOpen={() => openLocal({ kind: "details", tab: "agent" })}
                   openLabel="See what the agents are doing"
-                  empty="The agents are idle."
+                  empty="No active runs. The agents are idle."
                   className="lg:flex-[3]"
                 />
                 <StatPanel
-                  label="Queued"
+                  label="Queued runs"
                   value={data.queued}
-                  sub={`checked ${data.loopTick}`}
+                  sub={`last polled ${data.loopTick}`}
                   icon={Clock}
                   tone="neutral"
                   items={[]}

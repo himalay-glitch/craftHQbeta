@@ -79,8 +79,8 @@ export function ActivityPanel(p: ActivityPanelProps) {
             </div>
             <div className="mt-2 grid grid-cols-2 overflow-hidden rounded-[12px] border border-[var(--card-line)]">
               {[
-                { n: p.running.length, l: "Running" },
-                { n: p.queued, l: "Queued" },
+                { n: p.running.length, l: "Active runs" },
+                { n: p.queued, l: "Queued runs" },
               ].map((c, i) => (
                 <div key={c.l} className={`px-4 py-3 ${i ? "border-l border-[var(--card-line)]" : ""}`}>
                   <span className="block text-[24px] leading-8 tabular-nums">{c.n}</span>
@@ -90,7 +90,7 @@ export function ActivityPanel(p: ActivityPanelProps) {
             </div>
 
             <h3 className={`${SECTION} mt-6 flex justify-between`}>
-              Running <span className="tabular-nums">{p.running.length}</span>
+              Active runs <span className="tabular-nums">{p.running.length}</span>
             </h3>
             <ul className="mt-1">
               {p.running.map((r) => (
@@ -113,7 +113,7 @@ export function ActivityPanel(p: ActivityPanelProps) {
               ))}
             </ul>
             <p className="mt-4 text-[13px] leading-[18px] text-[var(--tx2)]">
-              Stuck stories are on the main list, because they need a person.
+              Blocked stories are in Needs you, because they need a person.
             </p>
           </>
         ) : (

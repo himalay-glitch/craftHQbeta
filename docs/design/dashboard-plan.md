@@ -24,16 +24,16 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ├────┬─────────────────────────────────────────────────────────────────────────────────────────┤
 │ ▦  │ WePop                                                                  ( + New story )  │
 │ ☰  │ ⚡ GitHub isn't connected, so the agents can't start work. Connect GitHub                 │
-│    │ ┌ ⇅ Ready to review ─┐   Needs you 14                         ┌ ◌ Running ─────────┐    │
+│    │ ┌ ⇅ Awaiting review ─┐   Needs you 14                         ┌ ◌ Active runs ─────┐    │
 │    │ │ 5                   │  ┌──────────────────────────────┐    │ 9                   │    │
-│    │ │ waiting on you      │  │ (Failed)                     │    │ 2 building, 7 check │    │
+│    │ │ waiting on you      │  │ (Failed)                     │    │ 2 building · 7 in c │    │
 │    │ │                     │  │ It's stuck: preview could    │    │                     │    │
 │    │ │ Creation flow rev…  │  │ not start. Try again?        │    │ Test Story-add sam… │    │
 │    │ │ Event Discuss tab…  │  │ Test story hq-21 · Start its…│    │ Your calendar: see… │    │
 │    │ │ + 2 more            │  │ ┌──────────────────────────┐ │    │ + 6 more            │    │
-│    │ ├ ✕ Stuck ────────────┤  │ │1 Try again   Recommended │ │    ├ ◷ Queued ───────────┤    │
+│    │ ├ ✕ Blocked ──────────┤  │ │1 Try again   Recommended │ │    ├ ◷ Queued runs ──────┤    │
 │    │ │ 2                   │  │ │2 Back to planning        │ │    │ 0                   │    │
-│    │ │ not being picked up │  │ │3 Cancel it               │ │    │ checked just now    │    │
+│    │ │ can’t proceed witho │  │ │3 Cancel it               │ │    │ last polled just now│    │
 │    │ │ Test story          │  │ │4 Other: add a note…      │ │    │ New work starts as… │    │
 │    │ │ Android: change t…  │  │ └──────────────────────────┘ │    │                     │    │
 │    │ └─────────────────────┘  └──────────────────────────────┘    └─────────────────────┘    │
@@ -60,21 +60,23 @@ Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 p
 The project's name (21/28) and **New story**, a secondary button: the page's one solid answer is the recommended one on the deck.
 
 ### Stats beside the deck (`StatPanel`)
+Named the way engineers name CI and review states (Himalay, 27 Nov): Awaiting review, Blocked, Active runs, Queued runs. Needs you keeps its name. The See all groups and the Details panel use the same words.
+
 Each is a KPI tile (`DESIGN.md` §5.6): its solid indicator (`Indicator`, 20 px) and label, the number (30/36 medium), one line, then up to three story titles (no ids, no times) and "+ n more". A hairline border and no shadow; no dividers and no footer rows. The label and number are one button, the tile's action; each title is its own button. Every tile reads the same way down; what's left of its height stays at its foot.
 
 | Tile | Side | Number, line | Titles | Action (label and number) |
 |---|---|---|---|---|
-| Ready to review | left | review stories waiting on you, "waiting on you" | picking one brings its card to the top of the deck | filters the deck to reviews; again shows everything |
-| Stuck | left | stuck stories, "not being picked up"; red with the alert ring | picking one brings its card to the top | filters the deck to stuck stories |
-| Running | right | stories the agents are on, "2 building, 7 checking"; green, turning | Building first; each opens the story panel | the Details panel |
-| Queued | right | waiting to start, "checked just now"; grey | "New work starts as soon as it's approved." | the Details panel |
+| Awaiting review | left | review stories waiting on you, "waiting on you" | picking one brings its card to the top of the deck | filters the deck to reviews; again shows everything |
+| Blocked | left | stuck stories, "can't proceed without you"; red with the alert ring | picking one brings its card to the top | filters the deck to stuck stories |
+| Active runs | right | stories the agents are on, "2 building · 7 in checks"; green, turning | Building first; each opens the story panel | the Details panel |
+| Queued runs | right | waiting to start, "last polled just now"; grey | "New work starts as soon as it's approved." | the Details panel |
 
 While a tile filters the deck, its border turns blue.
 
-**Needs you** heads the middle column: the title and the deck's count in grey. There's no filter control on it: the Ready to review and Stuck tiles filter the deck, and only while one does, **Show all 14** appears on the right to bring the rest back.
+**Needs you** heads the middle column: the title and the deck's count in grey. There's no filter control on it: the Awaiting review and Blocked tiles filter the deck, and only while one does, **Show all 14** appears on the right to bring the rest back.
 
 ### The stage: Needs you (`NeedsDeck`, `DecisionCard`, `decisions.ts`)
-One decision at a time: the stories waiting on you, plus Stuck, in the prototype's group order (Stuck first).
+One decision at a time: the stories waiting on you, plus the blocked ones, in the prototype's group order (Blocked first).
 
 - **The card:** the status pill and when it last changed; the question as the headline (20/28 semibold: "It passed its checks, but main has moved on since it was built. Rebuild it before it merges?"); then one quiet line: the story's title (underlined; opens the story panel), its ID and the facts, joined by " · " ("6 of 8 checks passed", "Preview ready", a sentence of context), with a failing fact in red ink. No agent is named on the card: the agents are in the sidebar.
 - **Answers:** four rows in one rounded list, split by hairlines, the way Claude asks a question. Rows 1–3 each have a plain number (its key), the answer and what it does in a grey line under it. The first is the recommended one: a pale blue row, a blue number and "Recommended" in blue. Row 4 is Other, a box ("Other: ask for changes…", "Other: add a note…"); Enter sends what you write as a note with the right intent.
@@ -83,7 +85,7 @@ One decision at a time: the stories waiting on you, plus Stuck, in the prototype
 - **The pile:** two cards under the top one, 16 and 32 px lower and a little smaller, so it reads as a deck. No rotation, ever (`DESIGN.md` §6.12).
 - **Browsing:** swiping only browses, so a stray swipe never approves anything: left sends the card to the back, right brings the last one back, with a "Later ›" or "‹ Back" tag fading in as you drag; the card lifts to 1.02 while held. ← → and the round arrow buttons do the same; 1–3 answer; the keys work in the deck, or anywhere while nothing else has the keyboard and no panel or menu is open. The numbers on the answers are their keys, so there's no hint line.
 - **Under the deck:** three quiet controls, centred: ‹ (Back), **See all** and › (Later). With one card left they go.
-- **See all (`NeedsPanel`):** the right-hand side panel (`SidePanel`; over the page from 1024 px, full width with a scrim below), titled Needs you with the count above and "Open one to answer it in the story's chat." Every decision on the deck as a list of small horizontal cards, grouped by kind in the queue's order. Each card: a chat mark in a soft square (blue on hover), the story's title (14/20 medium) with when on the right, and under it the ID and the question. When a group's cards all ask the same question (Ready to review), it's said once under the group's name ("Each asks: …") and the cards show only the ID. A card is a link to the story's chat on the Stories page (`/stories/hq-21`), where the question is asked and answered. It never drops down over the card.
+- **See all (`NeedsPanel`):** the right-hand side panel (`SidePanel`; over the page from 1024 px, full width with a scrim below), titled Needs you with the count above and "Open one to answer it in the story's chat." Every decision on the deck as a list of small horizontal cards, grouped by kind in the queue's order. Each card: a chat mark in a soft square (blue on hover), the story's title (14/20 medium) with when on the right, and under it the ID and the question. When a group's cards all ask the same question (Awaiting review), it's said once under the group's name ("Each asks: …") and the cards show only the ID. A card is a link to the story's chat on the Stories page (`/stories/hq-21`), where the question is asked and answered. It never drops down over the card.
 
 ### All clear (`AllClear`)
 `DESIGN.md` §6.7: the PM (64 px, blinking), "Nothing needs you", "The agents will ask here when they need you.", centred, at most 360 px wide, no action; plus "You answered 14 decisions" when you cleared it yourself.

@@ -18,7 +18,7 @@ const chatHref = (id: number) => `/stories/${storyRef(id)}`;
 /**
  * See all: every decision on the deck, in the side panel that slides in from the right, as a list of small
  * horizontal cards grouped by kind. Each card is its story's title with the question under it; opening one goes to
- * that story's chat on the Stories page. A question every card in a group shares (Ready to review) is said once,
+ * that story's chat on the Stories page. A question every card in a group shares (Awaiting review) is said once,
  * under the group's name, and those cards show the story's ID instead.
  */
 export function NeedsPanel({ stories, isWide, onClose }: NeedsPanelProps) {
