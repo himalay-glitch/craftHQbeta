@@ -1,9 +1,10 @@
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUp, ArrowUpRight, Check } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { Story } from "@/types/dashboard";
 import type { Decision, DecisionOption } from "./decisions";
+import { BTN_PRIMARY } from "./classes";
 import { NEED_STATUS, storyRef } from "./format";
 
 interface DecisionCardProps {
@@ -11,23 +12,36 @@ interface DecisionCardProps {
   decision: Decision;
   /** What happened, said on the card as it leaves. */
   sent: string | null;
+  /** The chosen answer: an option's index, or Other. */
+  choice: Choice;
+  onSelect: (choice: Choice) => void;
+  /** Sends the chosen option. */
   onChoose: (option: DecisionOption) => void;
   onReply: (text: string) => void;
   onOpen: () => void;
 }
 
-const ROW = "flex w-full gap-3 px-4 py-3 text-left transition-colors duration-[120ms] outline-none";
-const NUM = "w-3 flex-none pt-px text-[13px] leading-5 font-medium tabular-nums";
+export type Choice = number | "other";
+
+const ROW = "flex w-full gap-3 px-4 py-3 text-left transition-colors duration-[120ms]";
+// A native radio, drawn: a grey ring, and when chosen a thick blue ring around a white dot.
+const RADIO =
+  "mt-0.5 size-4 flex-none cursor-pointer appearance-none rounded-full border-[1.5px] border-[#B8B9BD] bg-white outline-none " +
+  "transition-[border-width,border-color] duration-[120ms] checked:border-[5px] checked:border-[var(--cta)]";
 
 /**
  * One decision, on a tall card: its status, the question as the headline, the story it's about and the facts in
- * one line (DESIGN.md §2.2). Then the answers as one list, the way Claude asks: three to pick, numbered, the
- * recommended one first, and the fourth, Other, a box to write your own.
+ * one line (DESIGN.md §2.2). Then the answers as a radio list (§6.2): three to pick, the recommended one first and
+ * chosen to start with, and the fourth, Other, a box to write your own; then the one button, which says what
+ * sending does ("Try again", "Send note").
  */
-export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen }: DecisionCardProps) {
+export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose, onReply, onOpen }: DecisionCardProps) {
   const [text, setText] = useState("");
+  const otherRef = useRef<HTMLInputElement>(null);
   const qId = `deck-q-${story.id}`;
+  const group = `deck-a-${story.id}`;
   const otherKey = decision.options.length + 1;
+  const chosen = choice === "other" ? null : decision.options[choice];
 
   return (
     <article aria-labelledby={qId} className="relative">
@@ -58,80 +72,108 @@ export function DecisionCard({ story, decision, sent, onChoose, onReply, onOpen 
         ))}
       </p>
 
-      {/* The answers, as one list: three to pick, the recommended one first, then Other to write your own. */}
-      <ul
-        aria-label="Your answer"
-        className="mt-5 list-none divide-y divide-[var(--line)] overflow-hidden rounded-[16px] border border-[var(--card-line)]"
+      {/* The answers, as one radio list: three to pick, the recommended one first and chosen to start with, then Other
+          to write your own. Nothing happens until you send, with the button that says what will happen. */}
+      <form
+        data-deck-form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (choice !== "other") onChoose(decision.options[choice]);
+          else if (text.trim()) onReply(text.trim());
+          else otherRef.current?.focus();
+        }}
+        onKeyDown={(e) => {
+          // Enter on a radio sends the chosen answer.
+          if (e.key === "Enter" && (e.target as HTMLInputElement).type === "radio") {
+            e.preventDefault();
+            e.currentTarget.requestSubmit();
+          }
+        }}
+        className="mt-5"
       >
-        {decision.options.map((o, i) => {
-          const recommended = i === 0;
-          return (
-            <li key={o.label}>
-              <button
-                type="button"
-                aria-keyshortcuts={String(i + 1)}
-                onClick={() => onChoose(o)}
-                className={`${ROW} items-start focus-visible:shadow-[inset_0_0_0_2px_var(--cta)] ${
-                  recommended ? "bg-[#F5F8FF] hover:bg-[#EDF3FF]" : "bg-white hover:bg-[var(--row-h)]"
+        <fieldset className="min-w-0 divide-y divide-[var(--line)] overflow-hidden rounded-[16px] border border-[var(--card-line)]">
+          <legend className="sr-only">Your answer</legend>
+          {decision.options.map((o, i) => {
+            const on = choice === i;
+            return (
+              <label
+                key={o.label}
+                className={`${ROW} cursor-pointer has-[:focus-visible]:shadow-[inset_0_0_0_2px_var(--cta)] ${
+                  on ? "bg-[#F5F8FF]" : "bg-white hover:bg-[var(--row-h)]"
                 }`}
               >
-                <span aria-hidden="true" className={`${NUM} ${recommended ? "text-[var(--cta)]" : "text-[var(--tx2)]"}`}>
-                  {i + 1}
-                </span>
+                <input
+                  type="radio"
+                  name={group}
+                  checked={on}
+                  onChange={() => onSelect(i)}
+                  aria-keyshortcuts={String(i + 1)}
+                  className={RADIO}
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[14px] leading-5 font-medium text-[var(--tx)]">
                     {o.label}
-                    {recommended && <span className="ml-2 text-[12px] font-medium text-[#1F57C3]">Recommended</span>}
+                    {i === 0 && <span className="ml-2 text-[12px] font-medium text-[#1F57C3]">Recommended</span>}
                   </span>
                   <span className="mt-0.5 block text-[13px] leading-[18px] text-[var(--tx2)]">{o.detail}</span>
                 </span>
                 {o.choice.kind === "open" && (
                   <ArrowUpRight aria-hidden="true" size={16} strokeWidth={1.75} className="mt-0.5 flex-none text-[var(--tx2)]" />
                 )}
-              </button>
-            </li>
-          );
-        })}
+              </label>
+            );
+          })}
 
-        {/* 4: Other, with its own box. Enter sends it as a note on the story. */}
-        <li>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (text.trim()) onReply(text.trim());
-            }}
-            className={`${ROW} items-center py-1.5 pr-1.5 focus-within:shadow-[inset_0_0_0_2px_var(--cta)]`}
+          {/* Other: its radio and its box. Typing in the box chooses it. */}
+          <div
+            className={`${ROW} items-center py-1.5 has-[:focus-visible]:shadow-[inset_0_0_0_2px_var(--cta)] ${
+              choice === "other" ? "bg-[#F5F8FF]" : "bg-white"
+            }`}
           >
-            <span aria-hidden="true" className="w-3 flex-none text-[13px] leading-5 font-medium text-[var(--tx2)] tabular-nums">
-              {otherKey}
-            </span>
             <input
+              type="radio"
+              name={group}
+              checked={choice === "other"}
+              onChange={() => {
+                onSelect("other");
+                otherRef.current?.focus();
+              }}
+              aria-label="Other"
+              aria-keyshortcuts={String(otherKey)}
+              className={`${RADIO} mt-0`}
+            />
+            <input
+              ref={otherRef}
               data-deck-other
               value={text}
+              onFocus={() => onSelect("other")}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   e.stopPropagation();
                   setText("");
+                  onSelect(0);
                   (e.target as HTMLInputElement).blur();
                 }
               }}
               placeholder={`Other: ${decision.reply.placeholder.charAt(0).toLowerCase()}${decision.reply.placeholder.slice(1)}`}
               aria-label="Other: write your own answer"
-              aria-keyshortcuts={String(otherKey)}
               className="h-9 min-w-0 flex-1 bg-transparent text-[14px] leading-5 text-[var(--tx)] outline-none placeholder:text-[var(--tx2)]"
             />
-            <button
-              type="submit"
-              disabled={!text.trim()}
-              aria-label="Send"
-              className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-[var(--cta)] text-white transition-opacity duration-[120ms] disabled:opacity-0"
-            >
-              <ArrowUp aria-hidden="true" size={16} strokeWidth={2} />
-            </button>
-          </form>
-        </li>
-      </ul>
+          </div>
+        </fieldset>
+
+        {/* The one button: it says what sending does. */}
+        <div className="mt-4 flex justify-end">
+          <button type="submit" disabled={choice === "other" && !text.trim()} className={`${BTN_PRIMARY} h-10 px-4`}>
+            {chosen ? chosen.label : "Send note"}
+            {chosen?.choice.kind === "open" && <ArrowUpRight aria-hidden="true" size={16} strokeWidth={2} />}
+            <kbd aria-hidden="true" className="hidden font-sans text-white/70 [@media(pointer:fine)]:inline">
+              ↵
+            </kbd>
+          </button>
+        </div>
+      </form>
 
       {/* What happened, as the card leaves. */}
       {sent !== null && (

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Story } from "@/types/dashboard";
-import { DecisionCard } from "./DecisionCard";
+import { DecisionCard, type Choice } from "./DecisionCard";
 import { decisionFor, type DecisionOption, type DecisionReply } from "./decisions";
 
 type KeyLike = Pick<globalThis.KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "preventDefault"> & {
@@ -118,7 +118,8 @@ const ICON_BTN =
 /**
  * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the card says what
  * happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
- * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same, and 1–3 answer.
+ * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same. 1–4 choose an
+ * answer and Enter sends it.
  * Under the deck, See all opens every decision in the side panel, each a way into its story's chat.
  */
 export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDeckProps) {
@@ -126,6 +127,8 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
   const [seq, setSeq] = useState<number[]>([]);
   const [move, setMove] = useState<Move>("answered");
   const [sent, setSent] = useState<{ id: number; text: string } | null>(null);
+  // The chosen answer on the top card; a card that hasn't been touched starts on the recommended one.
+  const [picked, setPicked] = useState<{ id: number; choice: Choice } | null>(null);
   const root = useRef<HTMLElement>(null);
   const hadFocus = useRef(false);
 
@@ -138,6 +141,8 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
   const decision = top ? decisionFor(top) : null;
   const next = order.slice(1).map((id) => byId.get(id)!);
   const topId = top?.id ?? null;
+  const choice: Choice = picked && picked.id === topId ? picked.choice : 0;
+  const select = (c: Choice) => topId !== null && setPicked({ id: topId, choice: c });
 
   // A story picked beside the deck (Awaiting review, Blocked) comes to the top, entering from the left.
   const [lastJump, setLastJump] = useState(jump?.key ?? 0);
@@ -192,11 +197,18 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
     answer(top, r.says, () => onDecide(top, { reply: r, text }));
   };
 
-  // ← → browse, 1–3 answer: inside the deck, or anywhere while nothing else has the keyboard and no panel is open.
+  // ← → browse, 1–4 choose an answer, Enter sends it: inside the deck, or anywhere while nothing else has the
+  // keyboard and no panel is open. On a radio, the arrows are the radio group's own.
   const onKeyDown = (e: KeyLike) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if ((e.target as HTMLElement | null)?.closest?.("textarea, input, select, [contenteditable='true']")) return;
-    if (e.key === "ArrowRight") {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.("textarea, select, [contenteditable='true'], input:not([type='radio'])")) return;
+    const onRadio = target instanceof HTMLInputElement && target.type === "radio";
+    if (onRadio && e.key.startsWith("Arrow")) return;
+    if (e.key === "Enter" && target === document.body) {
+      e.preventDefault();
+      root.current?.querySelector<HTMLFormElement>(`[data-deck-id="${topId}"] [data-deck-form]`)?.requestSubmit();
+    } else if (e.key === "ArrowRight") {
       e.preventDefault();
       later();
     } else if (e.key === "ArrowLeft") {
@@ -204,13 +216,13 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
       back();
     } else if (decision && /^[1-9]$/.test(e.key)) {
       const n = Number(e.key);
-      const option = decision.options[n - 1];
-      if (option) {
+      if (decision.options[n - 1]) {
         e.preventDefault();
-        choose(option);
+        select(n - 1);
       } else if (n === decision.options.length + 1) {
-        // The last number is Other: it puts you in its box.
+        // The last number is Other: it chooses it and puts you in its box.
         e.preventDefault();
+        select("other");
         root.current?.querySelector<HTMLInputElement>(`[data-deck-id="${topId}"] [data-deck-other]`)?.focus();
       }
     }
@@ -271,6 +283,8 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
               story={top}
               decision={decision}
               sent={sent?.id === top.id ? sent.text : null}
+              choice={choice}
+              onSelect={select}
               onChoose={choose}
               onReply={reply}
               onOpen={() => onOpen(top.id)}
@@ -279,8 +293,7 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
         </AnimatePresence>
       </div>
 
-      {/* Under the deck: back, See all (the side panel with every decision), later. The numbers on the answers are
-          their keys, so there's no hint line. */}
+      {/* Under the deck: back, See all (the side panel with every decision), later. */}
       {order.length > 1 && (
         <div className="flex items-center justify-center gap-1">
           <button type="button" onClick={back} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
