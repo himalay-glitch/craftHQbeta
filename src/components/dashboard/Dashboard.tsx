@@ -61,6 +61,8 @@ function useIsWide() {
 const visibleStoryButton = (id: number) =>
   Array.from(document.querySelectorAll<HTMLElement>(`[data-story="${id}"]`)).find((el) => el.offsetParent !== null);
 
+const NOTICE_KEY = "crafthq.setupNotice.dismissed";
+
 type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | { kind: "needs" } | null;
 
 /**
@@ -73,6 +75,16 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const urlStory = useUrlStory();
   const isWide = useIsWide();
   const setup = useConnectionSetup();
+  // The setup notice, once dismissed, stays hidden in this browser until something else is missing.
+  const missingKey = setup.missing.join(",");
+  const [dismissed, setDismissed] = useState<string | null>(() => {
+    try {
+      return window.localStorage.getItem(NOTICE_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const noticeShown = setup.missing.length > 0 && dismissed !== missingKey;
 
   const reduced = useReducedMotion();
   const [stories, setStories] = useState(data.stories);
@@ -294,6 +306,16 @@ export function Dashboard({ data }: { data: DashboardData }) {
     showToast(`${storyRef(id)} added. The agent drafts the spec from it.`, { label: "Open", run: () => open(id) });
   };
 
+  const dismissNotice = () => {
+    setDismissed(missingKey);
+    try {
+      window.localStorage.setItem(NOTICE_KEY, missingKey);
+    } catch {
+      // Private windows: it's hidden for now, and comes back next time.
+    }
+    showToast("Hidden. Connect accounts any time from Connectors in the sidebar.");
+  };
+
   const copyLink = () => {
     navigator.clipboard
       .writeText(window.location.href)
@@ -306,19 +328,20 @@ export function Dashboard({ data }: { data: DashboardData }) {
   return (
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
       {/* Panels float over the page from the right; the page keeps its full width underneath. */}
-      <main id="main" className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-20 md:px-8">
-        <div className="flex items-center justify-between gap-4">
-          <h1 id="dashboard-title" tabIndex={-1} className="text-[21px] leading-7 font-medium tracking-[-0.01em] text-[var(--tx)] outline-none">
-            {/* The project's name, not "Dashboard": the nav already says which page this is. */}
-            {data.project}
-          </h1>
-          <button type="button" className={`${BTN_SECONDARY} flex-none`} onClick={() => openLocal({ kind: "new" })}>
+      {/* No page scroll on a desktop: the columns fit the window, and tighten on short screens (820 px and less). */}
+      <main id="main" className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-6 md:px-8 [@media(max-height:820px)]:pt-4 [@media(max-height:820px)]:pb-4">
+        {/* The project's name is in the top bar, after the logo; the page keeps it as its heading for screen readers. */}
+        <h1 id="dashboard-title" tabIndex={-1} className="sr-only">
+          {data.project} dashboard
+        </h1>
+        {/* One line: what's missing (until it's dismissed), and New story on the right. */}
+        <div className="flex min-h-8 flex-wrap items-center gap-x-4 gap-y-2">
+          {!setup.open && noticeShown && <SetupBanner missing={setup.missing} onConnect={setup.reopen} onDismiss={dismissNotice} />}
+          <button type="button" className={`${BTN_SECONDARY} ml-auto flex-none`} onClick={() => openLocal({ kind: "new" })}>
             <Plus aria-hidden="true" size={16} strokeWidth={2} />
             New story
           </button>
         </div>
-
-        {!setup.open && <SetupBanner missing={setup.missing} onConnect={setup.reopen} />}
 
         {override === "loading" ? (
           <DashboardSkeleton />
@@ -326,12 +349,12 @@ export function Dashboard({ data }: { data: DashboardData }) {
           <>
             {/* Three columns that fill the width: what to review and what's stuck, Needs you with its deck in the
                 middle, what's running and queued. The side cards stretch to the deck's height. */}
-            <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
+            <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6 [@media(max-height:820px)]:mt-4">
               {/* Needs you is a tray, top to bottom of the tiles beside it: its header (the title, the deck's controls on
                   the right) and the deck sit inside it, so nothing floats on the page around the card. */}
               <section
                 aria-labelledby="needs-title"
-                className="flex min-w-0 flex-col rounded-[20px] border border-black/[0.05] bg-black/[0.025] p-3 sm:p-4 lg:order-2 lg:p-5"
+                className="flex min-w-0 flex-col rounded-[20px] border border-black/[0.05] bg-black/[0.025] p-3 sm:p-4 lg:order-2 lg:p-5 [@media(min-width:1024px)_and_(max-height:820px)]:p-4"
               >
                 <header className="flex h-8 items-center justify-between gap-3 pl-1">
                   <h2 id="needs-title" className="flex min-w-0 items-center gap-2 text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
@@ -354,7 +377,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   <div ref={setDeckControls} className="flex flex-none items-center gap-0.5" />
                 </header>
 
-                <div className="mt-4 flex-1">
+                <div className="mt-4 flex-1 [@media(max-height:820px)]:mt-3">
                   {override === "error" ? (
                     <QueueMessage kind="error" onRetry={() => window.location.assign(window.location.pathname)} />
                   ) : (

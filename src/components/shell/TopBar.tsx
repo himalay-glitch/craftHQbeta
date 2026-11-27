@@ -11,20 +11,22 @@ interface TopBarProps {
   search: SearchItem[];
   /** The current path, from the page, so the right link shows as current. */
   current: string;
+  /** The project this is, after the logo and a faint rule. */
+  project?: string;
 }
 
 /**
  * The app's top bar, 48 px on the reference's light grey and the full width of the window, as in Asana:
- * the glass wordmark on the left, search in the middle, the account menu on the right. The main links
+ * the CHQ mark and the project's name on the left, search in the middle, the account menu on the right. The main links
  * live in the sidebar; below 1024 px, where there's no sidebar, they're in a menu here.
  */
-export function TopBar({ viewer, search, current }: TopBarProps) {
+export function TopBar({ viewer, search, current, project }: TopBarProps) {
   const path = currentPath(current);
   return (
     <Tooltip.Provider delayDuration={400}>
       <header className="sticky top-0 z-40 h-[var(--bar-h)] bg-[var(--bar)]">
         <div className="flex h-full items-center gap-2 px-4 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-4">
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 items-center gap-1">
             <DropdownMenu.Root modal={false}>
               <DropdownMenu.Trigger aria-label="Menu" className={`${ICON_BTN} -ml-1.5 lg:hidden`}>
                 <Menu aria-hidden="true" size={18} strokeWidth={1.5} />
@@ -55,6 +57,12 @@ export function TopBar({ viewer, search, current }: TopBarProps) {
                 className="block h-6 w-auto"
               />
             </a>
+            {project && (
+              <>
+                <span aria-hidden="true" className="mx-2.5 h-4 w-px flex-none bg-black/[0.12]" />
+                <span className="min-w-0 truncate text-[14px] leading-5 font-medium text-[var(--tx)]">{project}</span>
+              </>
+            )}
           </div>
 
           <div className="ml-auto lg:ml-0">

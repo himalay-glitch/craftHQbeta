@@ -80,7 +80,7 @@ function TopCard({
       whileDrag={{ scale: 1.02, cursor: "grabbing" }}
       onDragEnd={onDragEnd}
       style={{ x, zIndex: 3 }}
-      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
+      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6 [@media(min-width:640px)_and_(max-height:820px)]:p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
     >
       {/* Swipe hints, fading in with the drag. */}
       <motion.span

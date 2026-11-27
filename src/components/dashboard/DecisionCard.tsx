@@ -50,7 +50,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
         {story.updated && <span className="truncate">{story.updated}</span>}
       </p>
 
-      <h3 id={qId} className="mt-4 text-[20px] leading-7 font-semibold tracking-[-0.012em] text-pretty text-[var(--tx)]">
+      <h3 id={qId} className="mt-4 text-[20px] [@media(max-height:820px)]:mt-3 leading-7 font-semibold tracking-[-0.012em] text-pretty text-[var(--tx)]">
         {decision.question}
       </h3>
 
@@ -89,7 +89,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
             e.currentTarget.requestSubmit();
           }
         }}
-        className="mt-5"
+        className="mt-5 [@media(max-height:820px)]:mt-4"
       >
         <fieldset className="min-w-0 divide-y divide-[var(--line)] overflow-hidden rounded-[16px] border border-[var(--card-line)]">
           <legend className="sr-only">Your answer</legend>
@@ -98,7 +98,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
             return (
               <label
                 key={o.label}
-                className={`${ROW} cursor-pointer has-[:focus-visible]:shadow-[inset_0_0_0_2px_var(--cta)] ${
+                className={`${ROW} cursor-pointer [@media(max-height:820px)]:py-2.5 has-[:focus-visible]:shadow-[inset_0_0_0_2px_var(--cta)] ${
                   on ? "bg-[#F5F8FF]" : "bg-white hover:bg-[var(--row-h)]"
                 }`}
               >
@@ -164,7 +164,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
         </fieldset>
 
         {/* The one button: it says what sending does. */}
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-end [@media(max-height:820px)]:mt-3">
           <button type="submit" disabled={choice === "other" && !text.trim()} className={`${BTN_PRIMARY} h-10 px-4`}>
             {chosen ? chosen.label : "Send note"}
             {chosen?.choice.kind === "open" && <ArrowUpRight aria-hidden="true" size={16} strokeWidth={2} />}
@@ -181,7 +181,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.15 }}
-          className="absolute -inset-5 z-10 flex flex-col sm:-inset-6 items-center justify-center rounded-[24px] bg-white px-6 text-center"
+          className="absolute -inset-5 z-10 flex flex-col sm:-inset-6 [@media(min-width:640px)_and_(max-height:820px)]:-inset-5 items-center justify-center rounded-[24px] bg-white px-6 text-center"
         >
           <span className="inline-flex size-11 items-center justify-center rounded-full bg-[#16A34A] text-white">
             <Check aria-hidden="true" size={22} strokeWidth={2.5} />
