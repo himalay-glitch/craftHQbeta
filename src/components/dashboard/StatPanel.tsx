@@ -36,12 +36,12 @@ interface StatPanelProps {
   className?: string;
 }
 
-// The cards' sizes, for working out how many fit: 52 px cards 6 px apart, the "+ n more" line, and a little room
-// kept free at the foot so the last card never touches the tile's edge.
-const CARD_H = 52;
+// The cards' sizes, for working out how many fit: 48 px cards 6 px apart, the "+ n more" line, and a little room
+// kept free at the foot (with the tile's own 16 px padding) so the last card never touches the tile's edge.
+const CARD_H = 48;
 const GAP = 6;
 const MORE_H = 22;
-const KEEP = 12;
+const KEEP = 4;
 const WIDE = "(min-width: 1024px)";
 const fitting = (space: number, total: number) => {
   const per = CARD_H + GAP;
@@ -114,7 +114,7 @@ export function StatPanel(p: StatPanelProps) {
                   type="button"
                   data-story={s.id}
                   onClick={() => p.onItem(s.id)}
-                  className="flex h-[52px] w-full flex-col justify-center gap-0.5 rounded-[10px] border border-[var(--card-line)] bg-[#FAFAFA] px-3 text-left transition-colors duration-[120ms] hover:border-[var(--ctl-h)] hover:bg-white"
+                  className="flex h-[48px] w-full flex-col justify-center gap-0.5 rounded-[10px] border border-[var(--card-line)] bg-[#FAFAFA] px-3 text-left transition-colors duration-[120ms] hover:border-[var(--ctl-h)] hover:bg-white"
                 >
                   <span className="flex w-full items-baseline gap-2">
                     <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] font-medium text-[var(--tx)]">{s.title}</span>
