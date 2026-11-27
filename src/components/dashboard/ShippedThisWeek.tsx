@@ -15,7 +15,7 @@ interface ShippedThisWeekProps {
 /**
  * What shipped (DESIGN.md §5.6, the third question): proof the work is moving, and the way to check it. On the
  * columns' grid: under the left tiles, this week's number as a KPI with the project's progress; beside it, what
- * merged, newest first, each opening its story. No timeline: the merges aren't evenly spaced in time, so points on
+ * merged, newest first, in two columns under the deck and the right tiles, each opening its story. No timeline: the merges aren't evenly spaced in time, so points on
  * a line would say something false.
  */
 export function ShippedThisWeek({ shipped, done, total, onOpen }: ShippedThisWeekProps) {
@@ -25,7 +25,7 @@ export function ShippedThisWeek({ shipped, done, total, onOpen }: ShippedThisWee
       className="grid grid-cols-1 gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)]"
     >
       <div className="px-4">
-        <h2 id="shipped-title" className="flex items-center gap-2 text-[13px] leading-5 text-[var(--tx2)]">
+        <h2 id="shipped-title" className="flex items-center gap-2 text-[13px] leading-5 font-normal text-[var(--tx2)]">
           <Indicator icon={Check} tone="done" on={shipped.length > 0} size={20} />
           Shipped this week
         </h2>
@@ -40,7 +40,7 @@ export function ShippedThisWeek({ shipped, done, total, onOpen }: ShippedThisWee
           Nothing has merged this week yet. Merged stories show here, newest first.
         </p>
       ) : (
-        <ul aria-label="Merged this week, newest first" className="grid list-none grid-cols-1 content-start gap-x-6 sm:grid-cols-2 lg:col-span-2 lg:pt-7">
+        <ul aria-label="Merged this week, newest first" className="grid list-none grid-cols-1 content-start gap-x-6 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-[480px_minmax(0,1fr)] lg:pt-7">
           {shipped.map((s) => (
             <li key={s.id} className="min-w-0">
               <button
