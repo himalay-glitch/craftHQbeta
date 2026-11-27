@@ -1,17 +1,70 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronRight, CircleAlert, LoaderCircle, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Indicator, type Tone } from "./Indicator";
 import { storyRef } from "./format";
+
+/** The small mark on a card's left: its checks as a ring, or what state it's in. */
+export type StatMark = { type: "checks"; passed: number; total: number } | { type: "alert" } | { type: "building" } | { type: "checking" };
 
 export interface StatItem {
   id: number;
   title: string;
-  /** The card's second line, after the ID: "8 of 8 checks passed", "Building", why it stopped. */
+  /** The card's second line, after the ID: "All 24 checks passed", "Building", why it stopped. */
   detail?: string;
   /** When, on the right of the title. */
   time?: string;
-  /** An agent is on it right now: a small green dot, pulsing. */
-  live?: boolean;
+  mark?: StatMark;
+}
+
+const TINT = {
+  good: "bg-[#E8F6EE] text-[#15803D]",
+  bad: "bg-[#FDECEC] text-[#C62828]",
+  plain: "bg-[#F1F1F2] text-[var(--tx2)]",
+} as const;
+
+/** The checks as a ring that fills as they pass, with a tick when they all have. */
+function ChecksRing({ passed, total }: { passed: number; total: number }) {
+  const r = 6.5;
+  const c = 2 * Math.PI * r;
+  const done = total > 0 ? passed / total : 0;
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
+      <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2.25" />
+      <circle
+        cx="9"
+        cy="9"
+        r={r}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeDasharray={`${c * done} ${c}`}
+        transform="rotate(-90 9 9)"
+      />
+      {passed === total && (
+        <path d="M6.1 9.2 8 11.1l3.9-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      )}
+    </svg>
+  );
+}
+
+function Mark({ mark }: { mark?: StatMark }) {
+  if (!mark) return null;
+  const tint =
+    mark.type === "checks" ? (mark.passed === mark.total ? TINT.good : TINT.bad) : mark.type === "alert" ? TINT.bad : TINT.good;
+  return (
+    <span aria-hidden="true" className={`inline-flex size-7 flex-none items-center justify-center rounded-[8px] ${tint}`}>
+      {mark.type === "checks" ? (
+        <ChecksRing passed={mark.passed} total={mark.total} />
+      ) : mark.type === "alert" ? (
+        <CircleAlert size={15} strokeWidth={2} />
+      ) : mark.type === "building" ? (
+        <LoaderCircle size={15} strokeWidth={2.25} className="motion-safe:animate-spin" />
+      ) : (
+        <ShieldCheck size={15} strokeWidth={2} />
+      )}
+    </span>
+  );
 }
 
 interface StatPanelProps {
@@ -51,7 +104,8 @@ const fitting = (space: number, total: number) => {
 
 /**
  * A KPI tile beside the deck (DESIGN.md §5.6): the label, the number, one line of context, then the stories behind
- * the number as small cards (title and when, then the ID and one fact). On a desktop the tile is as tall as the
+ * the number as small cards: a tinted mark for its state (the checks as a ring, an alert, building, in checks),
+ * the title and when, then the ID as a tag and one fact. On a desktop the tile is as tall as the
  * deck, so it shows as many cards as fit, with "+ n more" when some don't, and a little room left at its foot;
  * on narrower screens, where tiles stack, three.
  */
@@ -114,17 +168,17 @@ export function StatPanel(p: StatPanelProps) {
                   type="button"
                   data-story={s.id}
                   onClick={() => p.onItem(s.id)}
-                  className="flex h-[48px] w-full flex-col justify-center gap-0.5 rounded-[10px] border border-[var(--card-line)] bg-[#FAFAFA] px-3 text-left transition-colors duration-[120ms] hover:border-[var(--ctl-h)] hover:bg-white"
+                  className="flex h-[48px] w-full items-center gap-2.5 rounded-[10px] border border-[var(--card-line)] bg-white px-2.5 text-left shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[transform,border-color,box-shadow] duration-[120ms] hover:-translate-y-px hover:border-[var(--ctl-h)] hover:shadow-[0_6px_14px_-6px_rgb(0_0_0/0.16)] motion-reduce:hover:translate-y-0"
                 >
-                  <span className="flex w-full items-baseline gap-2">
-                    <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] font-medium text-[var(--tx)]">{s.title}</span>
-                    {s.time && <span className="flex-none text-[12px] leading-4 text-[var(--tx2)]">{s.time}</span>}
-                  </span>
-                  <span className="flex w-full min-w-0 items-center gap-1.5 text-[12px] leading-4 text-[var(--tx2)]">
-                    {s.live && <span aria-hidden="true" className="size-1.5 flex-none rounded-full bg-[#16A34A] motion-safe:animate-pulse" />}
-                    <span className="min-w-0 truncate">
-                      <span className="tabular-nums">{storyRef(s.id)}</span>
-                      {s.detail && ` · ${s.detail}`}
+                  <Mark mark={s.mark} />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex w-full items-baseline gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] font-medium text-[var(--tx)]">{s.title}</span>
+                      {s.time && <span className="flex-none text-[12px] leading-4 text-[var(--tx2)]">{s.time}</span>}
+                    </span>
+                    <span className="flex w-full min-w-0 items-center gap-1.5 text-[12px] leading-4 text-[var(--tx2)]">
+                      <span className="flex-none rounded-[4px] bg-black/[0.045] px-1 tabular-nums">{storyRef(s.id)}</span>
+                      {s.detail && <span className="min-w-0 truncate">{s.detail}</span>}
                     </span>
                   </span>
                 </button>

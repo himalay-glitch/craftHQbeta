@@ -422,7 +422,12 @@ export function Dashboard({ data }: { data: DashboardData }) {
                       id: s.id,
                       title: s.title,
                       time: s.updated,
-                      detail: s.checks ? `${s.checks.passed} of ${s.checks.total} checks passed` : "Preview ready",
+                      detail: s.checks
+                        ? s.checks.passed === s.checks.total
+                          ? `All ${s.checks.total} checks passed`
+                          : `${s.checks.passed} of ${s.checks.total} checks passed`
+                        : "Preview ready",
+                      mark: s.checks ? { type: "checks" as const, ...s.checks } : { type: "checking" as const },
                     }))}
                   onItem={pick}
                   onOpen={() => setNeed((n) => (n === "review" ? "all" : "review"))}
@@ -438,7 +443,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   icon={CircleX}
                   tone="negative"
                   ring
-                  items={stuck.map((s) => ({ id: s.id, title: s.title, time: s.updated, detail: stuckReason(s) }))}
+                  items={stuck.map((s) => ({ id: s.id, title: s.title, time: s.updated, detail: stuckReason(s), mark: { type: "alert" as const } }))}
                   onItem={pick}
                   onOpen={() => setNeed((n) => (n === "stuck" ? "all" : "stuck"))}
                   openLabel={need === "stuck" ? "Show everything in the deck" : "Show only these in the deck"}
@@ -463,7 +468,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                       title: r.title,
                       time: r.updated,
                       detail: r.status === "In progress" ? "Building" : "In checks",
-                      live: r.status === "In progress",
+                      mark: { type: r.status === "In progress" ? ("building" as const) : ("checking" as const) },
                     }))}
                   onItem={open}
                   onOpen={() => openLocal({ kind: "details", tab: "agent" })}
