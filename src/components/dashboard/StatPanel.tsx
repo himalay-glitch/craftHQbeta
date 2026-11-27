@@ -122,8 +122,10 @@ export function StatPanel(p: StatPanelProps) {
                   </span>
                   <span className="flex w-full min-w-0 items-center gap-1.5 text-[12px] leading-4 text-[var(--tx2)]">
                     {s.live && <span aria-hidden="true" className="size-1.5 flex-none rounded-full bg-[#16A34A] motion-safe:animate-pulse" />}
-                    <span className="flex-none tabular-nums">{storyRef(s.id)}</span>
-                    {s.detail && <span className="min-w-0 truncate">· {s.detail}</span>}
+                    <span className="min-w-0 truncate">
+                      <span className="tabular-nums">{storyRef(s.id)}</span>
+                      {s.detail && ` · ${s.detail}`}
+                    </span>
                   </span>
                 </button>
               </li>

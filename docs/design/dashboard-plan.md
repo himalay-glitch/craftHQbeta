@@ -47,7 +47,7 @@ Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 p
 ## 3. Parts
 
 ### Top bar and sidebar (`TopBar`, `Sidebar`, `nav.ts`, `SearchBox`, `AvatarMenu`)
-- **Top bar:** 48 px, `#F9F9F9`, sticky, the full width of the window, as in Asana. The CHQ mark on the left: black glass with a red glass slash on the Q, 24 px tall (`public/dashboard/crafthq-chq-{24,48,72}.webp` for 1x/2x/3x screens, shrunk from `design/renders/logo_chq_v001/out/chq_front.png`; the login header uses the same files), search in the middle, the account menu on the right.
+- **Top bar:** 48 px, `#F9F9F9`, sticky, the full width of the window, as in Asana. The CHQ mark on the left: black glass with a red glass slash on the Q, 24 px tall (`public/dashboard/crafthq-chq-{24,48,72}.webp` for 1x/2x/3x screens, shrunk from `design/renders/logo_chq_v001/out/chq_front.png`; the login header uses the same files), then a faint rule and the project's name (`AppLayout`'s `project`, the sample's until there's a session), search in the middle, the account menu on the right.
 - **Sidebar:** a **56 px rail** of icons (`DESIGN.md` §4.3's collapsed rail), on the same grey, under the top bar and sticky, from 1024 px. The prototype's links, each a 16 px lucide icon: Dashboard (`LayoutDashboard`), Stories (`ListTodo`), Feature pages (`PanelsTopLeft`), Docs (`BookOpen`); Settings (`Settings`) and the toggle (`PanelLeft`) are pinned to the bottom. Items are 32 px with the icon centred; hover is a 4% black fill, the current page a 6% fill with a dark icon. Hovering or focusing an icon shows its name at once, in the dark tooltip style, 12 px to its right. It's plain CSS, so it works from the first paint with no delay; every link keeps its name for screen readers.
 - **Opening it:** `[` (not while typing) or the toggle opens it to 176 px with 14/20 labels beside the icons, and the choice is remembered per browser. The width is set on `<html data-sidebar>` by an inline script before the page paints, so it never jumps on load; `--sidebar-w` follows it (the toast centres with it). It's plain links in the HTML and hydrates when idle, for the toggle and `[`.
 - **Bots:** under the links, a short rule, then the five bots (PM, Builder, Designer, Checker, Fixer) as 24 px faces; a working bot has a small pulsing green dot. Hovering names it and what it's on ("Builder · Building hq-54"). Clicking opens that bot's own chat (`/ask/builder`, `/ask/designer` …; the PM's is Ask PM), which is highlighted here while it's open. Opened, they sit under a "Bots" label with their names. This replaces the old Bots tab's cards.
@@ -56,18 +56,20 @@ Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 p
 - **Account menu** (Radix): name, email, the workspace line from the prototype, Settings, Sign out (goes to `/login` until there's a sign-out endpoint).
 
 ### Heading
-The project's name (21/28) and **New story**, a secondary button: the page's one solid answer is the recommended one on the deck.
+No visible title: the project's name is in the top bar, after the CHQ mark and a faint 1 × 16 px rule (12% black), at 14/20 medium; the page keeps "WePop dashboard" as its heading for screen readers. The first line holds the setup notice (when something isn't connected and it hasn't been dismissed) and **New story**, a secondary button, on the right. The notice is an amber pill as tall as the button: a plug, "GitHub isn't connected, so the agents can't start work.", **Connect GitHub**, and a × that hides it in this browser until something else is missing (a toast says Connectors in the sidebar still opens the modal).
+
+**No page scroll on a desktop:** the page fits the window down to 1366 × 768. Its foot has 24 px, and on screens 820 px tall or less the paddings tighten (page 16, the tray 16, the card 20, the answer rows 10, the gaps 12); the tiles show as many cards as fit.
 
 ### Stats beside the deck (`StatPanel`)
 Named the way engineers name CI and review states (Himalay, 27 Nov): Awaiting review, Need a fix, Active runs, Queued runs. Needs you keeps its name. The See all groups and the Details panel use the same words.
 
-Each is a KPI tile (`DESIGN.md` §5.6): its solid indicator (`Indicator`, 20 px) and label, the number (30/36 medium), one line, then up to three story titles (no ids, no times) and "+ n more". A hairline border and no shadow; no dividers and no footer rows. The label and number are one button, the tile's action; each title is its own button. Every tile reads the same way down; what's left of its height stays at its foot.
+Each is a KPI tile (`DESIGN.md` §5.6): its solid indicator (`Indicator`, 20 px) and label, the number (30/36 medium), one line, then the stories behind the number as small cards (48 px, 10 px corners, a hairline on #FAFAFA): the title and when, then the ID and one fact, with a green dot while an agent is on it. On a desktop a tile is as tall as its share of the deck's height and shows as many cards as fit, then "+ n more" (which does the tile's action), always leaving a little room at its foot; the cards are laid over that space so they never make the tile taller than the deck. Where tiles stack (under 1024 px), three. The label and number are one button, the tile's action; each card is its own button.
 
 | Tile | Side | Number, line | Titles | Action (label and number) |
 |---|---|---|---|---|
-| Awaiting review | left | review stories waiting on you, "waiting on you" | picking one brings its card to the top of the deck | filters the deck to reviews; again shows everything |
-| Need a fix | left | stuck stories, "can't proceed without you"; red with the alert ring | picking one brings its card to the top | filters the deck to stuck stories |
-| Active runs | right | stories the agents are on, "2 building · 7 in checks"; green, turning | Building first; each opens the story panel | the Details panel |
+| Awaiting review | left | review stories waiting on you, "waiting on you" | when; "24 of 24 checks passed"; picking one brings its card to the top of the deck | filters the deck to reviews; again shows everything |
+| Need a fix | left | stuck stories, "can't proceed without you"; red with the alert ring | why it stopped ("Preview could not start"); picking one brings its card to the top | filters the deck to them |
+| Active runs | right | stories the agents are on, "2 building · 7 in checks"; green, turning | Building first (green dot), then In checks; when; each opens the story | the Details panel |
 | Queued runs | right | waiting to start, "last polled just now"; grey | "New work starts as soon as it's approved." | the Details panel |
 
 While a tile filters the deck, its border turns blue.
