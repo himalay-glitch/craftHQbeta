@@ -29,7 +29,10 @@ export function DashboardSkeleton() {
           <div className="absolute inset-x-0 top-0 bottom-8 translate-y-8 scale-[0.91] rounded-[24px] border border-black/[0.06] bg-white" />
           <div className="absolute inset-x-0 top-0 bottom-8 translate-y-4 scale-[0.955] rounded-[24px] border border-black/[0.06] bg-white" />
           <div className="relative rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
-            <span className={`${SKELETON} block h-5 w-20 rounded-full`} />
+            <span className="flex items-center justify-between">
+              <span className={`${SKELETON} block h-5 w-20 rounded-full`} />
+              <span className={`${SKELETON} -my-1.5 -mr-1.5 block size-8 rounded-full`} />
+            </span>
             <span className={`${SKELETON} mt-4 block h-6 w-11/12`} />
             <span className={`${SKELETON} mt-2 block h-6 w-2/3`} />
             <span className={`${SKELETON} mt-3 block h-4 w-1/2`} />

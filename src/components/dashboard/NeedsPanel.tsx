@@ -2,7 +2,7 @@ import { useEffect, useId } from "react";
 import { ChevronRight, MessageCircle } from "lucide-react";
 import type { Story } from "@/types/dashboard";
 import { decisionFor, KINDS } from "./decisions";
-import { storyRef } from "./format";
+import { chatHref, storyRef } from "./format";
 import { SidePanel } from "./SidePanel";
 
 interface NeedsPanelProps {
@@ -11,9 +11,6 @@ interface NeedsPanelProps {
   isWide: boolean;
   onClose: () => void;
 }
-
-/** The story's own page, where its chat is: the agent's question is asked there, and answered there. */
-const chatHref = (id: number) => `/stories/${storyRef(id)}`;
 
 /**
  * See all: every decision on the deck, in the side panel that slides in from the right, as a list of small

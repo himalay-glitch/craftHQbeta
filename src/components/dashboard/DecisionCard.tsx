@@ -5,7 +5,8 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import type { Story } from "@/types/dashboard";
 import type { Decision, DecisionOption } from "./decisions";
 import { BTN_PRIMARY } from "./classes";
-import { NEED_STATUS, storyRef } from "./format";
+import { chatHref, NEED_STATUS, storyRef } from "./format";
+import { Tip } from "./Tip";
 
 interface DecisionCardProps {
   story: Story;
@@ -30,7 +31,8 @@ const RADIO =
   "transition-[border-width,border-color] duration-[120ms] checked:border-[5px] checked:border-[var(--cta)]";
 
 /**
- * One decision, on a tall card: its status, the question as the headline, the story it's about and the facts in
+ * One decision, on a tall card: its status (with an arrow on the right into the story's chat), the question as the
+ * headline, the story it's about and the facts in
  * one line (DESIGN.md §2.2). Then the answers as a radio list (§6.2): three to pick, the recommended one first and
  * chosen to start with, and the fourth, Other, a box to write your own; then the one button, Submit, which sends
  * whichever is chosen.
@@ -44,10 +46,22 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
 
   return (
     <article aria-labelledby={qId} className="relative">
-      <p className="flex min-w-0 items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
+      <div className="flex min-w-0 items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
         {story.need && <StatusPill status={NEED_STATUS[story.need]} />}
-        {story.updated && <span className="truncate">{story.updated}</span>}
-      </p>
+        {story.updated && <span className="min-w-0 truncate">{story.updated}</span>}
+        {/* The way to the story's chat on the Stories page, where the agent asked this. Not a drag handle, so the
+            card's swipe never starts on it. */}
+        <Tip label="Open in the story’s chat">
+          <a
+            href={chatHref(story.id)}
+            draggable={false}
+            aria-label={`Open ${storyRef(story.id)} in its chat`}
+            className="-my-1.5 -mr-1.5 ml-auto inline-flex size-8 flex-none items-center justify-center rounded-full border border-[var(--card-line)] bg-white text-[var(--tx2)] transition-colors duration-[120ms] hover:border-[var(--ctl-h)] hover:bg-[var(--ctl-bg-h)] hover:text-[var(--tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40"
+          >
+            <ArrowUpRight aria-hidden="true" size={16} strokeWidth={1.75} />
+          </a>
+        </Tip>
+      </div>
 
       <h3 id={qId} className="mt-4 text-[20px] [@media(max-height:820px)]:mt-3 leading-7 font-semibold tracking-[-0.012em] text-pretty text-[var(--tx)]">
         {decision.question}
