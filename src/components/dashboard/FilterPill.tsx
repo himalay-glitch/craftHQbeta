@@ -22,8 +22,6 @@ interface FilterPillProps<T extends string> {
   showDefaultValue?: boolean;
   /** Label when a value is chosen; defaults to "Name: Value". */
   formatActive?: (label: string) => string;
-  /** Which edge of the pill the menu lines up with. */
-  align?: "start" | "end";
 }
 
 // The reference's pill: 30 px, fully round, 1 px #CBCBCB, 13 px text, 16 px chevron 8 px after it.
@@ -41,7 +39,6 @@ export function FilterPill<T extends string>({
   onChange,
   showDefaultValue,
   formatActive,
-  align = "start",
 }: FilterPillProps<T>) {
   const current = options.find((o) => o.value === value) ?? options[0];
   const isDefault = value === defaultValue;
@@ -55,7 +52,7 @@ export function FilterPill<T extends string>({
         <ChevronDown aria-hidden="true" size={16} strokeWidth={1.5} className="text-[var(--tx2)]" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align={align} sideOffset={4} collisionPadding={8} className={MENU_CONTENT}>
+        <DropdownMenu.Content align="start" sideOffset={4} collisionPadding={8} className={MENU_CONTENT}>
           <DropdownMenu.RadioGroup value={value} onValueChange={(v) => onChange(v as T)}>
             {options.map((o) => (
               <DropdownMenu.RadioItem key={o.value} value={o.value} className={MENU_ITEM}>

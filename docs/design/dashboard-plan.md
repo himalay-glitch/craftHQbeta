@@ -24,7 +24,7 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ├────┬─────────────────────────────────────────────────────────────────────────────────────────┤
 │ ▦  │ WePop                                                                  ( + New story )  │
 │ ☰  │ ⚡ GitHub isn't connected, so the agents can't start work. Connect GitHub                 │
-│    │ ┌ ⇅ Ready to review ─┐   Needs you 14          (Show: All ⌄)  ┌ ◌ Running ─────────┐    │
+│    │ ┌ ⇅ Ready to review ─┐   Needs you 14                         ┌ ◌ Running ─────────┐    │
 │    │ │ 5                   │  ┌──────────────────────────────┐    │ 9                   │    │
 │    │ │ waiting on you      │  │ (Failed)                     │    │ 2 building, 7 check │    │
 │    │ │                     │  │ It's stuck: preview could    │    │                     │    │
@@ -72,7 +72,7 @@ Each is a KPI tile (`DESIGN.md` §5.6): its solid indicator (`Indicator`, 20 px)
 
 While a tile filters the deck, its border turns blue.
 
-**Needs you** heads the middle column: the title and the deck's count in grey, and on the right **Show: All ⌄** (`FilterPill`), which filters the deck by kind: All, then each kind that has decisions, with its count (Stuck 2, Ready to review 5, Decisions 3…). The Ready to review and Stuck tiles set the same filter.
+**Needs you** heads the middle column: the title and the deck's count in grey. There's no filter control on it: the Ready to review and Stuck tiles filter the deck, and only while one does, **Show all 14** appears on the right to bring the rest back.
 
 ### The stage: Needs you (`NeedsDeck`, `DecisionCard`, `decisions.ts`)
 One decision at a time: the stories waiting on you, plus Stuck, in the prototype's group order (Stuck first).

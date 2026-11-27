@@ -9,8 +9,7 @@ import { clearStoryParam, readStoryParam, sortQueue, storyRef, URL_EVENT, writeS
 import { ActivityPanel, type DetailsTab } from "./ActivityPanel";
 import { AllClear } from "./AllClear";
 import { DashboardSkeleton } from "./DashboardSkeleton";
-import { KINDS, type DecisionOption, type DecisionReply } from "./decisions";
-import { FilterPill } from "./FilterPill";
+import type { DecisionOption, DecisionReply } from "./decisions";
 import { NeedsDeck } from "./NeedsDeck";
 import { NeedsPanel } from "./NeedsPanel";
 import { NewStoryPanel } from "./NewStoryPanel";
@@ -328,26 +327,20 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 middle, what's running and queued. The side cards stretch to the deck's height. */}
             <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6">
               <section aria-labelledby="needs-title" className="min-w-0 lg:order-2">
-                <header className="flex h-[30px] items-center justify-between gap-3">
+                <header className="flex h-6 items-center justify-between gap-3">
                   <h2 id="needs-title" className="flex items-baseline gap-2 text-[15px] leading-[22px] font-semibold text-[var(--tx)]">
                     Needs you
                     <span className="font-normal text-[var(--tx2)] tabular-nums">{visible.length}</span>
                   </h2>
-                  {mine.length > 0 && (
-                    <FilterPill
-                      name="Show"
-                      value={need}
-                      defaultValue="all"
-                      showDefaultValue
-                      align="end"
-                      options={[
-                        { value: "all" as const, label: "All", count: mine.length },
-                        ...KINDS.map((k) => ({ value: k.kind, label: k.label, count: mine.filter((s) => s.need === k.kind).length })).filter(
-                          (o) => o.count > 0 || o.value === need,
-                        ),
-                      ]}
-                      onChange={setNeed}
-                    />
+                  {/* Only while a tile (Ready to review, Stuck) filters the deck: the way back to all of it. */}
+                  {need !== "all" && (
+                    <button
+                      type="button"
+                      onClick={() => setNeed("all")}
+                      className="text-[13px] leading-[18px] font-medium text-[var(--cta)] underline-offset-2 hover:underline"
+                    >
+                      Show all {mine.length}
+                    </button>
                   )}
                 </header>
 
