@@ -1,6 +1,6 @@
 # Dashboard
 
-Version 6 · 26 Nov 2026 · branch `himalay/dashboard-deck` · route `/dashboard`
+Version 7 · 27 Nov 2026 · branch `himalay/dashboard-deck` · route `/dashboard`
 
 What the dashboard is, where its look and content come from, and how it behaves. It describes the code in `src/pages/dashboard/`, `src/components/dashboard/`, `src/components/shell/` and `src/layouts/AppLayout.astro`.
 
@@ -24,7 +24,7 @@ What the dashboard is, where its look and content come from, and how it behaves.
 ├────┬─────────────────────────────────────────────────────────────────────────────────────────┤
 │ ▦  │ WePop                                                                  ( + New story )  │
 │ ☰  │ ⚡ GitHub isn't connected, so the agents can't start work. Connect GitHub                 │
-│    │ ┌ ⇅ Ready to review ─┐   Needs you 14                         ┌ ◌ Running ─────────┐    │
+│    │ ┌ ⇅ Ready to review ─┐   Needs you 14          (Show: All ⌄)  ┌ ◌ Running ─────────┐    │
 │    │ │ 5                   │  ┌──────────────────────────────┐    │ 9                   │    │
 │    │ │ waiting on you      │  │ (Failed)                     │    │ 2 building, 7 check │    │
 │    │ │                     │  │ It's stuck: preview could    │    │                     │    │
@@ -72,7 +72,7 @@ Each is a KPI tile (`DESIGN.md` §5.6): its solid indicator (`Indicator`, 20 px)
 
 While a tile filters the deck, its border turns blue.
 
-**Needs you** heads the middle column: the title and the deck's count in grey. With a filter on, the count becomes a blue chip ("Stuck · 2 ×") that clears it.
+**Needs you** heads the middle column: the title and the deck's count in grey, and on the right **Show: All ⌄** (`FilterPill`), which filters the deck by kind: All, then each kind that has decisions, with its count (Stuck 2, Ready to review 5, Decisions 3…). The Ready to review and Stuck tiles set the same filter.
 
 ### The stage: Needs you (`NeedsDeck`, `DecisionCard`, `decisions.ts`)
 One decision at a time: the stories waiting on you, plus Stuck, in the prototype's group order (Stuck first).
@@ -83,7 +83,8 @@ One decision at a time: the stories waiting on you, plus Stuck, in the prototype
 - **Answering:** reversible, so it acts at once (`DESIGN.md` §6.11). The card says what happened (a green tick, "Rebuilding on the latest code.", the story) for 0.7 s; it lifts 28 px and fades (180 ms); the next rises from the pile (240 ms). The toast offers **Undo**, which puts the card back on top.
 - **The pile:** two cards under the top one, 16 and 32 px lower and a little smaller, so it reads as a deck. No rotation, ever (`DESIGN.md` §6.12).
 - **Browsing:** swiping only browses, so a stray swipe never approves anything: left sends the card to the back, right brings the last one back, with a "Later ›" or "‹ Back" tag fading in as you drag; the card lifts to 1.02 while held. ← → and the round arrow buttons do the same; 1–3 answer; the keys work in the deck, or anywhere while nothing else has the keyboard and no panel or menu is open. The numbers on the answers are their keys, so there's no hint line.
-- **Under the deck:** three quiet controls, centred: ‹ (Back), **See all ⌄**, a menu of every decision grouped by kind (Stuck, Ready to review, Decisions, Plans to approve, New stories) to jump to any one, and › (Later). With one card left they go.
+- **Under the deck:** three quiet controls, centred: ‹ (Back), **See all** and › (Later). With one card left they go.
+- **See all (`NeedsPanel`):** the right-hand side panel (`SidePanel`; over the page from 1024 px, full width with a scrim below), titled Needs you with the count above. Every decision on the deck, grouped by kind in the queue's order. Each row is the question (14/20 medium, two lines at most) and under it the story, ID and when; the card on top says **On top**. When a group's rows all ask the same question (Ready to review), it's said once under the group's name ("Each asks: …") and the rows lead with their stories. Picking one closes the panel and puts it on top of the deck. It never drops down over the card.
 
 ### All clear (`AllClear`)
 `DESIGN.md` §6.7: the PM (64 px, blinking), "Nothing needs you", "The agents will ask here when they need you.", centred, at most 360 px wide, no action; plus "You answered 14 decisions" when you cleared it yourself.

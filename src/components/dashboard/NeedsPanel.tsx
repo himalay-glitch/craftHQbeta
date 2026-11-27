@@ -18,8 +18,9 @@ interface NeedsPanelProps {
 
 /**
  * See all: every decision on the deck, in the side panel that slides in from the right, grouped by kind. Each one
- * is its question, the card's headline, with the story under it, so you can scan them all and pick the one to
- * answer first. Picking puts it on top of the deck and closes the panel; the answering stays on the card.
+ * is its question, the card's headline, with the story under it (a question every row in a group shares is said
+ * once, under the group's name), so you can scan them all and pick the one to answer first. Picking puts it on
+ * top of the deck and closes the panel; the answering stays on the card.
  */
 export function NeedsPanel({ stories, top, isWide, onClose, onPick }: NeedsPanelProps) {
   const id = useId();
@@ -28,7 +29,13 @@ export function NeedsPanel({ stories, top, isWide, onClose, onPick }: NeedsPanel
     document.querySelector<HTMLElement>("[data-panel-title]")?.focus();
   }, []);
 
-  const groups = KINDS.map((k) => ({ ...k, items: stories.filter((s) => s.need === k.kind) })).filter((g) => g.items.length > 0);
+  // When every decision in a group asks the same thing (Ready to review: "Rebuild it before it merges?"), the
+  // question is said once under the group's name and the rows lead with their stories.
+  const groups = KINDS.map((k) => {
+    const items = stories.filter((s) => s.need === k.kind).map((s) => ({ story: s, question: decisionFor(s).question }));
+    const shared = items.length > 1 && items.every((i) => i.question === items[0].question) ? items[0].question : null;
+    return { ...k, items, shared };
+  }).filter((g) => g.items.length > 0);
 
   return (
     <SidePanel
@@ -45,8 +52,9 @@ export function NeedsPanel({ stories, top, isWide, onClose, onPick }: NeedsPanel
           <h3 id={`${id}-${g.kind}`} className="text-[13px] leading-[18px] font-medium text-[var(--tx2)]">
             {g.label} <span className="font-normal tabular-nums">· {g.items.length}</span>
           </h3>
+          {g.shared && <p className="mt-1 text-[13px] leading-[18px] text-[var(--tx2)]">Each asks: {g.shared}</p>}
           <ul className="mt-1 list-none">
-            {g.items.map((s) => {
+            {g.items.map(({ story: s, question }) => {
               const onTop = s.id === top;
               return (
                 <li key={s.id}>
@@ -57,9 +65,10 @@ export function NeedsPanel({ stories, top, isWide, onClose, onPick }: NeedsPanel
                     className="group -mx-3 flex w-[calc(100%+24px)] items-start gap-3 rounded-[10px] px-3 py-2.5 text-left transition-colors duration-[80ms] hover:bg-[var(--row-h)]"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 text-[14px] leading-5 font-medium text-[var(--tx)]">{decisionFor(s).question}</span>
+                      <span className="line-clamp-2 text-[14px] leading-5 font-medium text-[var(--tx)]">{g.shared ? s.title : question}</span>
                       <span className="mt-0.5 block truncate text-[13px] leading-[18px] text-[var(--tx2)]">
-                        {s.title} · <span className="tabular-nums">{storyRef(s.id)}</span>
+                        {!g.shared && `${s.title} · `}
+                        <span className="tabular-nums">{storyRef(s.id)}</span>
                         {s.updated && ` · ${s.updated}`}
                       </span>
                     </span>
