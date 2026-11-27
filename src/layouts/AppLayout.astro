@@ -7,14 +7,17 @@ import { Sidebar } from "@/components/shell/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
 import tokens from "@/components/dashboard/tokens.module.css";
 import type { SearchItem, Viewer } from "@/types/dashboard";
+import { dashboardData } from "@/pages/dashboard/_sample-data";
 
 interface Props {
   title?: string;
   viewer: Viewer;
   search: SearchItem[];
+  /** The project this is, beside the logo. Until there's a session with the current project, the sample's. */
+  project?: string;
 }
 
-const { title, viewer, search } = Astro.props;
+const { title, viewer, search, project = dashboardData.project } = Astro.props;
 ---
 
 <BaseLayout title={title}>
@@ -37,7 +40,7 @@ const { title, viewer, search } = Astro.props;
     >
       Skip to content
     </a>
-    <TopBar client:load viewer={viewer} search={search} current={Astro.url.pathname} />
+    <TopBar client:load viewer={viewer} search={search} current={Astro.url.pathname} project={project} />
     <div class="flex">
       {/* Plain links in the HTML; it hydrates when idle for its tooltips and the `[` toggle. */}
       <Sidebar client:idle current={Astro.url.pathname} />

@@ -38,6 +38,9 @@ const firstSentence = (text: string) => text.split(/(?<=\.)\s/)[0];
 const rest = (text: string) => text.slice(firstSentence(text).length).trim();
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
+/** Why a stuck story stopped, in a few words ("Preview could not start"), for its card beside the deck. */
+export const stuckReason = (story: Story) => (story.action ? firstSentence(story.action).replace(/\.$/, "") : "Not being picked up");
+
 export function decisionFor(story: Story): Decision {
   const need = story.need as NeedKind;
   switch (need) {
@@ -189,10 +192,10 @@ export function decisionFor(story: Story): Decision {
   }
 }
 
-/** The kinds of need, in the queue's order, as the All menu names them. */
+/** The kinds of need, in the queue's order, as the See all panel names them. */
 export const KINDS: { kind: NeedKind; label: string }[] = [
-  { kind: "stuck", label: "Stuck" },
-  { kind: "review", label: "Ready to review" },
+  { kind: "stuck", label: "Need a fix" },
+  { kind: "review", label: "Awaiting review" },
   { kind: "decision", label: "Decisions" },
   { kind: "planning", label: "Plans to approve" },
   { kind: "triage", label: "New stories" },

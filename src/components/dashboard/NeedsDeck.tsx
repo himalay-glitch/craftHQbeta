@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "framer-motion";
-import { DropdownMenu } from "radix-ui";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Story } from "@/types/dashboard";
-import { MENU_CONTENT, MENU_ITEM, MENU_SEPARATOR } from "./classes";
-import { DecisionCard } from "./DecisionCard";
-import { decisionFor, KINDS, type DecisionOption, type DecisionReply } from "./decisions";
-import { storyRef } from "./format";
+import { DecisionCard, type Choice } from "./DecisionCard";
+import { decisionFor, type DecisionOption, type DecisionReply } from "./decisions";
 
 type KeyLike = Pick<globalThis.KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "preventDefault"> & {
   target: EventTarget | null;
@@ -17,24 +15,42 @@ type Move = "answered" | "later" | "back";
 
 const EASE_OUT = [0.2, 0, 0, 1] as const;
 const EASE_IN = [0.4, 0, 1, 1] as const;
-// The cards under the top one: each lower and a little smaller, so the pile reads as a deck (no rotation, §6.12).
-const BEHIND = [
-  { y: 16, scale: 0.955, opacity: 1 },
-  { y: 32, scale: 0.91, opacity: 0.7 },
-];
+// The cards either side of the top one: the next on the right and the one before on the left, each a little smaller
+// and tilted out to its side, so the deck reads as browsing left and right, as its ‹ › do. Only resting cards tilt;
+// the one you hold never does (§6.12). From 1280 px the middle column is wider, so they fan out further; below it they
+// stay inside the tray's own padding, so the card keeps its width (440 px) either way.
+type Spot = { x: number; y: number; rotate: number; scale: number };
+const PILES: Record<"wide" | "snug", { next: Spot; prev: Spot }> = {
+  wide: { next: { x: 24, y: 10, rotate: 3.5, scale: 0.95 }, prev: { x: -24, y: 10, rotate: -3.5, scale: 0.95 } },
+  snug: { next: { x: 12, y: 8, rotate: 2, scale: 0.96 }, prev: { x: -12, y: 8, rotate: -2, scale: 0.96 } },
+};
+const ROOMY = "(min-width: 1280px)";
+const onRoomy = (change: () => void) => {
+  const query = window.matchMedia(ROOMY);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+};
+const useRoomy = () =>
+  useSyncExternalStore(
+    onRoomy,
+    () => window.matchMedia(ROOMY).matches,
+    () => false,
+  );
+
+type Custom = { move: Move; pile: { next: Spot; prev: Spot } };
 const SWIPE = 110; // px dragged, or …
 const FLICK = 500; // … px/s flicked, to count as a swipe
 const SAY_MS = 700; // how long the card says what happened before it leaves
 
+// Later: the top card goes into the left pile and the right one comes forward. Back: the reverse. Answered: it lifts
+// away and the right one comes forward.
 const variants = {
-  enter: (m: Move) => (m === "back" ? { opacity: 0, x: -56, y: 0, scale: 1 } : { opacity: 0, x: 0, y: BEHIND[0].y, scale: BEHIND[0].scale }),
-  center: { opacity: 1, x: 0, y: 0, scale: 1, transition: { duration: 0.24, ease: EASE_OUT } },
-  exit: (m: Move) =>
-    m === "later"
-      ? { opacity: 0, x: -80, transition: { duration: 0.15, ease: EASE_IN } }
-      : m === "back"
-        ? { opacity: 0, y: BEHIND[0].y, scale: BEHIND[0].scale, transition: { duration: 0.15, ease: EASE_IN } }
-        : { opacity: 0, y: -28, scale: 0.98, transition: { duration: 0.18, ease: EASE_IN } },
+  enter: ({ move, pile }: Custom) => ({ opacity: 0, ...(move === "back" ? pile.prev : pile.next) }),
+  center: { opacity: 1, x: 0, y: 0, rotate: 0, scale: 1, transition: { duration: 0.26, ease: EASE_OUT } },
+  exit: ({ move, pile }: Custom) =>
+    move === "answered"
+      ? { opacity: 0, y: -28, scale: 0.98, transition: { duration: 0.18, ease: EASE_IN } }
+      : { opacity: 0, ...(move === "later" ? pile.prev : pile.next), transition: { duration: 0.2, ease: EASE_IN } },
 };
 const fades = {
   enter: { opacity: 0 },
@@ -45,14 +61,14 @@ const fades = {
 /** The card on top. It owns its drag, so a card on its way out never moves the one taking its place. */
 function TopCard({
   id,
-  move,
+  custom,
   reduced,
   draggable,
   onSwipe,
   children,
 }: {
   id: number;
-  move: Move;
+  custom: Custom;
   reduced: boolean;
   draggable: boolean;
   onSwipe: (dir: "later" | "back") => void;
@@ -70,7 +86,7 @@ function TopCard({
       data-deck-top
       data-deck-id={id}
       tabIndex={-1}
-      custom={move}
+      custom={custom}
       variants={reduced ? fades : variants}
       initial="enter"
       animate="center"
@@ -82,7 +98,7 @@ function TopCard({
       whileDrag={{ scale: 1.02, cursor: "grabbing" }}
       onDragEnd={onDragEnd}
       style={{ x, zIndex: 3 }}
-      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
+      className={`relative flex flex-1 flex-col rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6 [@media(min-width:640px)_and_(max-height:820px)]:p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
     >
       {/* Swipe hints, fading in with the drag. */}
       <motion.span
@@ -105,28 +121,36 @@ function TopCard({
 }
 
 interface NeedsDeckProps {
-  /** The stories that need you, in the queue's order (Stuck first). */
+  /** The stories that need you, in the queue's order (Need a fix first). */
   stories: Story[];
   onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
   onOpen: (id: number) => void;
   /** A story picked beside the deck; each new key brings it to the top. */
   jump?: { id: number; key: number } | null;
+  /** See all: opens the side panel with every decision, each a way into its story's chat. */
+  onSeeAll: () => void;
+  /** Where See all and ‹ › go: the right of Needs you's header. */
+  controls: HTMLElement | null;
 }
 
 const ICON_BTN =
-  "inline-flex size-9 items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.04] hover:text-[var(--tx)]";
+  "inline-flex size-8 items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)] disabled:opacity-40 disabled:hover:bg-transparent";
 
 /**
- * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the card says what
- * happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
- * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same, and 1–3 answer.
- * Under the deck, See all, to jump to any decision.
+ * Needs you: one decision at a time, with the next card tilted out on its right and the one before on its left.
+ * Answer and the card says what happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
+ * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same. 1–4 choose an
+ * answer and Enter sends it.
+ * In the tray's header, See all opens every decision in the side panel, each a way into its story's chat.
  */
-export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
+export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls }: NeedsDeckProps) {
   const reduced = useReducedMotion();
+  const pile = PILES[useRoomy() ? "wide" : "snug"];
   const [seq, setSeq] = useState<number[]>([]);
   const [move, setMove] = useState<Move>("answered");
   const [sent, setSent] = useState<{ id: number; text: string } | null>(null);
+  // The chosen answer on the top card; a card that hasn't been touched starts on the recommended one.
+  const [picked, setPicked] = useState<{ id: number; choice: Choice } | null>(null);
   const root = useRef<HTMLElement>(null);
   const hadFocus = useRef(false);
 
@@ -137,10 +161,13 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
   const byId = new Map(stories.map((s) => [s.id, s]));
   const top = order.length ? byId.get(order[0])! : null;
   const decision = top ? decisionFor(top) : null;
-  const next = order.slice(1).map((id) => byId.get(id)!);
+  // The piles: the next card on the right once there are two, the one before on the left once there are three.
+  const piles = order.length >= 3 ? (["prev", "next"] as const) : order.length === 2 ? (["next"] as const) : [];
   const topId = top?.id ?? null;
+  const choice: Choice = picked && picked.id === topId ? picked.choice : 0;
+  const select = (c: Choice) => topId !== null && setPicked({ id: topId, choice: c });
 
-  // A story picked beside the deck (Ready to review, Stuck) comes to the top, entering from the left.
+  // A story picked beside the deck (Awaiting review, Need a fix) comes to the top, entering from the left.
   const [lastJump, setLastJump] = useState(jump?.key ?? 0);
   if (jump && jump.key !== lastJump) {
     setLastJump(jump.key);
@@ -169,11 +196,6 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
     setMove("back");
     setSeq([order[order.length - 1], ...order.slice(0, -1)]);
   };
-  const jumpTo = (id: number) => {
-    if (id === topId || sent) return;
-    setMove("back");
-    setSeq([id, ...order.filter((x) => x !== id)]);
-  };
 
   const answer = (story: Story, says: string, done: () => void) => {
     setMove("answered");
@@ -198,11 +220,18 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
     answer(top, r.says, () => onDecide(top, { reply: r, text }));
   };
 
-  // ← → browse, 1–3 answer: inside the deck, or anywhere while nothing else has the keyboard and no panel is open.
+  // ← → browse, 1–4 choose an answer, Enter sends it: inside the deck, or anywhere while nothing else has the
+  // keyboard and no panel is open. On a radio, the arrows are the radio group's own.
   const onKeyDown = (e: KeyLike) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if ((e.target as HTMLElement | null)?.closest?.("textarea, input, select, [contenteditable='true']")) return;
-    if (e.key === "ArrowRight") {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.("textarea, select, [contenteditable='true'], input:not([type='radio'])")) return;
+    const onRadio = target instanceof HTMLInputElement && target.type === "radio";
+    if (onRadio && e.key.startsWith("Arrow")) return;
+    if (e.key === "Enter" && target === document.body) {
+      e.preventDefault();
+      root.current?.querySelector<HTMLFormElement>(`[data-deck-id="${topId}"] [data-deck-form]`)?.requestSubmit();
+    } else if (e.key === "ArrowRight") {
       e.preventDefault();
       later();
     } else if (e.key === "ArrowLeft") {
@@ -210,13 +239,13 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
       back();
     } else if (decision && /^[1-9]$/.test(e.key)) {
       const n = Number(e.key);
-      const option = decision.options[n - 1];
-      if (option) {
+      if (decision.options[n - 1]) {
         e.preventDefault();
-        choose(option);
+        select(n - 1);
       } else if (n === decision.options.length + 1) {
-        // The last number is Other: it puts you in its box.
+        // The last number is Other: it chooses it and puts you in its box.
         e.preventDefault();
+        select("other");
         root.current?.querySelector<HTMLInputElement>(`[data-deck-id="${topId}"] [data-deck-other]`)?.focus();
       }
     }
@@ -237,9 +266,6 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
 
   if (!top || !decision) return null;
 
-  // All, grouped by kind of need, in the queue's order.
-  const groups = KINDS.map((k) => ({ ...k, items: order.map((id) => byId.get(id)!).filter((s) => s.need === k.kind) })).filter((g) => g.items.length > 0);
-
   return (
     <section
       ref={root}
@@ -249,29 +275,32 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
       onBlur={(e) => {
         if (e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) hadFocus.current = false;
       }}
-      className="min-w-0"
+      className="flex min-w-0 flex-1 flex-col"
     >
-      {/* The deck: the top card on the next two, with room below for the cards behind. */}
-      <div className="relative pb-8">
-        {BEHIND.slice(0, Math.min(next.length, BEHIND.length))
-          .map((b, i) => (
-            <motion.div
-              key={`behind-${i}`}
-              aria-hidden="true"
-              initial={false}
-              animate={reduced ? { opacity: b.opacity } : b}
-              transition={{ duration: 0.24, ease: EASE_OUT }}
-              style={{ zIndex: 2 - i }}
-              className="absolute inset-x-0 top-0 bottom-8 origin-bottom rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.12)]"
-            />
-          ))
-          .reverse()}
+      {/* The deck: the top card, with the next one tilted out on its right and the one before on its left. */}
+      {/* Room below, and either side where the tray's padding isn't enough, for the tilted cards' corners. On a
+          desktop the card fills the height the tray gives it, whatever it says. */}
+      <div className="relative flex flex-1 flex-col px-3 pb-4 lg:px-0 xl:px-6">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-3 top-0 bottom-4 lg:inset-x-0 xl:inset-x-6">
+          <AnimatePresence initial={false}>
+            {piles.map((side) => (
+              <motion.div
+                key={side}
+                initial={{ opacity: 0, ...pile[side] }}
+                animate={{ opacity: 1, ...pile[side] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: EASE_OUT }}
+                className="absolute inset-0 rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.14)]"
+              />
+            ))}
+          </AnimatePresence>
+        </div>
 
-        <AnimatePresence initial={false} mode="popLayout" custom={move}>
+        <AnimatePresence initial={false} mode="popLayout" custom={{ move, pile }}>
           <TopCard
             key={top.id}
             id={top.id}
-            move={move}
+            custom={{ move, pile }}
             reduced={!!reduced}
             draggable={!sent && order.length > 1}
             onSwipe={(dir) => (dir === "later" ? later() : back())}
@@ -280,6 +309,8 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
               story={top}
               decision={decision}
               sent={sent?.id === top.id ? sent.text : null}
+              choice={choice}
+              onSelect={select}
               onChoose={choose}
               onReply={reply}
               onOpen={() => onOpen(top.id)}
@@ -288,43 +319,27 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump }: NeedsDeckProps) {
         </AnimatePresence>
       </div>
 
-      {/* Under the deck: back, every decision, later. Nothing else; the numbers on the answers are their keys. */}
-      {order.length > 1 && (
-        <div className="flex items-center justify-center gap-1">
-          <button type="button" onClick={back} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
-            <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.75} />
-          </button>
-
-          <DropdownMenu.Root modal={false}>
-            <DropdownMenu.Trigger className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.04] data-[state=open]:bg-black/[0.06]">
+      {/* In the tray's header: See all (the side panel with every decision), then back and later. */}
+      {controls &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              onClick={onSeeAll}
+              aria-haspopup="dialog"
+              className="inline-flex h-8 items-center rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.05]"
+            >
               See all
-              <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content align="center" sideOffset={6} className={`${MENU_CONTENT} max-h-[420px] w-[340px] overflow-y-auto`}>
-                {groups.map((g, gi) => (
-                  <DropdownMenu.Group key={g.kind}>
-                    {gi > 0 && <DropdownMenu.Separator className={MENU_SEPARATOR} />}
-                    <DropdownMenu.Label className="px-4 pt-2 pb-1 text-[12px] leading-4 text-[var(--tx2)]">
-                      {g.label} · {g.items.length}
-                    </DropdownMenu.Label>
-                    {g.items.map((s) => (
-                      <DropdownMenu.Item key={s.id} onSelect={() => jumpTo(s.id)} className={`${MENU_ITEM} ${s.id === topId ? "font-medium" : ""}`}>
-                        <span className="w-11 flex-none text-[12px] text-[var(--tx2)] tabular-nums">{storyRef(s.id)}</span>
-                        <span className="truncate">{s.title}</span>
-                      </DropdownMenu.Item>
-                    ))}
-                  </DropdownMenu.Group>
-                ))}
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
-
-          <button type="button" onClick={later} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
-            <ChevronRight aria-hidden="true" size={18} strokeWidth={1.75} />
-          </button>
-        </div>
-      )}
+            </button>
+            <button type="button" onClick={back} disabled={order.length < 2} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
+              <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.75} />
+            </button>
+            <button type="button" onClick={later} disabled={order.length < 2} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
+              <ChevronRight aria-hidden="true" size={18} strokeWidth={1.75} />
+            </button>
+          </>,
+          controls,
+        )}
     </section>
   );
 }

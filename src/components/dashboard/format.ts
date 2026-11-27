@@ -3,6 +3,9 @@ import type { TicketStatus } from "@/types/status";
 
 export const storyRef = (id: number) => `hq-${id}`;
 
+/** The story's own page, where its chat is: an agent's question is asked there, and answered there. */
+export const chatHref = (id: number) => `/stories/${storyRef(id)}`;
+
 export const STATUS_LABEL: Record<StoryStatus, string> = {
   new: "New",
   planning: "Planning",
