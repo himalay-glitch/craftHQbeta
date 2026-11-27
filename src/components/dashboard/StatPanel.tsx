@@ -73,16 +73,14 @@ interface StatPanelProps {
   className?: string;
 }
 
-// The cards' sizes, for working out how many fit: 48 px cards 6 px apart, the pager's row, and a little room kept
-// free at the foot (with the tile's own 16 px padding) so the last card never touches the tile's edge.
+// The cards' sizes, for working out how many fit: 48 px cards 6 px apart, and a little room kept free at the foot
+// (with the tile's own 16 px padding) so the last card never touches the tile's edge.
 const CARD_H = 48;
 const GAP = 6;
-const PAGER_H = 28;
 const KEEP = 4;
 const NARROW_PAGE = 3;
 const WIDE = "(min-width: 1024px)";
-const fitsAll = (space: number) => Math.floor((space - KEEP + GAP) / (CARD_H + GAP));
-const perPage = (space: number) => Math.max(1, Math.floor((space - KEEP - PAGER_H) / (CARD_H + GAP)));
+const fitting = (space: number) => Math.max(1, Math.floor((space - KEEP + GAP) / (CARD_H + GAP)));
 
 const PAGE_BTN =
   "inline-flex size-7 items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] " +
@@ -93,7 +91,8 @@ const PAGE_BTN =
  * the number as small cards: a mark for its state in a soft tile (checks passed or failing, stopped, building, in
  * checks), the title and when, then the ID as a tag and one fact. On a desktop the tile is as tall as the deck and
  * shows as many cards as fit; on narrower screens, where tiles stack, three. When there are more, the tile pages
- * through them in place ("4–6 of 12", ‹ ›), so nothing opens over the page and the page never scrolls.
+ * through them in place, from its top right ("4–6 of 12", ‹ ›, as Needs you's header browses the deck), so nothing
+ * opens over the page and the page never scrolls.
  */
 export function StatPanel(p: StatPanelProps) {
   const box = useRef<HTMLDivElement>(null);
@@ -114,8 +113,7 @@ export function StatPanel(p: StatPanelProps) {
   }, []);
 
   const total = p.items.length;
-  const all = space === null ? total <= NARROW_PAGE : fitsAll(space) >= total;
-  const per = all ? Math.max(1, total) : space === null ? NARROW_PAGE : perPage(space);
+  const per = space === null ? NARROW_PAGE : fitting(space);
   const pages = Math.max(1, Math.ceil(total / per));
   const at = Math.min(page, pages - 1);
   const shown = p.items.slice(at * per, at * per + per);
@@ -127,7 +125,7 @@ export function StatPanel(p: StatPanelProps) {
   return (
     <section
       aria-label={p.label}
-      className={`flex min-h-0 flex-col rounded-[12px] border bg-white p-4 transition-[border-color,box-shadow] duration-[120ms] ${
+      className={`relative flex min-h-0 flex-col rounded-[12px] border bg-white p-4 transition-[border-color,box-shadow] duration-[120ms] ${
         p.pressed ? "border-[var(--cta)] shadow-[0_0_0_3px_rgb(47_111_237/0.12)]" : "border-[var(--card-line)]"
       } ${p.className ?? ""}`}
     >
@@ -138,9 +136,10 @@ export function StatPanel(p: StatPanelProps) {
         aria-label={`${p.label}: ${p.value}. ${p.openLabel}`}
         className="group -m-2 flex flex-col rounded-[8px] p-2 text-left transition-colors duration-[120ms] hover:bg-[#FAFAFA]"
       >
-        <span className="flex items-center gap-2 text-[13px] leading-5 text-[var(--tx2)]">
+        {/* With a pager, the label leaves it room. */}
+        <span className={`flex items-center gap-2 text-[13px] leading-5 text-[var(--tx2)] ${pages > 1 ? "pr-28" : ""}`}>
           <Indicator icon={p.icon} tone={p.tone} on={p.value > 0} spin={p.spin} ring={p.ring} size={20} />
-          <span className="min-w-0 flex-1 truncate">{p.label}</span>
+          <span className="min-w-0 truncate">{p.label}</span>
           <ChevronRight
             aria-hidden="true"
             size={16}
@@ -158,13 +157,13 @@ export function StatPanel(p: StatPanelProps) {
         // On a desktop the cards are laid over the space below the number, so they never make the tile taller than
         // the deck; only as many as fit are drawn.
         <div ref={box} className="relative mt-4 min-h-0 lg:flex-1">
-          <div className="flex flex-col gap-1.5 lg:absolute lg:inset-x-0 lg:top-0">
+          <div className="lg:absolute lg:inset-x-0 lg:top-0">
             <motion.ul
               key={at}
               initial={dir === null ? false : reduced ? { opacity: 0 } : { opacity: 0, x: dir * 14 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
-              // A short last page keeps the pager where it was.
+              // Stacked tiles keep their height on a short last page.
               style={pages > 1 ? { minHeight: per * CARD_H + (per - 1) * GAP } : undefined}
               className="flex list-none flex-col gap-1.5"
             >
@@ -191,34 +190,26 @@ export function StatPanel(p: StatPanelProps) {
                 </li>
               ))}
             </motion.ul>
-
-            {/* More than fit: page through them here, a tile's worth at a time. */}
-            {pages > 1 && (
-              <div className="flex h-7 items-center justify-between pl-1">
-                <p aria-live="polite" className="text-[12px] leading-4 text-[var(--tx2)] tabular-nums">
-                  {at * per + 1}–{at * per + shown.length} of {total}
-                </p>
-                <div className="flex items-center">
-                  <Tip label="Previous">
-                    <button type="button" onClick={() => turn(-1)} disabled={at === 0} aria-label={`Previous ${p.label}`} className={PAGE_BTN}>
-                      <ChevronLeft aria-hidden="true" size={16} strokeWidth={1.75} />
-                    </button>
-                  </Tip>
-                  <Tip label="Next">
-                    <button
-                      type="button"
-                      onClick={() => turn(1)}
-                      disabled={at === pages - 1}
-                      aria-label={`Next ${p.label}`}
-                      className={PAGE_BTN}
-                    >
-                      <ChevronRight aria-hidden="true" size={16} strokeWidth={1.75} />
-                    </button>
-                  </Tip>
-                </div>
-              </div>
-            )}
           </div>
+        </div>
+      )}
+
+      {/* More than fit: page through them here, a tile's worth at a time, from the tile's top right. */}
+      {total > 0 && pages > 1 && (
+        <div className="absolute top-3 right-3 flex items-center">
+          <p aria-live="polite" className="mr-1 text-[12px] leading-4 text-[var(--tx2)] tabular-nums">
+            {at * per + 1}–{at * per + shown.length} of {total}
+          </p>
+          <Tip label="Previous">
+            <button type="button" onClick={() => turn(-1)} disabled={at === 0} aria-label={`Previous ${p.label}`} className={PAGE_BTN}>
+              <ChevronLeft aria-hidden="true" size={16} strokeWidth={1.75} />
+            </button>
+          </Tip>
+          <Tip label="Next">
+            <button type="button" onClick={() => turn(1)} disabled={at === pages - 1} aria-label={`Next ${p.label}`} className={PAGE_BTN}>
+              <ChevronRight aria-hidden="true" size={16} strokeWidth={1.75} />
+            </button>
+          </Tip>
         </div>
       )}
     </section>
