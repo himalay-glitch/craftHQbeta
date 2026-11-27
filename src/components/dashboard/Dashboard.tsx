@@ -16,7 +16,6 @@ import { NewStoryPanel } from "./NewStoryPanel";
 import { QueueMessage } from "./QueueMessage";
 import { SetupBanner } from "./SetupBanner";
 import { useConnectionSetup } from "./setup";
-import { ShippedThisWeek } from "./ShippedThisWeek";
 import { StoryPanel, type StoryAction } from "./StoryPanel";
 import { StatPanel } from "./StatPanel";
 import { Toast, type ToastMessage } from "./Toast";
@@ -62,12 +61,12 @@ function useIsWide() {
 const visibleStoryButton = (id: number) =>
   Array.from(document.querySelectorAll<HTMLElement>(`[data-story="${id}"]`)).find((el) => el.offsetParent !== null);
 
-type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | { kind: "needs"; top: number } | null;
+type LocalPanel = { kind: "details"; tab: DetailsTab } | { kind: "new" } | { kind: "needs" } | null;
 
 /**
  * The dashboard island (DESIGN.md §5.6: what needs me, what's moving, what shipped), in three columns that fill
  * the width: Ready to review and Stuck on the left, Needs you in the middle (a deck of decisions, one at a time, or
- * the all clear), Running and Queued on the right; what shipped this week below, on the same grid.
+ * the all clear), Running and Queued on the right.
  */
 export function Dashboard({ data }: { data: DashboardData }) {
   const override = useStateOverride();
@@ -277,8 +276,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
     else if (answer.option.choice.kind === "act") act(story, answer.option.choice.action);
   };
 
-  // A story picked in Ready to review, Stuck or See all: bring that card to the top, showing the whole deck if the
-  // filter hides it.
+  // A story picked in Ready to review or Stuck: bring that card to the top, showing the whole deck if the filter
+  // hides it.
   const pick = (id: number) => {
     if (!visible.some((s) => s.id === id)) setNeed("all");
     setJump((j) => ({ id, key: (j?.key ?? 0) + 1 }));
@@ -364,7 +363,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                             onDecide={decide}
                             onOpen={open}
                             jump={jump}
-                            onSeeAll={(top) => openLocal({ kind: "needs", top })}
+                            onSeeAll={() => openLocal({ kind: "needs" })}
                           />
                         ) : (
                           <QueueMessage kind="filtered" onClear={() => setNeed("all")} />
@@ -438,9 +437,6 @@ export function Dashboard({ data }: { data: DashboardData }) {
               </div>
             </div>
 
-            <div className="mt-10 border-t border-[var(--line)] pt-6">
-              <ShippedThisWeek shipped={data.shipped} done={data.done + answered} total={data.totalStories} onOpen={open} />
-            </div>
           </>
         )}
       </main>
@@ -472,19 +468,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
             onOpenStory={open}
           />
         )}
-        {panel === "needs" && localPanel?.kind === "needs" && (
-          <NeedsPanel
-            key="needs"
-            stories={visible}
-            top={localPanel.top}
-            isWide={isWide}
-            onClose={() => closePanel()}
-            onPick={(id) => {
-              closePanel();
-              pick(id);
-            }}
-          />
-        )}
+        {panel === "needs" && <NeedsPanel key="needs" stories={visible} isWide={isWide} onClose={() => closePanel()} />}
         {panel === "new" && (
           <NewStoryPanel
             key="new"

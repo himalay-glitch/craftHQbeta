@@ -3,14 +3,13 @@ import styles from "./tokens.module.css";
 
 // A status indicator: a white icon in a solid circle, in the status pills' tones and icons (DESIGN.md §7.12).
 // Agents at work are green and turn (green reads as running); waiting is grey; a person's turn is amber; stuck is
-// red, with a soft ring pulsing out; shipped is the darker success ink, still, so it never reads as running. At 0 it goes grey and still, so colour only shows where there's something to
+// red, with a soft ring pulsing out. At 0 it goes grey and still, so colour only shows where there's something to
 // look at. Every fill keeps the icon above 3:1 (WCAG's bar for graphics).
 export const TONE = {
   active: "bg-[#16A34A] text-white",
   neutral: "bg-[#8E8F94] text-white",
   attention: "bg-[#D97706] text-white",
   negative: "bg-[#DC2626] text-white",
-  done: "bg-[var(--success-ink)] text-white",
 } as const;
 export type Tone = keyof typeof TONE;
 
@@ -20,7 +19,6 @@ export const DOT: Record<Tone, string> = {
   neutral: "bg-[#8E8F94]",
   attention: "bg-[#D97706]",
   negative: "bg-[#DC2626]",
-  done: "bg-[var(--success-ink)]",
 };
 
 const SIZES = { 20: { box: "size-5", icon: 12 }, 24: { box: "size-6", icon: 14 }, 28: { box: "size-7", icon: 16 } } as const;

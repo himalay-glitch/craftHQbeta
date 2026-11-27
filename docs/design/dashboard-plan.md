@@ -1,6 +1,6 @@
 # Dashboard
 
-Version 7 · 27 Nov 2026 · branch `himalay/dashboard-deck` · route `/dashboard`
+Version 8 · 27 Nov 2026 · branch `himalay/dashboard-deck` · route `/dashboard`
 
 What the dashboard is, where its look and content come from, and how it behaves. It describes the code in `src/pages/dashboard/`, `src/components/dashboard/`, `src/components/shell/` and `src/layouts/AppLayout.astro`.
 
@@ -38,13 +38,12 @@ What the dashboard is, where its look and content come from, and how it behaves.
 │    │ │ Android: change t…  │  │ └──────────────────────────┘ │    │                     │    │
 │    │ └─────────────────────┘  └──────────────────────────────┘    └─────────────────────┘    │
 │    │                               ‹   See all ⌄   ›                                         │
-│ ⚙  │ ─────────────────────────────────────────────────────────────────────────────────────── │
-│ ◫  │ (✓) Shipped this week     ⑂ Home feed: upcoming events…  2h ago  ⑂ Invite friends…  Yest. │
-│    │ 4 · 6 of 43 stories done  ⑂ Profile photo upload        Tuesday ⑂ RSVP with a gu… Monday │
+│ ⚙  │                                                                                         │
+│ ◫  │                                                                                         │
 └────┴─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 px apart. The side tiles stretch to the deck's height (3 : 2 in each column), so nothing beside the deck is blank. Version 6 is the calm pass: nothing on the page says the same thing twice, there are no ids or times beside the deck, and the answers sit in one list instead of four boxes. Under 1024 px Needs you comes first, then the side cards two by two (one by one on phones). The agents live in the sidebar, so the dashboard doesn't repeat them. **When nothing needs you,** the deck cross-fades (150 ms out, 200 ms in) to the all clear.
+Three columns fill the width: `minmax(0, 1fr) · 480 px · minmax(0, 1fr)`, 24 px apart. The side tiles stretch to the deck's height (3 : 2 in each column), so nothing beside the deck is blank. Version 6 was the calm pass: nothing on the page says the same thing twice, there are no ids or times beside the deck, and the answers sit in one list instead of four boxes. Under 1024 px Needs you comes first, then the side cards two by two (one by one on phones). The agents live in the sidebar, so the dashboard doesn't repeat them. **When nothing needs you,** the deck cross-fades (150 ms out, 200 ms in) to the all clear.
 
 ## 3. Parts
 
@@ -84,13 +83,13 @@ One decision at a time: the stories waiting on you, plus Stuck, in the prototype
 - **The pile:** two cards under the top one, 16 and 32 px lower and a little smaller, so it reads as a deck. No rotation, ever (`DESIGN.md` §6.12).
 - **Browsing:** swiping only browses, so a stray swipe never approves anything: left sends the card to the back, right brings the last one back, with a "Later ›" or "‹ Back" tag fading in as you drag; the card lifts to 1.02 while held. ← → and the round arrow buttons do the same; 1–3 answer; the keys work in the deck, or anywhere while nothing else has the keyboard and no panel or menu is open. The numbers on the answers are their keys, so there's no hint line.
 - **Under the deck:** three quiet controls, centred: ‹ (Back), **See all** and › (Later). With one card left they go.
-- **See all (`NeedsPanel`):** the right-hand side panel (`SidePanel`; over the page from 1024 px, full width with a scrim below), titled Needs you with the count above. Every decision on the deck, grouped by kind in the queue's order. Each row is the question (14/20 medium, two lines at most) and under it the story, ID and when; the card on top says **On top**. When a group's rows all ask the same question (Ready to review), it's said once under the group's name ("Each asks: …") and the rows lead with their stories. Picking one closes the panel and puts it on top of the deck. It never drops down over the card.
+- **See all (`NeedsPanel`):** the right-hand side panel (`SidePanel`; over the page from 1024 px, full width with a scrim below), titled Needs you with the count above and "Open one to answer it in the story's chat." Every decision on the deck as a list of small horizontal cards, grouped by kind in the queue's order. Each card: a chat mark in a soft square (blue on hover), the story's title (14/20 medium) with when on the right, and under it the ID and the question. When a group's cards all ask the same question (Ready to review), it's said once under the group's name ("Each asks: …") and the cards show only the ID. A card is a link to the story's chat on the Stories page (`/stories/hq-21`), where the question is asked and answered. It never drops down over the card.
 
 ### All clear (`AllClear`)
 `DESIGN.md` §6.7: the PM (64 px, blinking), "Nothing needs you", "The agents will ask here when they need you.", centred, at most 360 px wide, no action; plus "You answered 14 decisions" when you cleared it yourself.
 
-### Shipped this week (`ShippedThisWeek`)
-`DESIGN.md` §5.6's third question, what shipped: proof the work is moving, and the way to check it. It sits under a hairline, unboxed, on the columns' grid. Under the left tiles: a still, dark green check (`Indicator` tone `done`, so it never reads as running), "Shipped this week", the week's merges as a KPI number, and the project's progress ("6 of 43 stories done"). Beside it, under the deck and the right tiles: what merged, newest first, in two columns, each with a merge mark, its title and when; each opens its story. There's no timeline: the merges aren't evenly spaced in time, so points on a line would say something false. On phones it's one column, with no sideways scroll. With nothing merged: 0 and "Nothing has merged this week yet."
+### Shipped this week (removed)
+Removed on 27 Nov at Himalay's call: it didn't help anyone act, and finished work already shows on the Stories board. `DESIGN.md` §5.6 still lists "what shipped" as the dashboard's third question, so the document needs a shared-file PR to match.
 
 ### Indicators (`Indicator`)
 A white icon in a solid circle, in the status pills' tones (`DESIGN.md` §7.12): agents at work green `#16A34A` (turning), waiting grey `#8E8F94`, a person's turn amber `#D97706`, stuck red `#DC2626`; grey and still at 0. Every fill keeps the icon above 3:1. Values are never coloured.

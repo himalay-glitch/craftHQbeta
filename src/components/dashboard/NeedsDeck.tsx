@@ -106,10 +106,10 @@ interface NeedsDeckProps {
   stories: Story[];
   onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
   onOpen: (id: number) => void;
-  /** A story picked beside the deck or in See all; each new key brings it to the top. */
+  /** A story picked beside the deck; each new key brings it to the top. */
   jump?: { id: number; key: number } | null;
-  /** See all: opens the side panel with every decision; gets the card on top. */
-  onSeeAll: (top: number) => void;
+  /** See all: opens the side panel with every decision, each a way into its story's chat. */
+  onSeeAll: () => void;
 }
 
 const ICON_BTN =
@@ -119,7 +119,7 @@ const ICON_BTN =
  * Needs you: one decision at a time, on a deck you can see the next ones under. Answer and the card says what
  * happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
  * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same, and 1–3 answer.
- * Under the deck, See all opens every decision in the side panel, to pick which comes next.
+ * Under the deck, See all opens every decision in the side panel, each a way into its story's chat.
  */
 export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDeckProps) {
   const reduced = useReducedMotion();
@@ -139,7 +139,7 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
   const next = order.slice(1).map((id) => byId.get(id)!);
   const topId = top?.id ?? null;
 
-  // A story picked beside the deck (Ready to review, Stuck) or in See all comes to the top, entering from the left.
+  // A story picked beside the deck (Ready to review, Stuck) comes to the top, entering from the left.
   const [lastJump, setLastJump] = useState(jump?.key ?? 0);
   if (jump && jump.key !== lastJump) {
     setLastJump(jump.key);
@@ -289,7 +289,7 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll }: NeedsDe
 
           <button
             type="button"
-            onClick={() => onSeeAll(top.id)}
+            onClick={onSeeAll}
             aria-haspopup="dialog"
             className="inline-flex h-9 items-center rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.04]"
           >

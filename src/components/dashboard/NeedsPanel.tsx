@@ -1,5 +1,5 @@
 import { useEffect, useId } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, MessageCircle } from "lucide-react";
 import type { Story } from "@/types/dashboard";
 import { decisionFor, KINDS } from "./decisions";
 import { storyRef } from "./format";
@@ -8,29 +8,26 @@ import { SidePanel } from "./SidePanel";
 interface NeedsPanelProps {
   /** What's on the deck, in the queue's order. */
   stories: Story[];
-  /** The card on top of the deck when the panel opened. */
-  top: number | null;
   isWide: boolean;
   onClose: () => void;
-  /** Puts that decision on top of the deck (the panel closes). */
-  onPick: (id: number) => void;
 }
 
+/** The story's own page, where its chat is: the agent's question is asked there, and answered there. */
+const chatHref = (id: number) => `/stories/${storyRef(id)}`;
+
 /**
- * See all: every decision on the deck, in the side panel that slides in from the right, grouped by kind. Each one
- * is its question, the card's headline, with the story under it (a question every row in a group shares is said
- * once, under the group's name), so you can scan them all and pick the one to answer first. Picking puts it on
- * top of the deck and closes the panel; the answering stays on the card.
+ * See all: every decision on the deck, in the side panel that slides in from the right, as a list of small
+ * horizontal cards grouped by kind. Each card is its story's title with the question under it; opening one goes to
+ * that story's chat on the Stories page. A question every card in a group shares (Ready to review) is said once,
+ * under the group's name, and those cards show the story's ID instead.
  */
-export function NeedsPanel({ stories, top, isWide, onClose, onPick }: NeedsPanelProps) {
+export function NeedsPanel({ stories, isWide, onClose }: NeedsPanelProps) {
   const id = useId();
 
   useEffect(() => {
     document.querySelector<HTMLElement>("[data-panel-title]")?.focus();
   }, []);
 
-  // When every decision in a group asks the same thing (Ready to review: "Rebuild it before it merges?"), the
-  // question is said once under the group's name and the rows lead with their stories.
   const groups = KINDS.map((k) => {
     const items = stories.filter((s) => s.need === k.kind).map((s) => ({ story: s, question: decisionFor(s).question }));
     const shared = items.length > 1 && items.every((i) => i.question === items[0].question) ? items[0].question : null;
@@ -45,47 +42,41 @@ export function NeedsPanel({ stories, top, isWide, onClose, onPick }: NeedsPanel
       isWide={isWide}
       onClose={onClose}
     >
-      <p className="mt-1 text-[14px] leading-5 text-[var(--tx2)]">Pick one to answer it on the deck.</p>
+      <p className="mt-1 text-[14px] leading-5 text-[var(--tx2)]">Open one to answer it in the story’s chat.</p>
 
       {groups.map((g) => (
         <section key={g.kind} aria-labelledby={`${id}-${g.kind}`} className="mt-6">
           <h3 id={`${id}-${g.kind}`} className="text-[13px] leading-[18px] font-medium text-[var(--tx2)]">
             {g.label} <span className="font-normal tabular-nums">· {g.items.length}</span>
           </h3>
-          {g.shared && <p className="mt-1 text-[13px] leading-[18px] text-[var(--tx2)]">Each asks: {g.shared}</p>}
-          <ul className="mt-1 list-none">
-            {g.items.map(({ story: s, question }) => {
-              const onTop = s.id === top;
-              return (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => onPick(s.id)}
-                    aria-current={onTop ? "true" : undefined}
-                    className="group -mx-3 flex w-[calc(100%+24px)] items-start gap-3 rounded-[10px] px-3 py-2.5 text-left transition-colors duration-[80ms] hover:bg-[var(--row-h)]"
+          {g.shared && <p className="mt-0.5 text-[13px] leading-[18px] text-[var(--tx2)]">Each asks: {g.shared}</p>}
+          <ul className="mt-2 flex list-none flex-col gap-2">
+            {g.items.map(({ story: s, question }) => (
+              <li key={s.id}>
+                <a
+                  href={chatHref(s.id)}
+                  className="group flex items-center gap-3 rounded-[12px] border border-[var(--card-line)] bg-white py-2.5 pr-3 pl-2.5 transition-[background-color,border-color] duration-[120ms] hover:border-[var(--ctl-h)] hover:bg-[var(--ctl-bg-h)]"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex size-8 flex-none items-center justify-center rounded-[8px] bg-[#F1F1F2] text-[var(--tx2)] transition-colors duration-[120ms] group-hover:bg-[#E3ECFD] group-hover:text-[var(--cta)]"
                   >
-                    <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 text-[14px] leading-5 font-medium text-[var(--tx)]">{g.shared ? s.title : question}</span>
-                      <span className="mt-0.5 block truncate text-[13px] leading-[18px] text-[var(--tx2)]">
-                        {!g.shared && `${s.title} · `}
-                        <span className="tabular-nums">{storyRef(s.id)}</span>
-                        {s.updated && ` · ${s.updated}`}
-                      </span>
+                    <MessageCircle size={16} strokeWidth={1.75} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[14px] leading-5 font-medium text-[var(--tx)]">{s.title}</span>
+                      {s.updated && <span className="flex-none text-[12px] leading-4 text-[var(--tx2)]">{s.updated}</span>}
                     </span>
-                    {onTop ? (
-                      <span className="mt-px flex-none rounded-full bg-[#EEF4FF] px-2 py-0.5 text-[12px] leading-4 font-medium text-[#1F57C3]">On top</span>
-                    ) : (
-                      <ChevronRight
-                        aria-hidden="true"
-                        size={16}
-                        strokeWidth={1.75}
-                        className="mt-0.5 flex-none text-[var(--tx2)] opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-visible:opacity-100"
-                      />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
+                    <span className="block truncate text-[13px] leading-[18px] text-[var(--tx2)]">
+                      <span className="tabular-nums">{storyRef(s.id)}</span>
+                      {!g.shared && ` · ${question}`}
+                    </span>
+                  </span>
+                  <ChevronRight aria-hidden="true" size={16} strokeWidth={1.75} className="flex-none text-[var(--tx2)]" />
+                </a>
+              </li>
+            ))}
           </ul>
         </section>
       ))}
