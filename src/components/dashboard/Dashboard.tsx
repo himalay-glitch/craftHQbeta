@@ -328,8 +328,13 @@ export function Dashboard({ data }: { data: DashboardData }) {
   return (
     <Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
       {/* Panels float over the page from the right; the page keeps its full width underneath. */}
-      {/* No page scroll on a desktop: the columns fit the window, and tighten on short screens (820 px and less). */}
-      <main id="main" className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-6 md:px-8 [@media(max-height:820px)]:pt-4 [@media(max-height:820px)]:pb-4">
+      {/* No page scroll on a desktop: the columns fill the window's height (up to 680 px), and tighten on short screens
+          (820 px and less). The row's height comes from the window, never from the card on top, so browsing the deck
+          never resizes the tiles beside it. */}
+      <main
+        id="main"
+        className="mx-auto w-full max-w-[1344px] px-4 pt-6 pb-6 md:px-8 lg:flex lg:min-h-[calc(100dvh-var(--bar-h))] lg:flex-col [@media(max-height:820px)]:pt-4 [@media(max-height:820px)]:pb-4"
+      >
         {/* The project's name is in the top bar, after the logo; the page keeps it as its heading for screen readers. */}
         <h1 id="dashboard-title" tabIndex={-1} className="sr-only">
           {data.project} dashboard
@@ -349,7 +354,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
           <>
             {/* Three columns that fill the width: what to review and what's stuck, Needs you with its deck in the
                 middle, what's running and queued. The side cards stretch to the deck's height. */}
-            <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_528px_minmax(0,1fr)] [@media(max-height:820px)]:mt-4">
+            <div className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:max-h-[680px] lg:flex-1 lg:gap-6 xl:grid-cols-[minmax(0,1fr)_528px_minmax(0,1fr)] [@media(max-height:820px)]:mt-4">
               {/* Needs you is a tray, top to bottom of the tiles beside it: its header (the title, the deck's controls on
                   the right) and the deck sit inside it, so nothing floats on the page around the card. */}
               <section
@@ -377,7 +382,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                   <div ref={setDeckControls} className="flex flex-none items-center gap-0.5" />
                 </header>
 
-                <div className="mt-4 flex-1 [@media(max-height:820px)]:mt-3">
+                <div className="mt-4 flex flex-1 flex-col [@media(max-height:820px)]:mt-3">
                   {override === "error" ? (
                     <QueueMessage kind="error" onRetry={() => window.location.assign(window.location.pathname)} />
                   ) : (
@@ -388,6 +393,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                         initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.2, 0, 0, 1] } }}
                         exit={{ opacity: 0, transition: { duration: 0.15, ease: [0.4, 0, 1, 1] } }}
+                        className="flex flex-1 flex-col"
                       >
                         {allClear ? (
                           <AllClear answered={answered} />

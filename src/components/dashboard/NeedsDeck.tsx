@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -17,11 +17,27 @@ const EASE_OUT = [0.2, 0, 0, 1] as const;
 const EASE_IN = [0.4, 0, 1, 1] as const;
 // The cards either side of the top one: the next on the right and the one before on the left, each a little smaller
 // and tilted out to its side, so the deck reads as browsing left and right, as its ‹ › do. Only resting cards tilt;
-// the one you hold never does (§6.12).
-const PILE = {
-  next: { x: 24, y: 10, rotate: 3.5, scale: 0.95 },
-  prev: { x: -24, y: 10, rotate: -3.5, scale: 0.95 },
-} as const;
+// the one you hold never does (§6.12). From 1280 px the middle column is wider, so they fan out further; below it they
+// stay inside the tray's own padding, so the card keeps its width (440 px) either way.
+type Spot = { x: number; y: number; rotate: number; scale: number };
+const PILES: Record<"wide" | "snug", { next: Spot; prev: Spot }> = {
+  wide: { next: { x: 24, y: 10, rotate: 3.5, scale: 0.95 }, prev: { x: -24, y: 10, rotate: -3.5, scale: 0.95 } },
+  snug: { next: { x: 12, y: 8, rotate: 2, scale: 0.96 }, prev: { x: -12, y: 8, rotate: -2, scale: 0.96 } },
+};
+const ROOMY = "(min-width: 1280px)";
+const onRoomy = (change: () => void) => {
+  const query = window.matchMedia(ROOMY);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+};
+const useRoomy = () =>
+  useSyncExternalStore(
+    onRoomy,
+    () => window.matchMedia(ROOMY).matches,
+    () => false,
+  );
+
+type Custom = { move: Move; pile: { next: Spot; prev: Spot } };
 const SWIPE = 110; // px dragged, or …
 const FLICK = 500; // … px/s flicked, to count as a swipe
 const SAY_MS = 700; // how long the card says what happened before it leaves
@@ -29,12 +45,12 @@ const SAY_MS = 700; // how long the card says what happened before it leaves
 // Later: the top card goes into the left pile and the right one comes forward. Back: the reverse. Answered: it lifts
 // away and the right one comes forward.
 const variants = {
-  enter: (m: Move) => ({ opacity: 0, ...(m === "back" ? PILE.prev : PILE.next) }),
+  enter: ({ move, pile }: Custom) => ({ opacity: 0, ...(move === "back" ? pile.prev : pile.next) }),
   center: { opacity: 1, x: 0, y: 0, rotate: 0, scale: 1, transition: { duration: 0.26, ease: EASE_OUT } },
-  exit: (m: Move) =>
-    m === "answered"
+  exit: ({ move, pile }: Custom) =>
+    move === "answered"
       ? { opacity: 0, y: -28, scale: 0.98, transition: { duration: 0.18, ease: EASE_IN } }
-      : { opacity: 0, ...(m === "later" ? PILE.prev : PILE.next), transition: { duration: 0.2, ease: EASE_IN } },
+      : { opacity: 0, ...(move === "later" ? pile.prev : pile.next), transition: { duration: 0.2, ease: EASE_IN } },
 };
 const fades = {
   enter: { opacity: 0 },
@@ -45,14 +61,14 @@ const fades = {
 /** The card on top. It owns its drag, so a card on its way out never moves the one taking its place. */
 function TopCard({
   id,
-  move,
+  custom,
   reduced,
   draggable,
   onSwipe,
   children,
 }: {
   id: number;
-  move: Move;
+  custom: Custom;
   reduced: boolean;
   draggable: boolean;
   onSwipe: (dir: "later" | "back") => void;
@@ -70,7 +86,7 @@ function TopCard({
       data-deck-top
       data-deck-id={id}
       tabIndex={-1}
-      custom={move}
+      custom={custom}
       variants={reduced ? fades : variants}
       initial="enter"
       animate="center"
@@ -82,7 +98,7 @@ function TopCard({
       whileDrag={{ scale: 1.02, cursor: "grabbing" }}
       onDragEnd={onDragEnd}
       style={{ x, zIndex: 3 }}
-      className={`relative rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6 [@media(min-width:640px)_and_(max-height:820px)]:p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
+      className={`relative flex flex-1 flex-col rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6 [@media(min-width:640px)_and_(max-height:820px)]:p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
     >
       {/* Swipe hints, fading in with the drag. */}
       <motion.span
@@ -129,6 +145,7 @@ const ICON_BTN =
  */
 export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls }: NeedsDeckProps) {
   const reduced = useReducedMotion();
+  const pile = PILES[useRoomy() ? "wide" : "snug"];
   const [seq, setSeq] = useState<number[]>([]);
   const [move, setMove] = useState<Move>("answered");
   const [sent, setSent] = useState<{ id: number; text: string } | null>(null);
@@ -258,18 +275,19 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls 
       onBlur={(e) => {
         if (e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) hadFocus.current = false;
       }}
-      className="min-w-0"
+      className="flex min-w-0 flex-1 flex-col"
     >
       {/* The deck: the top card, with the next one tilted out on its right and the one before on its left. */}
-      {/* Room either side and below for the tilted cards' corners. */}
-      <div className="relative px-5 pb-4 sm:px-6">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 bottom-4 sm:inset-x-6">
+      {/* Room below, and either side where the tray's padding isn't enough, for the tilted cards' corners. On a
+          desktop the card fills the height the tray gives it, whatever it says. */}
+      <div className="relative flex flex-1 flex-col px-3 pb-4 lg:px-0 xl:px-6">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-3 top-0 bottom-4 lg:inset-x-0 xl:inset-x-6">
           <AnimatePresence initial={false}>
             {piles.map((side) => (
               <motion.div
                 key={side}
-                initial={{ opacity: 0, ...PILE[side] }}
-                animate={{ opacity: 1, ...PILE[side] }}
+                initial={{ opacity: 0, ...pile[side] }}
+                animate={{ opacity: 1, ...pile[side] }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, ease: EASE_OUT }}
                 className="absolute inset-0 rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.14)]"
@@ -278,11 +296,11 @@ export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls 
           </AnimatePresence>
         </div>
 
-        <AnimatePresence initial={false} mode="popLayout" custom={move}>
+        <AnimatePresence initial={false} mode="popLayout" custom={{ move, pile }}>
           <TopCard
             key={top.id}
             id={top.id}
-            move={move}
+            custom={{ move, pile }}
             reduced={!!reduced}
             draggable={!sent && order.length > 1}
             onSwipe={(dir) => (dir === "later" ? later() : back())}

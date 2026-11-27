@@ -19,18 +19,18 @@ function Tile({ names, grow }: { names: number; grow: string }) {
 /** Loading: the three columns in their final shape, so nothing jumps when data arrives. */
 export function DashboardSkeleton() {
   return (
-    <div aria-hidden="true" className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_528px_minmax(0,1fr)]">
-      <div className="rounded-[20px] border border-black/[0.05] bg-black/[0.025] p-3 sm:p-4 lg:order-2 lg:p-5">
+    <div aria-hidden="true" className="mt-6 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_480px_minmax(0,1fr)] lg:max-h-[680px] lg:flex-1 lg:gap-6 xl:grid-cols-[minmax(0,1fr)_528px_minmax(0,1fr)]">
+      <div className="flex flex-col rounded-[20px] border border-black/[0.05] bg-black/[0.025] p-3 sm:p-4 lg:order-2 lg:p-5">
         <span className="flex h-8 items-center justify-between pl-1">
           <span className={`${SKELETON} block h-5 w-28`} />
           <span className={`${SKELETON} block h-5 w-24`} />
         </span>
-        <div className="relative mt-4 px-5 pb-4 sm:px-6">
-          <div className="absolute inset-x-5 top-0 bottom-4 sm:inset-x-6">
-            <div className="absolute inset-0 -translate-x-[24px] translate-y-[10px] -rotate-[3.5deg] scale-[0.95] rounded-[24px] border border-black/[0.06] bg-white" />
-            <div className="absolute inset-0 translate-x-[24px] translate-y-[10px] rotate-[3.5deg] scale-[0.95] rounded-[24px] border border-black/[0.06] bg-white" />
+        <div className="relative mt-4 flex flex-1 flex-col px-3 pb-4 lg:px-0 xl:px-6">
+          <div className="absolute inset-x-3 top-0 bottom-4 lg:inset-x-0 xl:inset-x-6">
+            <div className="absolute inset-0 -translate-x-[12px] translate-y-[8px] -rotate-2 scale-[0.96] rounded-[24px] border border-black/[0.06] bg-white xl:-translate-x-[24px] xl:translate-y-[10px] xl:-rotate-[3.5deg] xl:scale-[0.95]" />
+            <div className="absolute inset-0 translate-x-[12px] translate-y-[8px] rotate-2 scale-[0.96] rounded-[24px] border border-black/[0.06] bg-white xl:translate-x-[24px] xl:translate-y-[10px] xl:rotate-[3.5deg] xl:scale-[0.95]" />
           </div>
-          <div className="relative rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
+          <div className="relative flex-1 rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6">
             <span className="flex items-center justify-between">
               <span className={`${SKELETON} block h-5 w-20 rounded-full`} />
               <span className={`${SKELETON} -my-1.5 -mr-1.5 block size-8 rounded-full`} />

@@ -45,7 +45,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
   const otherKey = decision.options.length + 1;
 
   return (
-    <article aria-labelledby={qId} className="relative">
+    <article aria-labelledby={qId} className="relative flex flex-1 flex-col">
       <div className="flex min-w-0 items-center gap-2 text-[13px] leading-[18px] text-[var(--tx2)]">
         {story.need && <StatusPill status={NEED_STATUS[story.need]} />}
         {story.updated && <span className="min-w-0 truncate">{story.updated}</span>}
@@ -102,7 +102,7 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
             e.currentTarget.requestSubmit();
           }
         }}
-        className="mt-5 [@media(max-height:820px)]:mt-4"
+        className="mt-5 flex flex-1 flex-col [@media(max-height:820px)]:mt-4"
       >
         <fieldset className="min-w-0 divide-y divide-[var(--line)] overflow-hidden rounded-[16px] border border-[var(--card-line)]">
           <legend className="sr-only">Your answer</legend>
@@ -176,8 +176,9 @@ export function DecisionCard({ story, decision, sent, choice, onSelect, onChoose
           </div>
         </fieldset>
 
-        {/* The one button, Submit: it sends whichever answer is chosen. */}
-        <div className="mt-4 flex justify-end [@media(max-height:820px)]:mt-3">
+        {/* The one button, Submit: it sends whichever answer is chosen. It sits at the card's foot, so it's in the same
+            place on every card. */}
+        <div className="mt-auto flex justify-end pt-4 [@media(max-height:820px)]:pt-3">
           <button type="submit" disabled={choice === "other" && !text.trim()} className={`${BTN_PRIMARY} h-10 px-4`}>
             Submit
             <kbd aria-hidden="true" className="hidden font-sans text-white/70 [@media(pointer:fine)]:inline">
