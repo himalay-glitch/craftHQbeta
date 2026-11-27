@@ -24,13 +24,8 @@ export const askData: AskData = {
     status: r.status === "In progress" ? "building" : "checking",
     detail: r.updated || undefined,
   })),
-  // The demo's week of merges (the dashboard's sample has only the count).
-  merged: [
-    { id: 5, title: "Home feed: upcoming events near you", status: "merged", detail: "Merged 2h ago" },
-    { id: 31, title: "Invite friends to an event by link", status: "merged", detail: "Merged yesterday" },
-    { id: 19, title: "Profile photo upload", status: "merged", detail: "Merged Tuesday" },
-    { id: 16, title: "RSVP with a guest count", status: "merged", detail: "Merged Monday" },
-  ],
+  // This week's merges: the dashboard's "Shipped this week".
+  merged: d.shipped.map((s) => ({ id: s.id, title: s.title, status: "merged", detail: `Merged ${s.when}` })),
   nextStoryId: d.nextStoryId,
 };
 

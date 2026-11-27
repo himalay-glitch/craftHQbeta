@@ -1,0 +1,345 @@
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { Story } from "@/types/dashboard";
+import { DecisionCard, type Choice } from "./DecisionCard";
+import { decisionFor, type DecisionOption, type DecisionReply } from "./decisions";
+
+type KeyLike = Pick<globalThis.KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "preventDefault"> & {
+  target: EventTarget | null;
+};
+
+/** How the top card leaves: you answered, you sent it to the back (Later), or an earlier card comes back on top. */
+type Move = "answered" | "later" | "back";
+
+const EASE_OUT = [0.2, 0, 0, 1] as const;
+const EASE_IN = [0.4, 0, 1, 1] as const;
+// The cards either side of the top one: the next on the right and the one before on the left, each a little smaller
+// and tilted out to its side, so the deck reads as browsing left and right, as its ‹ › do. Only resting cards tilt;
+// the one you hold never does (§6.12). From 1280 px the middle column is wider, so they fan out further; below it they
+// stay inside the tray's own padding, so the card keeps its width (440 px) either way.
+type Spot = { x: number; y: number; rotate: number; scale: number };
+const PILES: Record<"wide" | "snug", { next: Spot; prev: Spot }> = {
+  wide: { next: { x: 24, y: 10, rotate: 3.5, scale: 0.95 }, prev: { x: -24, y: 10, rotate: -3.5, scale: 0.95 } },
+  snug: { next: { x: 12, y: 8, rotate: 2, scale: 0.96 }, prev: { x: -12, y: 8, rotate: -2, scale: 0.96 } },
+};
+const ROOMY = "(min-width: 1280px)";
+const onRoomy = (change: () => void) => {
+  const query = window.matchMedia(ROOMY);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+};
+const useRoomy = () =>
+  useSyncExternalStore(
+    onRoomy,
+    () => window.matchMedia(ROOMY).matches,
+    () => false,
+  );
+
+type Custom = { move: Move; pile: { next: Spot; prev: Spot } };
+const SWIPE = 110; // px dragged, or …
+const FLICK = 500; // … px/s flicked, to count as a swipe
+const SAY_MS = 700; // how long the card says what happened before it leaves
+
+// Later: the top card goes into the left pile and the right one comes forward. Back: the reverse. Answered: it lifts
+// away and the right one comes forward.
+const variants = {
+  enter: ({ move, pile }: Custom) => ({ opacity: 0, ...(move === "back" ? pile.prev : pile.next) }),
+  center: { opacity: 1, x: 0, y: 0, rotate: 0, scale: 1, transition: { duration: 0.26, ease: EASE_OUT } },
+  exit: ({ move, pile }: Custom) =>
+    move === "answered"
+      ? { opacity: 0, y: -28, scale: 0.98, transition: { duration: 0.18, ease: EASE_IN } }
+      : { opacity: 0, ...(move === "later" ? pile.prev : pile.next), transition: { duration: 0.2, ease: EASE_IN } },
+};
+const fades = {
+  enter: { opacity: 0 },
+  center: { opacity: 1, transition: { duration: 0.15 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+};
+
+/** The card on top. It owns its drag, so a card on its way out never moves the one taking its place. */
+function TopCard({
+  id,
+  custom,
+  reduced,
+  draggable,
+  onSwipe,
+  children,
+}: {
+  id: number;
+  custom: Custom;
+  reduced: boolean;
+  draggable: boolean;
+  onSwipe: (dir: "later" | "back") => void;
+  children: ReactNode;
+}) {
+  const x = useMotionValue(0);
+  const laterHint = useTransform(x, [-SWIPE, -24], [1, 0]);
+  const backHint = useTransform(x, [24, SWIPE], [0, 1]);
+  const onDragEnd = (_: unknown, info: PanInfo) => {
+    if (info.offset.x < -SWIPE || info.velocity.x < -FLICK) onSwipe("later");
+    else if (info.offset.x > SWIPE || info.velocity.x > FLICK) onSwipe("back");
+  };
+  return (
+    <motion.div
+      data-deck-top
+      data-deck-id={id}
+      tabIndex={-1}
+      custom={custom}
+      variants={reduced ? fades : variants}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      drag={draggable ? "x" : false}
+      dragSnapToOrigin
+      dragElastic={0.7}
+      dragConstraints={{ left: 0, right: 0 }}
+      whileDrag={{ scale: 1.02, cursor: "grabbing" }}
+      onDragEnd={onDragEnd}
+      style={{ x, zIndex: 3 }}
+      className={`relative flex flex-1 flex-col rounded-[24px] border border-black/[0.06] bg-white p-5 sm:p-6 [@media(min-width:640px)_and_(max-height:820px)]:p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-16px_rgb(0_0_0/0.14)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]/40 ${draggable ? "cursor-grab" : ""}`}
+    >
+      {/* Swipe hints, fading in with the drag. */}
+      <motion.span
+        aria-hidden="true"
+        style={{ opacity: laterHint }}
+        className="pointer-events-none absolute top-5 right-5 z-30 inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[12px] font-medium text-white"
+      >
+        Later <ChevronRight size={13} strokeWidth={2} />
+      </motion.span>
+      <motion.span
+        aria-hidden="true"
+        style={{ opacity: backHint }}
+        className="pointer-events-none absolute top-5 right-5 z-30 inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[12px] font-medium text-white"
+      >
+        <ChevronLeft size={13} strokeWidth={2} /> Back
+      </motion.span>
+      {children}
+    </motion.div>
+  );
+}
+
+interface NeedsDeckProps {
+  /** The stories that need you, in the queue's order (Need a fix first). */
+  stories: Story[];
+  onDecide: (story: Story, answer: { option: DecisionOption } | { reply: DecisionReply; text: string }) => void;
+  onOpen: (id: number) => void;
+  /** A story picked beside the deck; each new key brings it to the top. */
+  jump?: { id: number; key: number } | null;
+  /** See all: opens the side panel with every decision, each a way into its story's chat. */
+  onSeeAll: () => void;
+  /** Where See all and ‹ › go: the right of Needs you's header. */
+  controls: HTMLElement | null;
+}
+
+const ICON_BTN =
+  "inline-flex size-8 items-center justify-center rounded-full text-[var(--tx2)] transition-colors duration-[120ms] hover:bg-black/[0.05] hover:text-[var(--tx)] disabled:opacity-40 disabled:hover:bg-transparent";
+
+/**
+ * Needs you: one decision at a time, with the next card tilted out on its right and the one before on its left.
+ * Answer and the card says what happened, then lifts away. Swiping only browses, so a stray swipe never approves anything: left sends the card
+ * to the back (Later), right brings the last one back; ← → and the arrow buttons do the same. 1–4 choose an
+ * answer and Enter sends it.
+ * In the tray's header, See all opens every decision in the side panel, each a way into its story's chat.
+ */
+export function NeedsDeck({ stories, onDecide, onOpen, jump, onSeeAll, controls }: NeedsDeckProps) {
+  const reduced = useReducedMotion();
+  const pile = PILES[useRoomy() ? "wide" : "snug"];
+  const [seq, setSeq] = useState<number[]>([]);
+  const [move, setMove] = useState<Move>("answered");
+  const [sent, setSent] = useState<{ id: number; text: string } | null>(null);
+  // The chosen answer on the top card; a card that hasn't been touched starts on the recommended one.
+  const [picked, setPicked] = useState<{ id: number; choice: Choice } | null>(null);
+  const root = useRef<HTMLElement>(null);
+  const hadFocus = useRef(false);
+
+  // The order: stories you haven't moved, in the queue's order, then the ones you browsed past. A story that comes
+  // back (Undo) isn't in `seq`, so it lands on top.
+  const ids = stories.map((s) => s.id);
+  const order = [...ids.filter((id) => !seq.includes(id)), ...seq.filter((id) => ids.includes(id))];
+  const byId = new Map(stories.map((s) => [s.id, s]));
+  const top = order.length ? byId.get(order[0])! : null;
+  const decision = top ? decisionFor(top) : null;
+  // The piles: the next card on the right once there are two, the one before on the left once there are three.
+  const piles = order.length >= 3 ? (["prev", "next"] as const) : order.length === 2 ? (["next"] as const) : [];
+  const topId = top?.id ?? null;
+  const choice: Choice = picked && picked.id === topId ? picked.choice : 0;
+  const select = (c: Choice) => topId !== null && setPicked({ id: topId, choice: c });
+
+  // A story picked beside the deck (Awaiting review, Need a fix) comes to the top, entering from the left.
+  const [lastJump, setLastJump] = useState(jump?.key ?? 0);
+  if (jump && jump.key !== lastJump) {
+    setLastJump(jump.key);
+    if (ids.includes(jump.id) && jump.id !== topId && !sent) {
+      setMove("back");
+      setSeq([jump.id, ...order.filter((x) => x !== jump.id)]);
+    }
+  }
+
+  // If the keyboard was on the card that left, it moves to the new one.
+  useEffect(() => {
+    if (topId === null || !hadFocus.current) return;
+    const active = document.activeElement as HTMLElement | null;
+    const card = active?.closest<HTMLElement>("[data-deck-top]");
+    const stranded = !active || active === document.body || !active.isConnected || (card && card.dataset.deckId !== String(topId));
+    if (stranded) root.current?.querySelector<HTMLElement>(`[data-deck-top][data-deck-id="${topId}"]`)?.focus();
+  }, [topId]);
+
+  const later = () => {
+    if (order.length < 2 || sent) return;
+    setMove("later");
+    setSeq([...order.slice(1), order[0]]);
+  };
+  const back = () => {
+    if (order.length < 2 || sent) return;
+    setMove("back");
+    setSeq([order[order.length - 1], ...order.slice(0, -1)]);
+  };
+
+  const answer = (story: Story, says: string, done: () => void) => {
+    setMove("answered");
+    setSent({ id: story.id, text: says });
+    window.setTimeout(
+      () => {
+        setSent(null);
+        done();
+      },
+      reduced ? 400 : SAY_MS,
+    );
+  };
+
+  const choose = (option: DecisionOption) => {
+    if (!top || sent) return;
+    if (option.choice.kind === "open") return onOpen(top.id);
+    answer(top, option.says, () => onDecide(top, { option }));
+  };
+  const reply = (text: string) => {
+    if (!top || !decision || sent) return;
+    const r = decision.reply;
+    answer(top, r.says, () => onDecide(top, { reply: r, text }));
+  };
+
+  // ← → browse, 1–4 choose an answer, Enter sends it: inside the deck, or anywhere while nothing else has the
+  // keyboard and no panel is open. On a radio, the arrows are the radio group's own.
+  const onKeyDown = (e: KeyLike) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.("textarea, select, [contenteditable='true'], input:not([type='radio'])")) return;
+    const onRadio = target instanceof HTMLInputElement && target.type === "radio";
+    if (onRadio && e.key.startsWith("Arrow")) return;
+    if (e.key === "Enter" && target === document.body) {
+      e.preventDefault();
+      root.current?.querySelector<HTMLFormElement>(`[data-deck-id="${topId}"] [data-deck-form]`)?.requestSubmit();
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      later();
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      back();
+    } else if (decision && /^[1-9]$/.test(e.key)) {
+      const n = Number(e.key);
+      if (decision.options[n - 1]) {
+        e.preventDefault();
+        select(n - 1);
+      } else if (n === decision.options.length + 1) {
+        // The last number is Other: it chooses it and puts you in its box.
+        e.preventDefault();
+        select("other");
+        root.current?.querySelector<HTMLInputElement>(`[data-deck-id="${topId}"] [data-deck-other]`)?.focus();
+      }
+    }
+  };
+  const keys = useRef(onKeyDown);
+  useEffect(() => {
+    keys.current = onKeyDown;
+  });
+  useEffect(() => {
+    const onDocument = (e: globalThis.KeyboardEvent) => {
+      if (e.defaultPrevented || e.target !== document.body) return;
+      if (document.querySelector('[role="dialog"], dialog[open], [role="menu"]')) return;
+      keys.current(e);
+    };
+    document.addEventListener("keydown", onDocument);
+    return () => document.removeEventListener("keydown", onDocument);
+  }, []);
+
+  if (!top || !decision) return null;
+
+  return (
+    <section
+      ref={root}
+      aria-label={`Needs you, ${order.length} ${order.length === 1 ? "decision" : "decisions"}`}
+      onKeyDown={onKeyDown}
+      onFocus={() => (hadFocus.current = true)}
+      onBlur={(e) => {
+        if (e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) hadFocus.current = false;
+      }}
+      className="flex min-w-0 flex-1 flex-col"
+    >
+      {/* The deck: the top card, with the next one tilted out on its right and the one before on its left. */}
+      {/* Room below, and either side where the tray's padding isn't enough, for the tilted cards' corners. On a
+          desktop the card fills the height the tray gives it, whatever it says. */}
+      <div className="relative flex flex-1 flex-col px-3 pb-4 lg:px-0 xl:px-6">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-3 top-0 bottom-4 lg:inset-x-0 xl:inset-x-6">
+          <AnimatePresence initial={false}>
+            {piles.map((side) => (
+              <motion.div
+                key={side}
+                initial={{ opacity: 0, ...pile[side] }}
+                animate={{ opacity: 1, ...pile[side] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: EASE_OUT }}
+                className="absolute inset-0 rounded-[24px] border border-black/[0.06] bg-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.14)]"
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+
+        <AnimatePresence initial={false} mode="popLayout" custom={{ move, pile }}>
+          <TopCard
+            key={top.id}
+            id={top.id}
+            custom={{ move, pile }}
+            reduced={!!reduced}
+            draggable={!sent && order.length > 1}
+            onSwipe={(dir) => (dir === "later" ? later() : back())}
+          >
+            <DecisionCard
+              story={top}
+              decision={decision}
+              sent={sent?.id === top.id ? sent.text : null}
+              choice={choice}
+              onSelect={select}
+              onChoose={choose}
+              onReply={reply}
+              onOpen={() => onOpen(top.id)}
+            />
+          </TopCard>
+        </AnimatePresence>
+      </div>
+
+      {/* In the tray's header: See all (the side panel with every decision), then back and later. */}
+      {controls &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              onClick={onSeeAll}
+              aria-haspopup="dialog"
+              className="inline-flex h-8 items-center rounded-full px-3 text-[13px] leading-[18px] font-medium text-[var(--tx)] transition-colors duration-[120ms] hover:bg-black/[0.05]"
+            >
+              See all
+            </button>
+            <button type="button" onClick={back} disabled={order.length < 2} aria-label="Back" aria-keyshortcuts="ArrowLeft" className={ICON_BTN}>
+              <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.75} />
+            </button>
+            <button type="button" onClick={later} disabled={order.length < 2} aria-label="Later" aria-keyshortcuts="ArrowRight" className={ICON_BTN}>
+              <ChevronRight aria-hidden="true" size={18} strokeWidth={1.75} />
+            </button>
+          </>,
+          controls,
+        )}
+    </section>
+  );
+}
